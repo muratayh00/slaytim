@@ -2,15 +2,53 @@ import { MetadataRoute } from 'next';
 import { buildCategoryPath, buildSlideoPath, buildSlidePath, buildTopicPath } from '@/lib/url';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+const FETCH_TIMEOUT_MS = 5000;
+
+function toSafeDate(input?: string): Date {
+  if (!input) return new Date();
+  const parsed = new Date(input);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
 
 async function fetchJson<T>(path: string): Promise<T | null> {
+  if (!API_URL) return null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
   try {
-    const res = await fetch(`${API_URL}${path}`, { next: { revalidate: 3600 } });
+    const res = await fetch(`${API_URL}${path}`, {
+      next: { revalidate: 3600 },
+      signal: controller.signal,
+    });
+
     if (!res.ok) return null;
-    return res.json();
+
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+    const text = await res.text();
+    const payload = text.trim();
+    if (!payload) return null;
+
+    // Build safety: reject obvious HTML/error pages to avoid JSON parse crashes.
+    if (payload.startsWith('<!doctype') || payload.startsWith('<html') || payload.startsWith('<')) {
+      return null;
+    }
+
+    // Prefer explicit JSON responses, but still parse safely if header is missing.
+    if (contentType && !contentType.includes('json')) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(payload) as T;
+    } catch {
+      return null;
+    }
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -43,7 +81,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   );
   const topicPages: MetadataRoute.Sitemap = (topicsData?.topics ?? []).map((topic) => ({
     url: `${BASE_URL}${buildTopicPath({ id: topic.id, slug: topic.slug, title: topic.title })}`,
-    lastModified: new Date(topic.createdAt),
+    lastModified: toSafeDate(topic.createdAt),
     changeFrequency: 'weekly',
     priority: 0.7,
   }));
@@ -53,7 +91,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   );
   const slidePages: MetadataRoute.Sitemap = (slidesData ?? []).map((slide) => ({
     url: `${BASE_URL}${buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title })}`,
-    lastModified: new Date(slide.createdAt),
+    lastModified: toSafeDate(slide.createdAt),
     changeFrequency: 'monthly',
     priority: 0.65,
   }));
@@ -63,7 +101,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   );
   const slideoPages: MetadataRoute.Sitemap = (slideoData?.slideos ?? []).map((slideo) => ({
     url: `${BASE_URL}${buildSlideoPath({ id: slideo.id, title: slideo.title })}`,
-    lastModified: new Date(slideo.createdAt),
+    lastModified: toSafeDate(slideo.createdAt),
     changeFrequency: 'weekly',
     priority: 0.7,
   }));
