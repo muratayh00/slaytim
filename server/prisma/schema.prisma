@@ -1,0 +1,826 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  avatarUrl    String?  @map("avatar_url")
+  bio          String?
+  role         String   @default("user") @map("role") // user | moderator | support | analytics | operations | super_admin
+  isAdmin      Boolean  @default(false) @map("is_admin")
+  isMuted      Boolean  @default(false) @map("is_muted")
+  isBanned     Boolean  @default(false) @map("is_banned")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  topics             Topic[]
+  slides             Slide[]
+  topicLikes         TopicLike[]
+  slideLikes         SlideLike[]
+  savedSlides        SavedSlide[]
+  collections        Collection[]
+  followedCollections CollectionFollow[]
+  topicSubscriptions TopicSubscription[]
+  roomsOwned         Room[]             @relation("room_owner")
+  roomMemberships    RoomMember[]
+  following          FollowedUser[]    @relation("follower")
+  followers          FollowedUser[]    @relation("following")
+  followedCategories FollowedCategory[]
+  visitedTopics      VisitedTopic[]
+  comments           Comment[]
+  notifications      Notification[]
+  reports            Report[]
+  blocking           BlockedUser[]     @relation("blocker")
+  blockedBy          BlockedUser[]     @relation("blocked")
+  warnings           UserWarning[]
+  userBadges         UserBadge[]
+  resetTokens        PasswordResetToken[]
+  slideos            Slideo[]
+  slideoLikes        SlideoLike[]
+  slideoSaves        SlideoSave[]
+  slideoCompletions  SlideoCompletion[]
+  slideoShares       SlideoShare[]
+  slideoSeries       SlideoSeries[]
+  slideoSessions     SlideoSession[]
+  slidePageReactions SlidePageReaction[]
+  slidePageComments  SlidePageComment[]
+  slideViewSessions  SlideViewSession[]
+  adminLogs          AdminLog[]        @relation("adminLogs")
+  flashcardSets      FlashcardSet[]
+  flashcardAttempts  FlashcardAttempt[]
+  roomMessages       RoomMessage[]
+
+  @@map("users")
+}
+
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  topics             Topic[]
+  followedCategories FollowedCategory[]
+
+  @@map("categories")
+}
+
+model Topic {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @map("user_id")
+  categoryId  Int       @map("category_id")
+  roomId      Int?      @map("room_id")
+  title       String
+  description String?
+  slug        String?   @unique
+  likesCount    Int       @default(0) @map("likes_count")
+  viewsCount    Int       @default(0) @map("views_count")
+  pinnedSlideId Int?      @map("pinned_slide_id")
+  isHidden      Boolean   @default(false) @map("is_hidden")
+  deletedAt     DateTime? @map("deleted_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime? @updatedAt @map("updated_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    Category @relation(fields: [categoryId], references: [id])
+  room        Room?    @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  pinnedSlide Slide?   @relation("pinnedSlide", fields: [pinnedSlideId], references: [id], onDelete: SetNull)
+  slides      Slide[]
+  likes       TopicLike[]
+  visits      VisitedTopic[]
+  comments    Comment[]
+  subscriptions TopicSubscription[]
+
+  @@index([userId])
+  @@index([categoryId])
+  @@index([roomId])
+  @@index([viewsCount])
+  @@index([isHidden])
+  @@map("topics")
+}
+
+model Slide {
+  id               Int       @id @default(autoincrement())
+  topicId          Int       @map("topic_id")
+  userId           Int       @map("user_id")
+  title            String
+  description      String?
+  slug             String?   @unique
+  fileUrl          String    @map("file_url")
+  thumbnailUrl     String?   @map("thumbnail_url")
+  pdfUrl           String?   @map("pdf_url")
+  conversionStatus String    @default("pending") @map("conversion_status")
+  likesCount       Int       @default(0) @map("likes_count")
+  savesCount       Int       @default(0) @map("saves_count")
+  viewsCount       Int       @default(0) @map("views_count")
+  downloadsCount   Int       @default(0) @map("downloads_count")
+  isHidden         Boolean   @default(false) @map("is_hidden")
+  deletedAt        DateTime? @map("deleted_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime? @updatedAt @map("updated_at")
+
+  topic       Topic             @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes       SlideLike[]
+  saves       SavedSlide[]
+  collections CollectionSlide[]
+  slideos     Slideo[]
+  slideoSessions SlideoSession[]
+  conversionJobs ConversionJob[]
+  pageStats      SlidePageStat[]
+  pageReactions  SlidePageReaction[]
+  pageComments   SlidePageComment[]
+  viewSessions   SlideViewSession[]
+  flashcardSets  FlashcardSet[]
+  pinnedInTopics Topic[]          @relation("pinnedSlide")
+
+  @@index([userId])
+  @@index([topicId])
+  @@index([likesCount])
+  @@index([isHidden])
+  @@map("slides")
+}
+
+model ConversionJob {
+  id         Int       @id @default(autoincrement())
+  slideId    Int       @unique @map("slide_id")
+  status     String    @default("queued") // queued | processing | failed | done
+  attempts   Int       @default(0)
+  lastError  String?   @map("last_error")
+  nextAttemptAt DateTime? @map("next_attempt_at")
+  lockedAt   DateTime? @map("locked_at")
+  finishedAt DateTime? @map("finished_at")
+  deadLetteredAt DateTime? @map("dead_lettered_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime? @updatedAt @map("updated_at")
+
+  slide Slide @relation(fields: [slideId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([nextAttemptAt])
+  @@index([lockedAt])
+  @@map("conversion_jobs")
+}
+
+model TopicLike {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  topicId   Int      @map("topic_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicId])
+  @@index([topicId])
+  @@map("topic_likes")
+}
+
+model SlideLike {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  slideId   Int      @map("slide_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slide Slide @relation(fields: [slideId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, slideId])
+  @@index([slideId])
+  @@map("slide_likes")
+}
+
+model SavedSlide {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  slideId   Int      @map("slide_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slide Slide @relation(fields: [slideId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, slideId])
+  @@index([slideId])
+  @@map("saved_slides")
+}
+
+model FollowedUser {
+  id          Int      @id @default(autoincrement())
+  followerId  Int      @map("follower_id")
+  followingId Int      @map("following_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  follower  User @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@map("followed_users")
+}
+
+model FollowedCategory {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  categoryId Int      @map("category_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, categoryId])
+  @@map("followed_categories")
+}
+
+model VisitedTopic {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  topicId   Int      @map("topic_id")
+  visitedAt DateTime @default(now()) @map("visited_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicId])
+  @@map("visited_topics")
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  topicId   Int      @map("topic_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@index([topicId])
+  @@index([userId])
+  @@map("comments")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  type      String
+  message   String
+  link      String?
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model AnalyticsEvent {
+  id        Int      @id @default(autoincrement())
+  eventId   String   @unique @map("event_id")
+  sessionId String   @map("session_id")
+  sequence  Int      @default(0)
+  eventType String   @map("event_type")
+  payload   String?  // JSON payload
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([sessionId, createdAt])
+  @@index([eventType, createdAt])
+  @@map("analytics_events")
+}
+
+model SessionSnapshot {
+  id         Int      @id @default(autoincrement())
+  snapshotId String   @unique @map("snapshot_id")
+  sessionId  String   @map("session_id")
+  topicId    Int?     @map("topic_id")
+  slideId    Int?     @map("slide_id")
+  durationMs Int      @default(0) @map("duration_ms")
+  maxScroll  Int      @default(0) @map("max_scroll")
+  pagesViewed String  @default("[]") @map("pages_viewed") // JSON int[]
+  interactions String @default("{}") // JSON object
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([sessionId, createdAt])
+  @@index([slideId, createdAt])
+  @@map("session_snapshots")
+}
+
+model Report {
+  id         Int       @id @default(autoincrement())
+  userId     Int       @map("user_id")
+  targetType String    @map("target_type")
+  targetId   Int       @map("target_id")
+  reason     String
+  details    String?
+  status     String    @default("pending") // pending | reviewed | resolved | rejected
+  priority   String    @default("medium")  // low | medium | high | critical
+  note       String?
+  resolvedAt DateTime? @map("resolved_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([priority])
+  @@map("reports")
+}
+
+model BlockedUser {
+  id        Int      @id @default(autoincrement())
+  blockerId Int      @map("blocker_id")
+  blockedId Int      @map("blocked_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  blocker User @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@map("blocked_users")
+}
+
+model UserWarning {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  reason    String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_warnings")
+}
+
+model Badge {
+  id          Int         @id @default(autoincrement())
+  key         String      @unique
+  name        String
+  description String
+  icon        String
+  category    String
+  isHidden    Boolean     @default(false) @map("is_hidden")
+  userBadges  UserBadge[]
+
+  @@map("badges")
+}
+
+model UserBadge {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  badgeId   Int      @map("badge_id")
+  earnedAt  DateTime @default(now()) @map("earned_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@map("user_badges")
+}
+
+model Collection {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  name        String
+  description String?
+  isPublic    Boolean  @default(true) @map("is_public")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slides CollectionSlide[]
+  followers CollectionFollow[]
+
+  @@index([userId])
+  @@map("collections")
+}
+
+model CollectionSlide {
+  id           Int      @id @default(autoincrement())
+  collectionId Int      @map("collection_id")
+  slideId      Int      @map("slide_id")
+  addedAt      DateTime @default(now()) @map("added_at")
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  slide      Slide      @relation(fields: [slideId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, slideId])
+  @@map("collection_slides")
+}
+
+model CollectionFollow {
+  id           Int        @id @default(autoincrement())
+  userId       Int        @map("user_id")
+  collectionId Int        @map("collection_id")
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, collectionId])
+  @@index([collectionId])
+  @@map("collection_follows")
+}
+
+model TopicSubscription {
+  id               Int      @id @default(autoincrement())
+  userId           Int      @map("user_id")
+  topicId          Int      @map("topic_id")
+  notifyNewSlides  Boolean  @default(true) @map("notify_new_slides")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicId])
+  @@index([topicId])
+  @@map("topic_subscriptions")
+}
+
+model Room {
+  id          Int        @id @default(autoincrement())
+  ownerId     Int        @map("owner_id")
+  name        String
+  slug        String     @unique
+  description String?
+  isPublic    Boolean    @default(true) @map("is_public")
+  accessPasswordHash String? @map("access_password_hash")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime?  @updatedAt @map("updated_at")
+
+  owner   User         @relation("room_owner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members RoomMember[]
+  topics  Topic[]
+  messages RoomMessage[]
+
+  @@index([ownerId])
+  @@index([isPublic])
+  @@map("rooms")
+}
+
+model RoomMessage {
+  id        Int      @id @default(autoincrement())
+  roomId    Int      @map("room_id")
+  userId    Int      @map("user_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt])
+  @@index([userId, createdAt])
+  @@map("room_messages")
+}
+
+model RoomMember {
+  id        Int      @id @default(autoincrement())
+  roomId    Int      @map("room_id")
+  userId    Int      @map("user_id")
+  role      String   @default("member")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([userId])
+  @@map("room_members")
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  token     String    @unique
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+model SlideoSeries {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  title     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slideos Slideo[]
+
+  @@index([userId])
+  @@map("slideo_series")
+}
+
+model Slideo {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  slideId      Int      @map("slide_id")
+  title        String
+  slug         String?  @unique
+  description  String?
+  pageIndices  String   @map("page_indices") // JSON array e.g. "[1,3,5]"
+  coverPage    Int      @default(1) @map("cover_page")
+  viewsCount   Int      @default(0) @map("views_count")
+  likesCount   Int      @default(0) @map("likes_count")
+  savesCount   Int      @default(0) @map("saves_count")
+  shareCount   Int      @default(0) @map("share_count")
+  seriesId     Int?     @map("series_id")
+  seriesOrder  Int?     @map("series_order")
+  isHidden     Boolean  @default(false) @map("is_hidden")
+  hiddenAt     DateTime? @map("hidden_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slide  Slide         @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  series SlideoSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  likes  SlideoLike[]
+  saves  SlideoSave[]
+  completions SlideoCompletion[]
+  shares SlideoShare[]
+  feedEvents SlideoFeedEvent[]
+  publishedInSessions SlideoSession[] @relation("PublishedSessionSlideo")
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([isHidden])
+  @@map("slideos")
+}
+
+model SlideoLike {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  slideoId  Int      @map("slideo_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slideo Slideo @relation(fields: [slideoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, slideoId])
+  @@index([slideoId])
+  @@map("slideo_likes")
+}
+
+model SlideoSave {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  slideoId  Int      @map("slideo_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slideo Slideo @relation(fields: [slideoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, slideoId])
+  @@index([slideoId])
+  @@map("slideo_saves")
+}
+
+model SlideoCompletion {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  slideoId    Int      @map("slideo_id")
+  completedAt DateTime @default(now()) @map("completed_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slideo Slideo @relation(fields: [slideoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, slideoId])
+  @@index([completedAt])
+  @@map("slideo_completions")
+}
+
+model SlideoShare {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  slideoId  Int      @map("slideo_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slideo Slideo @relation(fields: [slideoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, slideoId])
+  @@index([createdAt])
+  @@map("slideo_shares")
+}
+
+model SlideoSession {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @map("user_id")
+  slideId         Int       @map("slide_id")
+  status          String    @default("pending") // pending | processing | done | failed | published | canceled
+  error           String?
+  pageCount       Int?      @map("page_count")
+  publishedSlideoId Int?    @map("published_slideo_id")
+  expiresAt       DateTime? @map("expires_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime? @updatedAt @map("updated_at")
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slide           Slide     @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  publishedSlideo Slideo?   @relation("PublishedSessionSlideo", fields: [publishedSlideoId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@unique([slideId])
+  @@map("slideo_sessions")
+}
+
+model SlideoFeedAssignment {
+  id         Int      @id @default(autoincrement())
+  subjectKey String   @unique @map("subject_key")
+  variant    String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime? @updatedAt @map("updated_at")
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at")
+
+  @@index([variant])
+  @@map("slideo_feed_assignments")
+}
+
+model SlideoFeedEvent {
+  id         Int      @id @default(autoincrement())
+  subjectKey String   @map("subject_key")
+  variant    String
+  slideoId   Int      @map("slideo_id")
+  page       Int      @default(1)
+  position   Int      @default(0)
+  eventType  String   @map("event_type") // impression | open | like | save | share | complete | skip
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  slideo Slideo @relation(fields: [slideoId], references: [id], onDelete: Cascade)
+
+  @@index([subjectKey, createdAt])
+  @@index([variant, eventType, createdAt])
+  @@index([slideoId, createdAt])
+  @@map("slideo_feed_events")
+}
+
+model SlidePageStat {
+  id              Int      @id @default(autoincrement())
+  slideId         Int      @map("slide_id")
+  pageNumber      Int      @map("page_number")
+  viewCount       Int      @default(0) @map("view_count")
+  uniqueViewCount Int      @default(0) @map("unique_view_count")
+  totalReadMs     Int      @default(0) @map("total_read_ms")
+  likeCount       Int      @default(0) @map("like_count")
+  saveCount       Int      @default(0) @map("save_count")
+  shareCount      Int      @default(0) @map("share_count")
+  confusedCount   Int      @default(0) @map("confused_count")
+  summaryCount    Int      @default(0) @map("summary_count")
+  examCount       Int      @default(0) @map("exam_count")
+  emojiCount      Int      @default(0) @map("emoji_count")
+  commentCount    Int      @default(0) @map("comment_count")
+  dropCount       Int      @default(0) @map("drop_count")
+  profileVisitCount Int    @default(0) @map("profile_visit_count")
+  followConversionCount Int @default(0) @map("follow_conversion_count")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime? @updatedAt @map("updated_at")
+
+  slide Slide @relation(fields: [slideId], references: [id], onDelete: Cascade)
+
+  @@unique([slideId, pageNumber])
+  @@index([slideId])
+  @@index([viewCount])
+  @@map("slide_page_stats")
+}
+
+model SlideViewSession {
+  id              Int      @id @default(autoincrement())
+  slideId         Int      @map("slide_id")
+  userId          Int?     @map("user_id")
+  sessionKey      String   @map("session_key")
+  startedAt       DateTime @default(now()) @map("started_at")
+  lastSeenAt      DateTime @default(now()) @map("last_seen_at")
+  maxPage         Int      @default(1) @map("max_page")
+  totalReadMs     Int      @default(0) @map("total_read_ms")
+  completed       Boolean  @default(false)
+  profileVisited  Boolean  @default(false) @map("profile_visited")
+  followConverted Boolean  @default(false) @map("follow_converted")
+
+  slide Slide @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([slideId, sessionKey])
+  @@index([slideId])
+  @@index([userId])
+  @@map("slide_view_sessions")
+}
+
+model SlidePageReaction {
+  id           Int      @id @default(autoincrement())
+  slideId      Int      @map("slide_id")
+  pageNumber   Int      @map("page_number")
+  userId       Int?     @map("user_id")
+  actorKey     String   @map("actor_key")
+  reactionType String   @map("reaction_type") // like|save|share|emoji|confused|summary|exam
+  emoji        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  slide Slide @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([slideId, pageNumber, actorKey, reactionType, emoji])
+  @@index([slideId, pageNumber])
+  @@map("slide_page_reactions")
+}
+
+model SlidePageComment {
+  id         Int      @id @default(autoincrement())
+  slideId    Int      @map("slide_id")
+  pageNumber Int?     @map("page_number")
+  userId     Int      @map("user_id")
+  content    String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  slide Slide @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([slideId, pageNumber])
+  @@index([userId])
+  @@map("slide_page_comments")
+}
+
+model FlashcardSet {
+  id          Int      @id @default(autoincrement())
+  slideId     Int      @map("slide_id")
+  userId      Int      @map("user_id")
+  title       String
+  mode        String   @default("four") // two | four
+  isPublished Boolean  @default(true) @map("is_published")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+
+  slide     Slide              @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions FlashcardQuestion[]
+  attempts  FlashcardAttempt[]
+
+  @@index([slideId, isPublished])
+  @@index([userId])
+  @@map("flashcard_sets")
+}
+
+model FlashcardQuestion {
+  id            Int      @id @default(autoincrement())
+  setId         Int      @map("set_id")
+  orderIndex    Int      @default(0) @map("order_index")
+  prompt        String
+  optionA       String   @map("option_a")
+  optionB       String   @map("option_b")
+  optionC       String?  @map("option_c")
+  optionD       String?  @map("option_d")
+  correctOption Int      @map("correct_option") // 0..3
+  explanation   String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  set FlashcardSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+
+  @@index([setId, orderIndex])
+  @@map("flashcard_questions")
+}
+
+model FlashcardAttempt {
+  id         Int      @id @default(autoincrement())
+  setId      Int      @map("set_id")
+  userId     Int?     @map("user_id")
+  sessionKey String   @map("session_key")
+  score      Int
+  total      Int
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  set  FlashcardSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  user User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([setId, createdAt])
+  @@index([userId])
+  @@map("flashcard_attempts")
+}
+
+// â”€â”€ Admin Audit Log â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Records all sensitive admin actions for accountability.
+model AdminLog {
+  id         Int      @id @default(autoincrement())
+  adminId    Int      @map("admin_id")
+  action     String   // ban_user | mute_user | warn_user | hide_content | restore_content | delete_content | delete_slideo | set_priority | resolve_report
+  targetType String?  @map("target_type") // user | topic | slide | comment | slideo | report
+  targetId   Int?     @map("target_id")
+  meta       String?  // JSON string with extra context
+  ip         String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  admin User @relation("adminLogs", fields: [adminId], references: [id])
+
+  @@index([adminId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("admin_logs")
+}

@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /api/
+Disallow: /embed/
+Disallow: /reset-password/
+Disallow: /forgot-password
+
+Sitemap: https://slaytim.com/sitemap.xml

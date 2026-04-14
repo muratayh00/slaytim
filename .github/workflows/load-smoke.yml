@@ -1,0 +1,30 @@
+name: Load Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Target API base URL (without /api suffix)
+        required: true
+        default: https://api-staging.slaytim.com
+      vus:
+        description: Virtual users
+        required: false
+        default: "100"
+      duration:
+        description: Test duration
+        required: false
+        default: 120s
+
+jobs:
+  k6-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run k6 smoke test
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: server/tests/load/k6-smoke.js
+          flags: --env BASE_URL=${{ inputs.base_url }} --env VUS=${{ inputs.vus }} --env DURATION=${{ inputs.duration }}

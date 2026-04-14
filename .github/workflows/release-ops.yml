@@ -1,0 +1,45 @@
+name: Release Ops
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Deploy or rollback release marker
+        required: true
+        default: deploy
+        type: choice
+        options:
+          - deploy
+          - rollback
+      release_id:
+        description: Release id for deploy (ignored in rollback)
+        required: false
+        default: ""
+
+jobs:
+  release-ops:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Mark release
+        if: ${{ inputs.operation == 'deploy' }}
+        run: npm run release:mark -- "${{ inputs.release_id || github.sha }}"
+
+      - name: Rollback release
+        if: ${{ inputs.operation == 'rollback' }}
+        run: npm run release:rollback

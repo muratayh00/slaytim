@@ -1,0 +1,3 @@
+-- no-op migration:
+-- is_hidden / hidden_at were already introduced in the previous slideo migration.
+-- keeping this file as a safe no-op avoids duplicate-column failures on shadow DB.

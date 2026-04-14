@@ -1,0 +1,61 @@
+/**
+ * Bildirim oluşturma yardımcı fonksiyonu.
+ * Fire-and-forget — ana iş akışını asla engellememeli.
+ */
+
+const prisma = require('./prisma');
+const { pushEvent } = require('../services/notification-stream.service');
+
+/**
+ * Kullanıcıya bildirim gönder.
+ * @param {object} opts
+ * @param {number} opts.userId - Bildirimi alacak kullanıcı
+ * @param {string} opts.type   - Bildirim türü (like|save|follow|comment|badge|warning|mute)
+ * @param {string} opts.message
+ * @param {string} [opts.link]
+ */
+async function createNotification({ userId, type, message, link = null }) {
+  try {
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const existingRecent = await prisma.notification.findFirst({
+      where: {
+        userId: Number(userId),
+        type,
+        link,
+        isRead: false,
+        createdAt: { gte: tenMinutesAgo },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const created = existingRecent
+      ? await prisma.notification.update({
+          where: { id: existingRecent.id },
+          data: { message, createdAt: new Date() },
+        })
+      : await prisma.notification.create({
+          data: { userId, type, message, link },
+        });
+
+    const unread = await prisma.notification.count({
+      where: { userId: Number(userId), isRead: false },
+    });
+    pushEvent(userId, 'notification', {
+      type: 'notification',
+      id: String(created.id),
+      createdAt: created.createdAt,
+      data: { notification: created, unread },
+    });
+    pushEvent(userId, 'unread_count', {
+      type: 'unread_count',
+      id: `unread_${created.id}`,
+      createdAt: new Date().toISOString(),
+      data: { count: unread },
+    });
+  } catch (err) {
+    // Bildirim hatası hiçbir zaman ana isteği engellememeli
+    console.error('[notify] Failed to create notification:', err.message);
+  }
+}
+
+module.exports = { createNotification };

@@ -1,0 +1,132 @@
+services:
+  # ── API (Express HTTP server) ──────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      target: production
+    command: npm run start
+    env_file:
+      - .env.staging
+    environment:
+      REDIS_ENABLED: "true"
+      REDIS_URL: "redis://redis:6379"
+    ports:
+      - "5001:5001"
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - uploads-data:/app/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5001/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ── BullMQ Conversion Worker ───────────────────────────────────────────────
+  worker:
+    build:
+      context: .
+      target: production
+    command: npm run worker:conversion:redis
+    env_file:
+      - .env.staging
+    environment:
+      REDIS_ENABLED: "true"
+      REDIS_URL: "redis://redis:6379"
+      # Heartbeat file written by the worker every 30s (see conversion.worker.js)
+      WORKER_HEARTBEAT_PATH: "/tmp/worker-heartbeat"
+      WORKER_HEARTBEAT_INTERVAL_MS: "30000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    volumes:
+      - uploads-data:/app/uploads
+    restart: unless-stopped
+    # Healthcheck: verify the worker wrote a heartbeat within the last 90 seconds.
+    # If the process hangs or is OOM-killed the file goes stale → container → unhealthy.
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - |
+          HFILE=/tmp/worker-heartbeat
+          [ -f "$$HFILE" ] || exit 1
+          NOW=$$(date +%s)
+          MTIME=$$(date -r "$$HFILE" +%s 2>/dev/null || stat -c %Y "$$HFILE" 2>/dev/null)
+          [ -n "$$MTIME" ] || exit 1
+          AGE=$$((NOW - MTIME))
+          [ "$$AGE" -le 90 ] || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ── Stuck Job Monitor ──────────────────────────────────────────────────────
+  monitor:
+    build:
+      context: .
+      target: production
+    command: node src/workers/stuck-job-monitor.js
+    env_file:
+      - .env.staging
+    environment:
+      REDIS_ENABLED: "true"
+      REDIS_URL: "redis://redis:6379"
+      STUCK_JOB_POLL_MS: "60000"
+      STUCK_JOB_THRESHOLD_MS: "600000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --save 60 1000
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    volumes:
+      - redis-staging-data:/data
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  redis-staging-data:
+    driver: local
+  uploads-data:
+    driver: local

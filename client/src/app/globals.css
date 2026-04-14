@@ -1,0 +1,137 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 98%;
+    --foreground: 224 22% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 22% 13%;
+    --primary: 25 92% 52%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 16% 95%;
+    --secondary-foreground: 224 20% 18%;
+    --muted: 220 16% 95%;
+    --muted-foreground: 220 10% 43%;
+    --accent: 220 16% 94%;
+    --accent-foreground: 224 20% 18%;
+    --border: 220 14% 89%;
+    --input: 220 14% 89%;
+    --ring: 25 92% 52%;
+    --radius: 0.75rem;
+  }
+  .dark {
+    --background: 224 16% 10%;
+    --foreground: 218 18% 90%;
+    --card: 224 16% 12%;
+    --card-foreground: 218 18% 90%;
+    --primary: 25 92% 56%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 224 14% 17%;
+    --secondary-foreground: 220 14% 78%;
+    --muted: 224 14% 16%;
+    --muted-foreground: 220 10% 60%;
+    --accent: 224 14% 18%;
+    --accent-foreground: 220 14% 82%;
+    --border: 224 12% 23%;
+    --input: 224 12% 23%;
+    --ring: 25 92% 56%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground antialiased font-medium; }
+  h1, h2, h3, h4, h5, h6 { @apply tracking-tight font-bold; }
+  h1 { @apply text-3xl md:text-4xl leading-tight; }
+  h2 { @apply text-2xl md:text-3xl leading-tight; }
+  h3 { @apply text-xl leading-snug; }
+  p { @apply leading-relaxed; }
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring/35 ring-offset-2 ring-offset-background;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+/* Hide scrollbar utility (used by scrollbar-none and scrollbar-hide classes) */
+.scrollbar-none, .scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-none::-webkit-scrollbar, .scrollbar-hide::-webkit-scrollbar { display: none; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); }
+
+/* Skeleton */
+.skeleton { @apply relative overflow-hidden bg-muted rounded-xl; }
+.skeleton::after {
+  content: '';
+  @apply absolute inset-0;
+  background: linear-gradient(90deg, transparent, hsl(var(--muted-foreground) / 0.04) 50%, transparent);
+  animation: shimmer 2.4s linear infinite;
+  transform: translateX(-100%);
+}
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+
+/* Keep compatibility classes but tone them down */
+.text-gradient {
+  color: hsl(var(--foreground));
+}
+
+.glass {
+  background: hsl(var(--card));
+}
+
+.card-hover {
+  transition: box-shadow 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+}
+
+/* Slideo full-height (navbar + optional bottom nav) */
+.slideo-h {
+  height: calc(100vh - 118px); /* mobile: navbar(62) + bottom-nav(56) */
+}
+@media (min-width: 1024px) {
+  .slideo-h {
+    height: calc(100vh - 56px); /* desktop: just topbar */
+  }
+}
+
+/* Disable previously flashy background helper */
+.mesh-bg {
+  background: transparent;
+}
+
+/* Motion policy: keep short and subtle */
+* {
+  scroll-behavior: smooth;
+}
+.transition-all {
+  transition-property: color, background-color, border-color, opacity, box-shadow;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer utilities {
+  .viewer-overlay {
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+
+  .viewer-controls-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+

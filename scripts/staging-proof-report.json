@@ -1,0 +1,57 @@
+{
+  "apiBase": "http://localhost:5001/api",
+  "samplePdf": "C:\\Users\\HP\\Desktop\\slaytim.com\\server\\node_modules\\pdf-parse\\test\\data\\01-valid.pdf",
+  "startedAt": "2026-04-14T00:24:25.083Z",
+  "single": {
+    "slideId": 222,
+    "status": "done",
+    "pdfStatus": 200,
+    "pdfUrl": "/uploads/pdfs/1776126268775-701958200.pdf",
+    "thumbnailUrl": "/uploads/thumbnails/1776126268775-701958200.png"
+  },
+  "concurrent": [
+    {
+      "slideId": 224,
+      "status": "done",
+      "pdfUrl": "/uploads/pdfs/1776126325036-490310486.pdf",
+      "thumbnailUrl": "/uploads/thumbnails/1776126325036-490310486.png"
+    },
+    {
+      "slideId": 223,
+      "status": "done",
+      "pdfUrl": "/uploads/pdfs/1776126325286-900826950.pdf",
+      "thumbnailUrl": "/uploads/thumbnails/1776126325286-900826950.png"
+    },
+    {
+      "slideId": 225,
+      "status": "done",
+      "pdfUrl": "/uploads/pdfs/1776126325287-938791087.pdf",
+      "thumbnailUrl": "/uploads/thumbnails/1776126325287-938791087.png"
+    },
+    {
+      "slideId": 226,
+      "status": "done",
+      "pdfUrl": "/uploads/pdfs/1776126325288-843530030.pdf",
+      "thumbnailUrl": "/uploads/thumbnails/1776126325288-843530030.png"
+    },
+    {
+      "slideId": 227,
+      "status": "done",
+      "pdfUrl": "/uploads/pdfs/1776126325674-604773252.pdf",
+      "thumbnailUrl": "/uploads/thumbnails/1776126325674-604773252.png"
+    }
+  ],
+  "restart": {
+    "mode": "local",
+    "slideId": 228,
+    "status": "done",
+    "pdfUrl": "/uploads/pdfs/1776126471519-936278180.pdf",
+    "thumbnailUrl": "/uploads/thumbnails/1776126471519-936278180.png"
+  },
+  "deleteCleanup": {
+    "deletedSlideId": 224,
+    "deleteStatus": 200,
+    "fetchAfterDeleteStatus": 404
+  },
+  "finishedAt": "2026-04-14T00:30:52.653Z"
+}
