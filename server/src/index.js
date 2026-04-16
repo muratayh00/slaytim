@@ -82,25 +82,51 @@ if (TRUST_PROXY === '1' || TRUST_PROXY === 'true') {
   app.set('trust proxy', 1);
 }
 
-// Security headers
+// ── CORS origin allowlist ────────────────────────────────────────────────────
+// Sources (all comma-separated):
+//   CLIENT_URL   – primary env var  (e.g. "https://slaytim.com")
+//   CLIENT_URLS  – optional alias   (additional origins)
+// The production apex + www origins are always included regardless of env vars.
+// Vercel preview deployments for this project are allowed via a strict regex so
+// that new Vercel preview URLs never require a code change.
 const isProd = process.env.NODE_ENV === 'production';
-const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:3000')
-  .split(',')
-  .map((x) => x.trim())
-  .filter(Boolean);
+
+const _parseOriginList = (str) =>
+  (str || '').split(',').map((x) => x.trim()).filter(Boolean);
+
+const allowedOriginsSet = new Set([
+  ..._parseOriginList(process.env.CLIENT_URL),
+  ..._parseOriginList(process.env.CLIENT_URLS),
+  // Production apex + www — always allowed, safe to include in dev too
+  'https://slaytim.com',
+  'https://www.slaytim.com',
+]);
+
 if (!isProd) {
-  const devOrigins = [
+  for (const o of [
     'http://localhost:3000',
     'http://localhost:3001',
     'http://127.0.0.1:3000',
     'http://127.0.0.1:3001',
-  ];
-  for (const origin of devOrigins) {
-    if (!allowedOrigins.includes(origin)) {
-      allowedOrigins.push(origin);
-    }
+  ]) {
+    allowedOriginsSet.add(o);
   }
 }
+
+// Vercel preview deployments: only match THIS project's slug prefix so we
+// don't inadvertently allow all of *.vercel.app.
+// Pattern: https://slaytim-trpg-<hash>-<account-slug>.vercel.app
+const _vercelPreviewRe = /^https:\/\/slaytim-trpg-[a-z0-9-]+-[a-z0-9-]+\.vercel\.app$/i;
+
+const isOriginAllowed = (origin) => {
+  if (!origin) return true; // server-to-server / same-origin / curl — no Origin header
+  if (allowedOriginsSet.has(origin)) return true;
+  if (_vercelPreviewRe.test(origin)) return true;
+  return false;
+};
+
+// Keep an array for CSP frame-ancestors (must be explicit list, no regex)
+const allowedOrigins = [...allowedOriginsSet];
 const uploadFrameAncestors = ["'self'", ...allowedOrigins, 'http://127.0.0.1:3000'];
 
 app.use(helmet({
@@ -116,13 +142,19 @@ if (!isProd) {
   });
 }
 
+// Reflect the exact requesting origin so Access-Control-Allow-Origin is never
+// "*", which is incompatible with credentials: true.
+// OPTIONS preflight is handled automatically by the cors package.
 app.use(cors({
   origin(origin, cb) {
-    if (!origin) return cb(null, true);
-    if (allowedOrigins.includes(origin)) return cb(null, true);
+    if (isOriginAllowed(origin)) return cb(null, origin || true);
     return cb(null, false);
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Requested-With'],
+  exposedHeaders: ['X-Request-Id'],
+  maxAge: 86400, // preflight cache: 24 h
 }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
