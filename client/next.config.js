@@ -13,10 +13,20 @@ const nextConfig = {
   },
   images: {
     remotePatterns: [
+      // Local dev API server
       ...(process.env.NODE_ENV !== 'production'
         ? [{ protocol: 'http', hostname: 'localhost', port: '5001' }]
         : []),
-      { protocol: 'https', hostname: process.env.NEXT_PUBLIC_UPLOAD_HOST || 'slaytim.com' },
+      // API server — uploads, avatars, thumbnails are all served from here
+      { protocol: 'https', hostname: 'api.slaytim.com' },
+      // Configurable upload host (CDN / S3 proxy / staging). Included only when
+      // it differs from the hardcoded api.slaytim.com to avoid duplicate entries.
+      ...(process.env.NEXT_PUBLIC_UPLOAD_HOST &&
+      process.env.NEXT_PUBLIC_UPLOAD_HOST !== 'api.slaytim.com'
+        ? [{ protocol: 'https', hostname: process.env.NEXT_PUBLIC_UPLOAD_HOST }]
+        : []),
+      // Apex domain (OG images, static assets hosted on slaytim.com itself)
+      { protocol: 'https', hostname: 'slaytim.com' },
     ],
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 3600,

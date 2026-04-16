@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
 import { buildProfilePath, buildTopicCreatePath, buildTopicPath } from '@/lib/url';
+import { resolveMediaUrl } from '@/lib/media';
 
 const BASE_NAV = [
   { href: '/', label: 'Ana Sayfa', icon: Home },
@@ -188,8 +189,8 @@ export default function Sidebar() {
                 className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-muted/70 transition-colors w-full text-left"
               >
                 <div className="w-7 h-7 rounded-lg border border-border bg-muted/70 flex items-center justify-center text-[10px] font-black text-primary shrink-0 overflow-hidden relative">
-                  {user.avatarUrl
-                    ? <Image src={user.avatarUrl} alt={user.username} fill sizes="28px" className="object-cover" />
+                  {resolveMediaUrl(user.avatarUrl)
+                    ? <Image src={resolveMediaUrl(user.avatarUrl)!} alt={user.username} fill sizes="28px" className="object-cover" />
                     : user.username.slice(0, 2).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">

@@ -2,13 +2,7 @@
 // All PDF loading goes through the Next.js proxy at /api/slides/:id/pdf
 // to keep requests same-origin and avoid cross-origin issues.
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5001/api';
-const SERVER_BASE = API_BASE.replace('/api', '');
-
-function normalizeApiPath(path: string): string {
-  if (!path) return path;
-  return path.replace(/\/api\/api\//g, '/api/');
-}
+import { resolveMediaUrl } from './media';
 
 let pdfjsLib: any = null;
 const runtimeImport = new Function('u', 'return import(u)') as (u: string) => Promise<any>;
@@ -47,11 +41,15 @@ async function getPdfjs() {
   return pdfjsLib;
 }
 
-export function resolveFileUrl(path: string): string {
+// Kept for backward compat — delegates to the shared media resolver.
+// Returns '' (not null) so existing callers that use it as a src prop
+// stay type-compatible; the truthy check in callers guards against rendering.
+export function resolveFileUrl(path: string | null | undefined): string {
   if (!path) return '';
-  const normalized = normalizeApiPath(path);
-  if (normalized.startsWith('/api/')) return normalized;
-  return normalized.startsWith('http') ? normalized : `${SERVER_BASE}${normalized}`;
+  // /api/ paths are same-origin Next.js routes — return as-is without prefixing
+  const cleaned = path.replace(/\/api\/api\//g, '/api/');
+  if (cleaned.startsWith('/api/')) return cleaned;
+  return resolveMediaUrl(path) ?? '';
 }
 
 /**

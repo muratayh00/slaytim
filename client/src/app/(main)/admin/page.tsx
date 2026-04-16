@@ -17,6 +17,7 @@ import { useAuthStore } from '@/store/auth';
 import { formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { buildCategoryPath, buildProfilePath, buildSlidePath, buildTopicPath } from '@/lib/url';
+import { resolveMediaUrl } from '@/lib/media';
 
 // â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -1144,8 +1145,8 @@ function UsersTab() {
               <div key={u.id} className="flex items-center justify-between gap-4 p-4 bg-card border border-border rounded-xl flex-wrap">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden relative">
-                    {u.avatarUrl
-                      ? <Image src={u.avatarUrl} alt={u.username} fill sizes="40px" className="object-cover" />
+                    {resolveMediaUrl(u.avatarUrl)
+                      ? <Image src={resolveMediaUrl(u.avatarUrl)!} alt={u.username} fill sizes="40px" className="object-cover" />
                       : u.username.slice(0, 2).toUpperCase()
                     }
                   </div>

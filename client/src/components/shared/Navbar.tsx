@@ -13,6 +13,7 @@ import { useAuthStore } from '@/store/auth';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { buildProfilePath, buildTopicCreatePath } from '@/lib/url';
+import { resolveMediaUrl } from '@/lib/media';
 
 export default function Navbar() {
   const { user, logout } = useAuthStore();
@@ -154,8 +155,8 @@ export default function Navbar() {
                 <div ref={profileRef} className="relative">
                   <button onClick={() => setProfileOpen((o) => !o)} className="flex items-center gap-1">
                     <div className="w-9 h-9 rounded-lg border border-border bg-muted/60 flex items-center justify-center text-xs font-black text-primary overflow-hidden relative">
-                      {user.avatarUrl
-                        ? <Image src={user.avatarUrl} alt={user.username} fill sizes="36px" className="object-cover" />
+                      {resolveMediaUrl(user.avatarUrl)
+                        ? <Image src={resolveMediaUrl(user.avatarUrl)!} alt={user.username} fill sizes="36px" className="object-cover" />
                         : user.username.slice(0, 2).toUpperCase()}
                     </div>
                     <ChevronDown className={cn('w-3.5 h-3.5 text-muted-foreground transition-transform', profileOpen && 'rotate-180')} />

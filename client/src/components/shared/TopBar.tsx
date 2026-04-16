@@ -7,6 +7,7 @@ import { Search, Plus, Users } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import NotificationBell from './NotificationBell';
 import { buildProfilePath, buildTopicCreatePath } from '@/lib/url';
+import { resolveMediaUrl } from '@/lib/media';
 
 export default function TopBar() {
   const { user } = useAuthStore();
@@ -47,8 +48,8 @@ export default function TopBar() {
             <NotificationBell />
             <Link href={buildProfilePath(user.username)} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-muted transition-colors">
               <div className="w-7 h-7 rounded-lg border border-border bg-muted/70 flex items-center justify-center text-[10px] font-black text-primary overflow-hidden relative shrink-0">
-                {user.avatarUrl
-                  ? <Image src={user.avatarUrl} alt={user.username} fill sizes="28px" className="object-cover" />
+                {resolveMediaUrl(user.avatarUrl)
+                  ? <Image src={resolveMediaUrl(user.avatarUrl)!} alt={user.username} fill sizes="28px" className="object-cover" />
                   : user.username.slice(0, 2).toUpperCase()}
               </div>
               <span className="text-[13px] font-semibold max-w-[100px] truncate">{user.username}</span>
