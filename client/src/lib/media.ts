@@ -33,3 +33,13 @@ export function resolveMediaUrl(url: string | null | undefined): string | null {
   if (!_serverBase) return null; // misconfigured production env — bail safely
   return `${_serverBase}${cleaned.startsWith('/') ? cleaned : `/${cleaned}`}`;
 }
+
+export function isSignedMediaUrl(url: string | null | undefined): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const value = url.toLowerCase();
+  return (
+    value.includes('x-amz-algorithm=')
+    || value.includes('x-amz-signature=')
+    || value.includes('x-id=getobject')
+  );
+}

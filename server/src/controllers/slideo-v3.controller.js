@@ -6,7 +6,7 @@ const { enqueueSlideConversion } = require('../services/conversion.service');
 const { toSlug, uniqueSlug } = require('../lib/slug');
 const { sanitizeText } = require('../lib/sanitize');
 const { cleanupUploadedFile } = require('../middleware/upload');
-const { putLocalFile, isRemoteEnabled } = require('../services/storage.service');
+const { putLocalFile, isRemoteEnabled, resolveStorageReadUrl } = require('../services/storage.service');
 const { notifyTopicSubscribers } = require('../services/topic-subscription.service');
 const { invalidateHotFeedCache } = require('../services/slideo-feed-cache.service');
 
@@ -31,14 +31,18 @@ const getPdfPageCount = async (pdfUrl) => {
   let lastError = null;
   for (let attempt = 1; attempt <= 4; attempt += 1) {
     try {
-      const isRemote = /^https?:\/\//i.test(pdfUrl);
+      const localCandidatePath = toUploadAbsPath(pdfUrl);
+      const isRemote =
+        /^https?:\/\//i.test(pdfUrl)
+        || (String(pdfUrl || '').startsWith('/uploads/') && isRemoteEnabled() && (!localCandidatePath || !fs.existsSync(localCandidatePath)));
       let pdfBuffer = null;
       if (isRemote) {
-        const upstream = await fetch(pdfUrl);
+        const readUrl = await resolveStorageReadUrl(pdfUrl);
+        const upstream = await fetch(readUrl);
         if (!upstream.ok) throw new Error('Remote PDF fetch failed');
         pdfBuffer = Buffer.from(await upstream.arrayBuffer());
       } else {
-        const pdfPath = toUploadAbsPath(pdfUrl);
+        const pdfPath = localCandidatePath;
         if (!pdfPath || !fs.existsSync(pdfPath)) throw new Error('PDF file not found');
         pdfBuffer = await fs.promises.readFile(pdfPath);
       }

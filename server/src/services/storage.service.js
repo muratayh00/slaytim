@@ -92,12 +92,7 @@ async function putLocalFile(filePath, key, contentType) {
       ContentType: contentType || undefined,
     }),
   );
-  const signed = await getSignedUrl(
-    c,
-    new GetObjectCommand({ Bucket: BUCKET, Key: key }),
-    { expiresIn: SIGNED_URL_TTL_SECONDS },
-  );
-  return signed;
+  return `/uploads/${String(key).replace(/^\/+/, '')}`;
 }
 
 async function putBuffer(buffer, key, contentType) {
@@ -120,12 +115,7 @@ async function putBuffer(buffer, key, contentType) {
       ContentType: contentType || undefined,
     }),
   );
-  const signed = await getSignedUrl(
-    c,
-    new GetObjectCommand({ Bucket: BUCKET, Key: key }),
-    { expiresIn: SIGNED_URL_TTL_SECONDS },
-  );
-  return signed;
+  return `/uploads/${String(key).replace(/^\/+/, '')}`;
 }
 
 function toUploadsUrl(localFilePath) {
@@ -146,6 +136,9 @@ function extractStorageKeyFromUrl(fileUrl) {
   if (fileUrl.startsWith('/uploads/')) {
     return fileUrl.replace(/^\/uploads\//, '');
   }
+  if (fileUrl.startsWith('storage://')) {
+    return fileUrl.replace(/^storage:\/\//, '');
+  }
   if (!/^https?:\/\//i.test(fileUrl)) return null;
 
   try {
@@ -161,9 +154,27 @@ function extractStorageKeyFromUrl(fileUrl) {
   }
 }
 
-async function resolveStorageReadUrl(fileUrl) {
+function toCanonicalMediaUrl(fileUrl) {
   if (!fileUrl || typeof fileUrl !== 'string') return fileUrl;
   if (fileUrl.startsWith('/uploads/')) return fileUrl;
+  const key = extractStorageKeyFromUrl(fileUrl);
+  if (!key) return fileUrl;
+  return `/uploads/${key.replace(/^\/+/, '')}`;
+}
+
+async function resolveStorageReadUrl(fileUrl) {
+  if (!fileUrl || typeof fileUrl !== 'string') return fileUrl;
+  if (fileUrl.startsWith('/uploads/')) {
+    if (!isRemoteEnabled()) return fileUrl;
+    const key = extractStorageKeyFromUrl(fileUrl);
+    if (!key) return fileUrl;
+    try {
+      const signed = await signStorageKey(key);
+      return signed || fileUrl;
+    } catch {
+      return fileUrl;
+    }
+  }
   if (!/^https?:\/\//i.test(fileUrl)) return fileUrl;
   if (!isRemoteEnabled()) return fileUrl;
 
@@ -218,6 +229,7 @@ module.exports = {
   putLocalFile,
   putBuffer,
   resolveStorageReadUrl,
+  toCanonicalMediaUrl,
   toUploadsUrl,
   extractStorageKeyFromUrl,
   deleteStoredObject,

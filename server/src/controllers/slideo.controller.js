@@ -5,6 +5,7 @@ const { getAssignedVariant, trackFeedEvents, getFeedEvaluation } = require('../s
 const { getRecommendationFlags } = require('../services/feature-flag.service');
 const { runSlideoShadowEvaluation } = require('../services/recommendation-shadow.service');
 const ttlCache = require('../lib/ttl-cache');
+const { normalizeMediaUrls } = require('../lib/media-normalize');
 
 const dedup = require('../lib/dedup');
 const isPrismaCode = (err, code) => err && typeof err === 'object' && err.code === code;
@@ -79,7 +80,7 @@ const getFeed = async (req, res) => {
     const sortPart = sort || 'auto';
     const cacheKey = `${userPart}|p:${page}|l:${limit}|sort:${sortPart}|v:${feedVariant}|shadow:${recFlags.shadowEnabled ? 1 : 0}|serve:${recFlags.serveEnabled ? 1 : 0}`;
     const cached = ttlCache.get('slideo-feed', cacheKey);
-    if (cached) return res.json(cached);
+    if (cached) return res.json(normalizeMediaUrls(cached));
 
     const runShadowAsync = (items, appliedSort) => {
       if (!recFlags.shadowEnabled) return;
@@ -123,7 +124,7 @@ const getFeed = async (req, res) => {
         },
       };
       ttlCache.set('slideo-feed', cacheKey, payload, 12_000);
-      return res.json(payload);
+      return res.json(normalizeMediaUrls(payload));
     }
 
     if (sort === 'popular') {
@@ -154,7 +155,7 @@ const getFeed = async (req, res) => {
         },
       };
       ttlCache.set('slideo-feed', cacheKey, payload, 12_000);
-      return res.json(payload);
+      return res.json(normalizeMediaUrls(payload));
     }
 
     // A/B default feed for hot ranking.
@@ -186,7 +187,7 @@ const getFeed = async (req, res) => {
       },
     };
     ttlCache.set('slideo-feed', cacheKey, payload, 12_000);
-    res.json(payload);
+    res.json(normalizeMediaUrls(payload));
   } catch (err) {
     logger.error('Failed to fetch slideo feed', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch feed' });
@@ -232,7 +233,7 @@ const getOne = async (req, res) => {
       return res.status(404).json({ error: 'Slideo not found' });
     }
     const [result] = await enrich([slideo], req.user?.id);
-    res.json(result);
+    res.json(normalizeMediaUrls(result));
   } catch (err) {
     logger.error('Failed to fetch slideo', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch slideo' });
@@ -247,7 +248,7 @@ const getMine = async (req, res) => {
       orderBy: { createdAt: 'desc' },
       select: slideoSelect,
     });
-    res.json(slideos.map(s => fmt(s)));
+    res.json(normalizeMediaUrls(slideos.map(s => fmt(s))));
   } catch (err) {
     logger.error('Failed to fetch user slideos (getMine)', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch your slideos' });

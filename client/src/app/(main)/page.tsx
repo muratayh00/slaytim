@@ -17,6 +17,7 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { resolveFileUrl } from '@/lib/pdfRenderer';
 import { buildSlideoPath, buildTopicCreatePath } from '@/lib/url';
+import { isSignedMediaUrl } from '@/lib/media';
 
 const CAT_ICONS: Record<string, string> = {
   'teknoloji': 'T', 'is-Girişimcilik': 'G', 'egitim': 'E',
@@ -391,16 +392,19 @@ const SLIDEO_AVATAR_COLORS = ['bg-violet-500', 'bg-blue-500', 'bg-emerald-500', 
 
 function SlideoPreviewCard({ slideo }: { slideo: any }) {
   const pages = Array.isArray(slideo.pageIndices) ? slideo.pageIndices : [];
+  const thumbSrc = resolveFileUrl(slideo?.slide?.thumbnailUrl || '');
+  const avatarSrc = resolveFileUrl(slideo?.user?.avatarUrl || '');
   return (
     <Link href={buildSlideoPath({ id: slideo.id, title: slideo.title })} prefetch={false} className="shrink-0 w-[140px] flex flex-col rounded-xl border border-border bg-card hover:border-primary/40 transition-colors overflow-hidden group">
       <div className="h-[90px] bg-black/80 relative flex items-center justify-center overflow-hidden">
         {slideo.slide?.thumbnailUrl ? (
           <Image
-            src={resolveFileUrl(slideo.slide.thumbnailUrl)}
+            src={thumbSrc}
             alt=""
             fill
             sizes="140px"
             className="object-cover opacity-90"
+            unoptimized={isSignedMediaUrl(thumbSrc)}
           />
         ) : (
           <Play className="w-8 h-8 text-white/20" fill="currentColor" />
@@ -413,7 +417,7 @@ function SlideoPreviewCard({ slideo }: { slideo: any }) {
         <div className="flex items-center gap-1 mt-auto">
           <div className={cn('w-4 h-4 rounded-full shrink-0 flex items-center justify-center text-[7px] font-black text-white overflow-hidden relative', SLIDEO_AVATAR_COLORS[slideo.user.id % SLIDEO_AVATAR_COLORS.length])}>
             {slideo.user.avatarUrl
-              ? <Image src={resolveFileUrl(slideo.user.avatarUrl)} alt="" fill sizes="16px" className="object-cover" />
+              ? <Image src={avatarSrc} alt="" fill sizes="16px" className="object-cover" unoptimized={isSignedMediaUrl(avatarSrc)} />
               : slideo.user.username.slice(0, 1).toUpperCase()}
           </div>
           <span className="text-[9px] text-muted-foreground truncate">{slideo.user.username}</span>

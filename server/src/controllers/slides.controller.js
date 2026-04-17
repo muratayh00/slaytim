@@ -13,6 +13,7 @@ const {
   isRemoteEnabled,
   deleteStoredObject,
   resolveStorageReadUrl,
+  toCanonicalMediaUrl,
 } = require('../services/storage.service');
 const { notifyTopicSubscribers } = require('../services/topic-subscription.service');
 const logger = require('../lib/logger');
@@ -114,6 +115,16 @@ const mapSlideUploadError = (err) => {
   };
 };
 
+const normalizeSlideMedia = (slide) => {
+  if (!slide || typeof slide !== 'object') return slide;
+  return {
+    ...slide,
+    fileUrl: toCanonicalMediaUrl(slide.fileUrl),
+    pdfUrl: toCanonicalMediaUrl(slide.pdfUrl),
+    thumbnailUrl: toCanonicalMediaUrl(slide.thumbnailUrl),
+  };
+};
+
 const upsertPageStat = async (slideId, pageNumber, increments = {}) => {
   const inc = {
     viewCount: Number(increments.viewCount || 0),
@@ -198,7 +209,12 @@ const getByTopic = async (req, res) => {
       }),
       prisma.slide.count({ where }),
     ]);
-    res.json({ slides, total, page: pageNum, hasMore: pageNum * limitNum < total });
+    res.json({
+      slides: slides.map(normalizeSlideMedia),
+      total,
+      page: pageNum,
+      hasMore: pageNum * limitNum < total,
+    });
   } catch (err) {
     logger.error('Failed to fetch slides by topic', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch slides' });
@@ -215,10 +231,7 @@ const getOne = async (req, res) => {
       where: { slideId },
       select: { status: true, lastError: true, attempts: true, updatedAt: true },
     });
-    let hydrated = slide;
-    if (slide?.pdfUrl) hydrated = { ...hydrated, pdfUrl: await resolveStorageReadUrl(slide.pdfUrl) };
-    if (slide?.thumbnailUrl) hydrated = { ...hydrated, thumbnailUrl: await resolveStorageReadUrl(slide.thumbnailUrl) };
-    if (slide?.fileUrl) hydrated = { ...hydrated, fileUrl: await resolveStorageReadUrl(slide.fileUrl) };
+    const hydrated = normalizeSlideMedia(slide);
     res.json({
       ...hydrated,
       conversionJob: job || null,
@@ -749,10 +762,10 @@ const create = async (req, res) => {
         where: { id: slide.id },
         select: slideSelect,
       }).catch(() => null);
-      return res.status(201).json(fresh || { ...slide, conversionStatus: 'failed' });
+      return res.status(201).json(normalizeSlideMedia(fresh || { ...slide, conversionStatus: 'failed' }));
     }
 
-    res.status(201).json(slide);
+    res.status(201).json(normalizeSlideMedia(slide));
   } catch (err) {
     logger.error('Failed to upload slide', { error: err.message, stack: err.stack });
     cleanupUploadedFile(req.file);
@@ -773,10 +786,7 @@ const getBySlug = async (req, res) => {
       where: { slideId: slide.id },
       select: { status: true, lastError: true, attempts: true, updatedAt: true },
     });
-    let hydrated = slide;
-    if (slide?.pdfUrl) hydrated = { ...hydrated, pdfUrl: await resolveStorageReadUrl(slide.pdfUrl) };
-    if (slide?.thumbnailUrl) hydrated = { ...hydrated, thumbnailUrl: await resolveStorageReadUrl(slide.thumbnailUrl) };
-    if (slide?.fileUrl) hydrated = { ...hydrated, fileUrl: await resolveStorageReadUrl(slide.fileUrl) };
+    const hydrated = normalizeSlideMedia(slide);
     res.json({
       ...hydrated,
       conversionJob: job || null,
@@ -828,7 +838,10 @@ const getPdfForPreview = async (req, res) => {
     res.setHeader('Cache-Control', 'private, max-age=120, must-revalidate');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
-    const isRemote = /^https?:\/\//i.test(slide.pdfUrl);
+    const localCandidatePath = toUploadAbsPath(slide.pdfUrl);
+    const isRemote =
+      /^https?:\/\//i.test(slide.pdfUrl)
+      || (String(slide.pdfUrl || '').startsWith('/uploads/') && isRemoteEnabled() && (!localCandidatePath || !fs.existsSync(localCandidatePath)));
     if (isRemote) {
       const parsed = new URL(slide.pdfUrl);
       const allowedHosts = (process.env.ALLOWED_CDN_HOSTS || '').split(',').filter(Boolean);
@@ -875,7 +888,7 @@ const getPdfForPreview = async (req, res) => {
       return;
     }
 
-    const filePath = toUploadAbsPath(slide.pdfUrl);
+    const filePath = localCandidatePath;
     if (!filePath || !fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'PDF file not found' });
     }
@@ -919,7 +932,10 @@ const getPreviewMeta = async (req, res) => {
     for (let attempt = 1; attempt <= 4; attempt += 1) {
       try {
         let pdfBuffer = null;
-        const isRemote = /^https?:\/\//i.test(slide.pdfUrl);
+        const localCandidatePath = toUploadAbsPath(slide.pdfUrl);
+        const isRemote =
+          /^https?:\/\//i.test(slide.pdfUrl)
+          || (String(slide.pdfUrl || '').startsWith('/uploads/') && isRemoteEnabled() && (!localCandidatePath || !fs.existsSync(localCandidatePath)));
         if (isRemote) {
           const readUrl = await resolveStorageReadUrl(slide.pdfUrl);
           const upstream = await fetch(readUrl);
@@ -927,7 +943,7 @@ const getPreviewMeta = async (req, res) => {
           const raw = await upstream.arrayBuffer();
           pdfBuffer = Buffer.from(raw);
         } else {
-          const filePath = toUploadAbsPath(slide.pdfUrl);
+          const filePath = localCandidatePath;
           if (!filePath || !fs.existsSync(filePath)) throw new Error('PDF file not found');
           pdfBuffer = await fs.promises.readFile(filePath);
         }
@@ -965,7 +981,7 @@ const getPopular = async (req, res) => {
       take: 12,
       select: slideSelect,
     });
-    res.json(slides);
+    res.json(slides.map(normalizeSlideMedia));
   } catch (err) {
     logger.error('Failed to fetch popular slides', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch popular slides' });
@@ -1005,7 +1021,7 @@ const getMine = async (req, res) => {
       },
     });
 
-    res.json({ slides });
+    res.json({ slides: slides.map(normalizeSlideMedia) });
   } catch (err) {
     logger.error('Failed to fetch user slides (getMine)', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch your slides' });
@@ -1105,7 +1121,11 @@ const getRelated = async (req, res) => {
       }),
     ]);
 
-    res.json({ topicPopular, categoryLatest, newest });
+    res.json({
+      topicPopular: topicPopular.map(normalizeSlideMedia),
+      categoryLatest: categoryLatest.map(normalizeSlideMedia),
+      newest: newest.map(normalizeSlideMedia),
+    });
   } catch (err) {
     logger.error('Failed to fetch related slides', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch related slides' });

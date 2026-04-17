@@ -3,6 +3,7 @@ const { sanitizeText } = require('../lib/sanitize');
 const { toSlug, uniqueSlug } = require('../lib/slug');
 const logger = require('../lib/logger');
 const ttlCache = require('../lib/ttl-cache');
+const { normalizeMediaUrls } = require('../lib/media-normalize');
 
 const topicSelect = {
   id: true,
@@ -133,7 +134,7 @@ const getAll = async (req, res) => {
     ]);
 
     const normalizedTopics = await withGuaranteedSlugs(topics);
-    res.json({ topics: normalizedTopics, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
+    res.json(normalizeMediaUrls({ topics: normalizedTopics, total, page: Number(page), pages: Math.ceil(total / Number(limit)) }));
   } catch (err) {
     logger.error('Failed to fetch topics', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch topics' });
@@ -174,7 +175,7 @@ const getOne = async (req, res) => {
     }
 
     const normalizedTopic = await withGuaranteedSlug(topic);
-    res.json({ ...normalizedTopic, isSubscribed });
+    res.json(normalizeMediaUrls({ ...normalizedTopic, isSubscribed }));
   } catch (err) {
     logger.error('Failed to fetch topic (getOne)', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Konu yüklenemedi' });
@@ -219,7 +220,7 @@ const create = async (req, res) => {
       },
     });
     clearTopicCaches();
-    res.status(201).json(topic);
+    res.status(201).json(normalizeMediaUrls(topic));
   } catch (err) {
     logger.error('Failed to create topic', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Konu oluşturulamadı' });
@@ -273,7 +274,7 @@ const getBySlug = async (req, res) => {
       isSubscribed = Boolean(sub);
     }
     const normalizedTopic = await withGuaranteedSlug(topic);
-    res.json({ ...normalizedTopic, isSubscribed });
+    res.json(normalizeMediaUrls({ ...normalizedTopic, isSubscribed }));
   } catch (err) {
     logger.error('Failed to fetch topic (getBySlug)', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch topic' });
@@ -308,7 +309,7 @@ const update = async (req, res) => {
     }
     const updated = await prisma.topic.update({ where: { id: Number(id) }, data, select: topicSelect });
     clearTopicCaches();
-    res.json(updated);
+    res.json(normalizeMediaUrls(updated));
   } catch (err) {
     logger.error('Failed to update topic', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to update topic' });
@@ -339,7 +340,7 @@ const pinSlide = async (req, res) => {
         select: topicSelect,
       });
       clearTopicCaches();
-      return res.json(updated);
+      return res.json(normalizeMediaUrls(updated));
     }
 
     const slideId = Number(rawSlideId);
@@ -361,7 +362,7 @@ const pinSlide = async (req, res) => {
       select: topicSelect,
     });
     clearTopicCaches();
-    return res.json(updated);
+    return res.json(normalizeMediaUrls(updated));
   } catch (err) {
     logger.error('Failed to pin slide', { error: err.message, stack: err.stack });
     return res.status(500).json({ error: 'Failed to pin slide' });
@@ -372,7 +373,7 @@ const pinSlide = async (req, res) => {
 const getTrending = async (req, res) => {
   try {
     const cached = ttlCache.get('topic-trending', 'default');
-    if (cached) return res.json(cached);
+    if (cached) return res.json(normalizeMediaUrls(cached));
 
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // last 30 days
     const topics = await prisma.topic.findMany({
@@ -393,7 +394,7 @@ const getTrending = async (req, res) => {
 
     const normalized = await withGuaranteedSlugs(scored);
     ttlCache.set('topic-trending', 'default', normalized, 30_000);
-    res.json(normalized);
+    res.json(normalizeMediaUrls(normalized));
   } catch (err) {
     logger.error('Failed to fetch trending topics', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch trending topics' });
@@ -421,7 +422,7 @@ const search = async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(30, Math.max(1, parseInt(req.query.limit) || 10));
     if (!q.trim()) {
-      return res.json({
+      return res.json(normalizeMediaUrls({
         topics: [],
         slides: [],
         total: 0,
@@ -429,7 +430,7 @@ const search = async (req, res) => {
         pages: 0,
         totals: { topics: 0, slides: 0, all: 0 },
         paging: { topics: 0, slides: 0, max: 0 },
-      });
+      }));
     }
 
     const qNorm = normalizeTr(q);
@@ -476,7 +477,7 @@ const search = async (req, res) => {
     const topicsPage = allTopics.slice((page - 1) * limit, page * limit);
     const slidesPage = allSlides.slice((page - 1) * limit, page * limit);
 
-    res.json({
+    res.json(normalizeMediaUrls({
       topics: topicsPage,
       slides: slidesPage,
       total,
@@ -484,7 +485,7 @@ const search = async (req, res) => {
       pages: maxPages,
       totals: { topics: topicTotal, slides: slideTotal, all: total },
       paging: { topics: topicPages, slides: slidePages, max: maxPages },
-    });
+    }));
   } catch (err) {
     logger.error('Search failed', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Search failed' });
@@ -500,7 +501,7 @@ const getFeed = async (req, res) => {
     const limitNum = Math.min(50, Math.max(1, Number(limit)));
     const cacheKey = `u:${userId}|p:${pageNum}|l:${limitNum}`;
     const cached = ttlCache.get('topic-feed', cacheKey);
-    if (cached) return res.json(cached);
+    if (cached) return res.json(normalizeMediaUrls(cached));
 
     const [followedUsers, followedCategories, recentVisits, likedTopics, savedSlides] = await Promise.all([
       prisma.followedUser.findMany({ where: { followerId: userId }, select: { followingId: true } }),
@@ -606,7 +607,7 @@ const getFeed = async (req, res) => {
       isFallback,
     };
     ttlCache.set('topic-feed', cacheKey, payload, 15_000);
-    res.json(payload);
+    res.json(normalizeMediaUrls(payload));
   } catch (err) {
     logger.error('Failed to fetch feed', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch feed' });
@@ -660,7 +661,7 @@ const getMySubscriptions = async (req, res) => {
       },
       take: 100,
     });
-    res.json({ topics: rows.map((r) => r.topic).filter(Boolean) });
+    res.json(normalizeMediaUrls({ topics: rows.map((r) => r.topic).filter(Boolean) }));
   } catch (err) {
     logger.error('Failed to fetch subscriptions', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch subscriptions' });

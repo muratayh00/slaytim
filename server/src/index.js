@@ -28,7 +28,7 @@ const {
   getUploadPipelineHealth,
 } = require('./services/conversion.service');
 const { setupNotificationWebSocket } = require('./services/notification-stream.service');
-const { assertRemoteStorageConfigured } = require('./services/storage.service');
+const { assertRemoteStorageConfigured, isRemoteEnabled, resolveStorageReadUrl } = require('./services/storage.service');
 const { runPreflight } = require('./lib/preflight');
 const dedup = require('./lib/dedup');
 const prisma = require('./lib/prisma');
@@ -186,7 +186,28 @@ app.use((req, res, next) => {
 app.use('/uploads', (req, res, next) => {
   res.removeHeader('X-Frame-Options');
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
   next();
+}, async (req, res, next) => {
+  if (!isRemoteEnabled()) return next();
+  const requestedPath = String(req.path || '/').replace(/^\/+/, '');
+  const normalizedPath = `/uploads/${requestedPath}`;
+  const localPath = path.join(__dirname, '../uploads', requestedPath);
+  if (localPath && require('fs').existsSync(localPath)) return next();
+
+  try {
+    const signed = await resolveStorageReadUrl(normalizedPath);
+    if (typeof signed === 'string' && /^https?:\/\//i.test(signed)) {
+      return res.redirect(302, signed);
+    }
+    return res.status(404).json({ error: 'File not found' });
+  } catch (err) {
+    logger.error('[uploads] failed to resolve remote media', {
+      path: normalizedPath,
+      error: err?.message || String(err),
+    });
+    return res.status(502).json({ error: 'Remote media fetch failed' });
+  }
 }, express.static(path.join(__dirname, '../uploads'), {
   maxAge: '7d',
   immutable: false,

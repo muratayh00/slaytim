@@ -8,6 +8,7 @@ const {
   deleteStoredObject,
   extractStorageKeyFromUrl,
   resolveStorageReadUrl,
+  isRemoteEnabled,
 } = require('./storage.service');
 const { scanFile, hasClamAv, getClamScanBinary, isScanRequired } = require('./file-scan.service');
 const logger = require('../lib/logger');
@@ -551,7 +552,11 @@ async function convertSlide(slideId) {
   let uploadedThumbUrl = null;
   const libreOfficePath = getLibreOfficeBinary();
 
-  if (sourceIsRemote) {
+  const shouldFetchRemoteSource =
+    sourceIsRemote
+    || (slide.fileUrl?.startsWith('/uploads/') && isRemoteEnabled() && !fs.existsSync(inputPath));
+
+  if (shouldFetchRemoteSource) {
     const sourceReadUrl = await resolveStorageReadUrl(slide.fileUrl);
     const response = await fetch(sourceReadUrl);
     if (!response.ok) {

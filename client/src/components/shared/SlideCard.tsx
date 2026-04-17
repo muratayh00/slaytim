@@ -7,6 +7,7 @@ import { Heart, Bookmark, ArrowUpRight, Presentation, Lock, Eye } from 'lucide-r
 import { useAuthStore } from '@/store/auth';
 import { resolveFileUrl } from '@/lib/pdfRenderer';
 import { buildSlidePath } from '@/lib/url';
+import { isSignedMediaUrl } from '@/lib/media';
 
 const AVATAR_COLORS = ['bg-violet-500', 'bg-blue-500', 'bg-emerald-500', 'bg-orange-500', 'bg-pink-500', 'bg-cyan-500'];
 
@@ -33,6 +34,10 @@ export default function SlideCard({ slide }: SlideCardProps) {
   const fileExt = slide.fileUrl?.split('.').pop()?.toUpperCase() ?? 'PPTX';
   const [thumbError, setThumbError] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
+  const thumbSrc = resolveFileUrl(slide.thumbnailUrl || '');
+  const avatarSrc = resolveFileUrl(slide.user.avatarUrl || '');
+  const thumbNeedsBypass = isSignedMediaUrl(thumbSrc);
+  const avatarNeedsBypass = isSignedMediaUrl(avatarSrc);
 
   return (
     <Link href={buildSlidePath(slide)} className="block group">
@@ -40,11 +45,12 @@ export default function SlideCard({ slide }: SlideCardProps) {
         <div className="aspect-video relative overflow-hidden bg-muted border-b border-border/60">
           {slide.thumbnailUrl && !thumbError ? (
             <Image
-              src={resolveFileUrl(slide.thumbnailUrl)}
+              src={thumbSrc}
               alt={slide.title}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               className="object-cover"
+              unoptimized={thumbNeedsBypass}
               onError={() => setThumbError(true)}
             />
           ) : (
@@ -84,7 +90,15 @@ export default function SlideCard({ slide }: SlideCardProps) {
               <div className={`w-5 h-5 rounded-full ${avatarColor} flex items-center justify-center text-[8px] font-black text-white overflow-hidden shrink-0 relative`}>
                 {slide.user.username.slice(0, 1).toUpperCase()}
                 {slide.user.avatarUrl && !avatarError && (
-                  <Image src={resolveFileUrl(slide.user.avatarUrl)} alt={slide.user.username} fill sizes="20px" className="object-cover" onError={() => setAvatarError(true)} />
+                  <Image
+                    src={avatarSrc}
+                    alt={slide.user.username}
+                    fill
+                    sizes="20px"
+                    className="object-cover"
+                    unoptimized={avatarNeedsBypass}
+                    onError={() => setAvatarError(true)}
+                  />
                 )}
               </div>
               <span className="text-[11.5px] text-muted-foreground font-medium truncate">{slide.user.username}</span>

@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { Heart, Eye, Layers, ArrowUpRight } from 'lucide-react';
 import { formatRelative } from '@/lib/utils';
 import { buildTopicPath } from '@/lib/url';
-import { resolveMediaUrl } from '@/lib/media';
+import { resolveMediaUrl, isSignedMediaUrl } from '@/lib/media';
 
 interface TopicCardProps {
   topic: {
@@ -27,6 +27,7 @@ const AVATAR_COLORS = ['bg-violet-500', 'bg-blue-500', 'bg-emerald-500', 'bg-ora
 export default function TopicCard({ topic }: TopicCardProps) {
   const avatarColor = AVATAR_COLORS[topic.user.id % AVATAR_COLORS.length];
   const href = buildTopicPath(topic);
+  const avatarSrc = resolveMediaUrl(topic.user.avatarUrl);
 
   return (
     <Link href={href} className="block group">
@@ -46,8 +47,8 @@ export default function TopicCard({ topic }: TopicCardProps) {
         <div className="p-4">
           <div className="flex items-center gap-2 mb-2.5">
             <div className={`w-6 h-6 rounded-full ${avatarColor} flex items-center justify-center text-[9px] font-black text-white shrink-0 overflow-hidden relative`}>
-              {resolveMediaUrl(topic.user.avatarUrl)
-                ? <Image src={resolveMediaUrl(topic.user.avatarUrl)!} alt={topic.user.username} fill sizes="24px" className="object-cover" />
+              {avatarSrc
+                ? <Image src={avatarSrc} alt={topic.user.username} fill sizes="24px" className="object-cover" unoptimized={isSignedMediaUrl(avatarSrc)} />
                 : topic.user.username.slice(0, 2).toUpperCase()}
             </div>
             <span className="text-[12px] font-medium text-muted-foreground truncate">{topic.user.username}</span>
