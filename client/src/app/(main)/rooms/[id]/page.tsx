@@ -20,7 +20,7 @@ type RoomMessage = {
   };
 };
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5001/api').replace('/api', '');
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5001/api').replace(/\/api$/, '');
 
 export default function RoomDetailPage() {
   const { id } = useParams();

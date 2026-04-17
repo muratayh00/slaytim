@@ -45,7 +45,7 @@ const BG_GRADIENTS = [
   'from-amber-500/10 via-orange-500/5 to-transparent',
 ];
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5001/api').replace('/api', '');
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5001/api').replace(/\/api$/, '');
 
 function ConversionBanner({
   status,

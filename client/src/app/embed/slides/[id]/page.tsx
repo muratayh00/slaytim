@@ -6,7 +6,7 @@ import { Loader2, Presentation } from 'lucide-react';
 import SlideViewer from '@/components/shared/SlideViewer';
 import { buildSlidePath } from '@/lib/url';
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5001/api').replace('/api', '');
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5001/api').replace(/\/api$/, '');
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
 
 export default function EmbedSlidePage() {

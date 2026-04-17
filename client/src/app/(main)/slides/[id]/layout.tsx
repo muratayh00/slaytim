@@ -5,7 +5,7 @@ import { buildProfilePath, buildSlidePath, buildTopicPath, splitIdSlug } from '@
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
-const SERVER_BASE = API_URL.replace('/api', '');
+const SERVER_BASE = API_URL.replace(/\/api$/, '');
 
 function resolveUrl(path: string | null | undefined): string | undefined {
   if (!path) return undefined;
