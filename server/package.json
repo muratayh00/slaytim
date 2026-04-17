@@ -17,6 +17,8 @@
     "release:mark": "node scripts/release-mark.js",
     "release:rollback": "node scripts/release-rollback.js",
     "admin:create": "node scripts/create-admin.js",
+    "content:reset:dry": "node scripts/reset-all-content.js",
+    "content:reset": "node scripts/reset-all-content.js --confirm",
     "load:smoke": "node scripts/load-smoke.js",
     "test": "jest",
     "test:watch": "jest --watch",
