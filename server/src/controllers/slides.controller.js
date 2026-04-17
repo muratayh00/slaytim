@@ -892,7 +892,30 @@ const getPdfForPreview = async (req, res) => {
     if (!filePath || !fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'PDF file not found' });
     }
-    fs.createReadStream(filePath).pipe(res);
+
+    // Byte-range support: lets PDF.js fetch only the pages it needs,
+    // dramatically reducing time-to-first-page for large PDFs.
+    const stat = fs.statSync(filePath);
+    const fileSize = stat.size;
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Content-Length', fileSize);
+
+    const rangeHeader = req.headers.range;
+    if (rangeHeader) {
+      const [startStr, endStr] = rangeHeader.replace(/bytes=/, '').split('-');
+      const start = parseInt(startStr, 10);
+      const end = endStr ? parseInt(endStr, 10) : fileSize - 1;
+      if (isNaN(start) || start >= fileSize || end >= fileSize || start > end) {
+        res.setHeader('Content-Range', `bytes */${fileSize}`);
+        return res.status(416).end();
+      }
+      res.status(206);
+      res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+      res.setHeader('Content-Length', end - start + 1);
+      fs.createReadStream(filePath, { start, end }).pipe(res);
+    } else {
+      fs.createReadStream(filePath).pipe(res);
+    }
   } catch (err) {
     logger.error('Failed to stream pdf', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to stream pdf' });

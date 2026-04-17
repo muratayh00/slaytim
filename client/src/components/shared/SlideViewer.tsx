@@ -127,6 +127,9 @@ export default function SlideViewer({
   const pendingRenderCountRef = useRef(0);
   const storageKey = `slide_page_${slideId}`;
   const transitionKey = `slide_transition_${slideId}`;
+  // Keep fullscreen accessible inside renderPage without adding it to useCallback deps
+  const fullscreenRef = useRef(fullscreen);
+  useEffect(() => { fullscreenRef.current = fullscreen; }, [fullscreen]);
 
   // ── Load PDF ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -215,15 +218,23 @@ export default function SlideViewer({
     pendingRenderCountRef.current += 1;
     setRendering(true);
     try {
-      const w = Math.max(canvasRef.current.parentElement?.clientWidth ?? 800, 400);
-      // HiDPI/Retina desteği: DPR ≤ 2 ile sınırla (bellek/performans dengesi)
-      // CSS `w-full h-auto` canvas'ı container genişliğine sığdırır;
-      // 2x piksel çözünürlüğü Retina ekranlarda metin ve çizgileri çok daha net yapar.
+      const isFs = fullscreenRef.current;
+      const containerW = canvasRef.current.parentElement?.clientWidth ?? 800;
+      // Cap render width: 1200 px non-fullscreen keeps quality high without wasting pixels;
+      // fullscreen uses actual container width (can be larger on big monitors).
+      const w = isFs
+        ? Math.max(containerW, 400)
+        : Math.min(Math.max(containerW, 400), 1200);
+      // DPR 1.5 saves ~44% pixels vs 2 on Retina while remaining visually sharp.
       const dpr = Math.min(
         typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1,
-        2,
+        isFs ? 2 : 1.5,
       );
-      await renderPageToCanvas(doc, pageNum, canvasRef.current, w, dpr);
+      // Constrain height so portrait/A4 slides don't require vertical scrolling.
+      const maxH = isFs
+        ? undefined
+        : Math.min(Math.max((typeof window !== 'undefined' ? window.innerHeight : 800) - 260, 400), 800);
+      await renderPageToCanvas(doc, pageNum, canvasRef.current, w, dpr, maxH);
       if (seq === renderSeqRef.current) {
         localStorage.setItem(storageKey, String(pageNum));
       }
@@ -250,11 +261,11 @@ export default function SlideViewer({
   useEffect(() => {
     if (!doc || numPages === 0) return;
     let cancelled = false;
-    const before = 2;
-    // Grid modda daha fazla önbelleğe alınır ama ana iş parçacığını bloke etmemek için
-    // maksimum 20 sayfa ile sınırlandırıldı (önceki 36 → 20).
-    const after = showGrid ? 20 : 8;
-    const yieldMs = showGrid ? 18 : 10; // Grid modda UI'ya daha fazla nefes hakkı
+    const before = 1;
+    // Grid mode prefetches up to 10 visible thumbnails; normal mode only fetches
+    // the next 3 pages — enough to avoid loading spinners on fast swipes.
+    const after = showGrid ? 10 : 3;
+    const yieldMs = showGrid ? 20 : 12; // yield so main thread stays responsive
     const from = Math.max(1, currentPage - before);
     const to = Math.min(numPages, currentPage + after);
     const targets: number[] = [];
@@ -510,10 +521,10 @@ export default function SlideViewer({
               <Loader2 className="w-7 h-7 animate-spin text-white/30" />
             </div>
           )}
-          <div className={`w-full flex items-center justify-center ${!fullscreen ? 'min-h-[60vh]' : ''}`}>
+          <div className={`w-full flex items-center justify-center ${!fullscreen ? 'min-h-[30vh]' : ''}`}>
             <canvas
               ref={canvasRef}
-              className={fullscreen ? 'max-h-full max-w-full object-contain bg-white' : 'w-full h-auto block bg-white'}
+              className={fullscreen ? 'max-h-full max-w-full object-contain bg-white' : 'max-w-full h-auto block bg-white mx-auto'}
               style={{
                 transition: motionMode === 'snap' ? 'opacity 0.08s, transform 0.08s' : 'opacity 0.16s, transform 0.16s',
                 opacity: 1,

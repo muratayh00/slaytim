@@ -16,16 +16,15 @@ export async function GET(
 
   let upstream: Response;
   try {
-    upstream = await fetch(url, {
-      method: 'GET',
-      cache: 'no-store',
-      headers: {
-        accept: 'application/pdf,application/json;q=0.9,*/*;q=0.8',
-        cookie: req.headers.get('cookie') || '',
-        authorization: req.headers.get('authorization') || '',
-        'x-forwarded-for': req.headers.get('x-forwarded-for') || '',
-      },
-    });
+    const reqHeaders: Record<string, string> = {
+      accept: 'application/pdf,application/json;q=0.9,*/*;q=0.8',
+      cookie: req.headers.get('cookie') || '',
+      authorization: req.headers.get('authorization') || '',
+      'x-forwarded-for': req.headers.get('x-forwarded-for') || '',
+    };
+    const rangeHeader = req.headers.get('range');
+    if (rangeHeader) reqHeaders['range'] = rangeHeader;
+    upstream = await fetch(url, { method: 'GET', cache: 'no-store', headers: reqHeaders });
   } catch {
     return new NextResponse(JSON.stringify({ error: 'Backend unavailable' }), {
       status: 502,
@@ -49,8 +48,14 @@ export async function GET(
     });
   }
 
-  // Buffer the entire PDF before returning — more reliable than streaming in dev mode.
-  // PDFs are typically small enough (< 50 MB) that buffering is fine.
-  const buffer = await upstream.arrayBuffer();
-  return new NextResponse(buffer, { status: 200, headers });
+  // Stream the PDF directly — lets PDF.js start rendering while bytes are still in flight.
+  // Forward range-response headers so byte-range requests work end-to-end.
+  const cl = upstream.headers.get('content-length');
+  const cr = upstream.headers.get('content-range');
+  const ar = upstream.headers.get('accept-ranges');
+  if (cl) headers['content-length'] = cl;
+  if (cr) headers['content-range'] = cr;
+  if (ar) headers['accept-ranges'] = ar;
+  const status = upstream.status === 206 ? 206 : 200;
+  return new NextResponse(upstream.body, { status, headers });
 }

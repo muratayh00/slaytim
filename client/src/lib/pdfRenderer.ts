@@ -57,46 +57,34 @@ export function resolveFileUrl(path: string | null | undefined): string {
 }
 
 /**
- * Load a PDF document.
+ * Load a PDF document via PDF.js URL-based loading.
  *
- * IMPORTANT: pdfPath should always be a same-origin path like /api/slides/:id/pdf.
- * Direct Express URLs (http://localhost:5001/uploads/...) are cross-origin and will
- * be blocked by the browser's CORS/CORP restrictions.
+ * PDF.js fetches the file directly, using byte-range requests when the server
+ * supports them (our backend does), so only the pages actually needed are
+ * downloaded — dramatically reducing time-to-first-page for large PDFs.
  */
 export async function loadPdfDocument(pdfPath: string) {
   const lib = await getPdfjs();
-
   const resolved = resolveFileUrl(pdfPath);
-  console.log('[PDF] Fetching:', resolved);
-
-  const response = await fetch(resolved, {
-    method: 'GET',
-    credentials: 'include',
-    cache: 'no-store',
-  });
-
-  if (!response.ok) {
-    let errBody = '';
-    try { errBody = await response.text(); } catch {}
-    console.error(`[PDF] Fetch failed: HTTP ${response.status} ${response.statusText}`, errBody);
-    throw new Error(`PDF fetch failed: ${response.status}`);
-  }
-
-  const contentType = response.headers.get('content-type') || '';
-  const data = await response.arrayBuffer();
-  console.log('[PDF] Fetched OK — content-type:', contentType, 'bytes:', data.byteLength);
-
-  if (data.byteLength === 0) {
-    console.error('[PDF] Empty response body');
-    throw new Error('PDF response was empty');
-  }
+  console.log('[PDF] Loading:', resolved);
 
   try {
-    const doc = await lib.getDocument({ data: new Uint8Array(data) }).promise;
+    const doc = await lib.getDocument({
+      url: resolved,
+      withCredentials: true,   // send same-site cookies (SameSite=Lax ok across slaytim.com subdomains)
+      disableRange: false,     // enable byte-range requests
+      rangeChunkSize: 65536,   // 64 KB chunks — good balance for typical slide PDFs
+      disableStream: false,    // allow PDF.js to start rendering before full download
+      disableAutoFetch: false, // allow pre-fetching of remaining pages in background
+    }).promise;
     console.log('[PDF] Loaded OK — pages:', doc.numPages);
     return doc;
-  } catch (err) {
+  } catch (err: any) {
     console.error('[PDF] getDocument() failed:', err);
+    // UnexpectedResponseException carries the HTTP status
+    if (err?.name === 'UnexpectedResponseException') {
+      throw new Error(`PDF fetch failed: ${err.status ?? 'unknown'}`);
+    }
     throw err;
   }
 }
@@ -107,6 +95,7 @@ export async function renderPageToCanvas(
   canvas: HTMLCanvasElement,
   maxWidth: number,
   devicePixelRatio = 1,
+  maxHeight?: number, // CSS px — constrains tall/portrait slides to fit the viewport
 ): Promise<void> {
   const prevTask = activeCanvasRenderTasks.get(canvas);
   if (prevTask && typeof prevTask.cancel === 'function') {
@@ -117,7 +106,14 @@ export async function renderPageToCanvas(
   const baseVp = page.getViewport({ scale: 1, rotation: 0 });
   const safeMaxWidth = Math.max(320, Number.isFinite(maxWidth) ? maxWidth : 320);
   const safeDpr = Math.max(1, Number.isFinite(devicePixelRatio) ? devicePixelRatio : 1);
-  const scale = (safeMaxWidth / baseVp.width) * safeDpr;
+
+  let scale = (safeMaxWidth / baseVp.width) * safeDpr;
+  // Also constrain by height so portrait/A4 slides don't overflow the viewport.
+  if (maxHeight && Number.isFinite(maxHeight) && maxHeight > 0) {
+    const heightScale = (Math.max(240, maxHeight) / baseVp.height) * safeDpr;
+    if (heightScale < scale) scale = heightScale;
+  }
+
   const viewport = page.getViewport({ scale, rotation: 0 });
 
   // Render into an offscreen canvas first so the visible canvas is not cleared
