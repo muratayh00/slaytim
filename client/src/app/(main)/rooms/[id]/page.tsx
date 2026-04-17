@@ -23,6 +23,13 @@ type RoomMessage = {
 
 const API_ORIGIN = getApiOrigin();
 
+const formatMessageTime = (value: string | null | undefined) => {
+  if (!value) return '--:--';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '--:--';
+  return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+};
+
 export default function RoomDetailPage() {
   const { id } = useParams();
   const roomId = Number(id);
@@ -396,7 +403,7 @@ export default function RoomDetailPage() {
                               <div className={`font-semibold mb-1 ${mine ? 'text-white/90' : 'text-foreground'}`}>{m.user?.username || 'Kullanıcı'}</div>
                               <p className="whitespace-pre-wrap break-words leading-relaxed">{m.content}</p>
                               <div className={`mt-1 text-[10px] ${mine ? 'text-white/70' : 'text-muted-foreground'}`}>
-                                {new Date(m.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                {formatMessageTime(m.createdAt)}
                               </div>
                             </div>
                           </div>

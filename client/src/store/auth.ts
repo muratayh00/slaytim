@@ -43,12 +43,20 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   hydrate: async () => {
-    try {
-      const { data } = await api.get('/auth/me');
-      const resolvedUser = data?.user ?? (data?.id ? data : null);
-      set({ user: resolvedUser, token: null, isLoading: false });
-    } catch {
-      set({ user: null, token: null, isLoading: false });
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const { data } = await api.get('/auth/me');
+        const resolvedUser = data?.user ?? (data?.id ? data : null);
+        set({ user: resolvedUser, token: null, isLoading: false });
+        return;
+      } catch (err: any) {
+        const isNetworkIssue = !err?.response;
+        if (!isNetworkIssue || attempt === 3) {
+          set({ user: null, token: null, isLoading: false });
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+      }
     }
   },
 }));
