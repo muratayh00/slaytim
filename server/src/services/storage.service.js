@@ -98,8 +98,11 @@ async function putLocalFile(filePath, key, contentType) {
 async function putBuffer(buffer, key, contentType) {
   const c = getClient();
   if (!c) {
-    if (NODE_ENV === 'production') {
-      throw new Error('Remote storage is required in production');
+    // Same guard as putLocalFile: only fail hard when the operator explicitly
+    // chose s3/r2 but credentials are missing.  Self-hosted VPS with no remote
+    // driver configured should always fall through to local disk.
+    if (remoteDriverIntended()) {
+      throw new Error('Remote storage driver is configured but client could not be initialised — check STORAGE_BUCKET / STORAGE_ACCESS_KEY_ID / STORAGE_SECRET_ACCESS_KEY.');
     }
     const sanitizedKey = String(key || '').replace(/^\/+/, '');
     const localPath = path.join(__dirname, '../../uploads', sanitizedKey);

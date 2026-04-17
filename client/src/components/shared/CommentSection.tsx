@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { MessageCircle, Send, Trash2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import Image from 'next/image';
 import api from '@/lib/api';
 import { resolveMediaUrl } from '@/lib/media';
 import { useAuthStore } from '@/store/auth';
@@ -139,10 +138,12 @@ export default function CommentSection({ topicId }: { topicId: number }) {
                 <div key={comment.id} className="flex gap-3 group">
                     <Link href={`${buildProfilePath(comment.user.username)}`} className="shrink-0">
                       <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-xs font-bold text-white overflow-hidden relative`}>
-                        {resolveMediaUrl(comment.user.avatarUrl)
-                          ? <Image src={resolveMediaUrl(comment.user.avatarUrl)!} alt={comment.user.username} fill sizes="32px" className="object-cover" />
-                          : comment.user.username.slice(0, 2).toUpperCase()
-                        }
+                        {comment.user.username.slice(0, 2).toUpperCase()}
+                        {resolveMediaUrl(comment.user.avatarUrl) && (
+                          <img src={resolveMediaUrl(comment.user.avatarUrl)!} alt={comment.user.username}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                        )}
                       </div>
                     </Link>
                     <div className="flex-1 min-w-0">

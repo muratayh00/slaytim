@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import {
   TrendingUp, Layers, Plus, ChevronRight, Flame,
   ArrowRight, Rss, Search, Star, Play, Eye, Heart,
@@ -17,7 +16,6 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { resolveFileUrl } from '@/lib/pdfRenderer';
 import { buildSlideoPath, buildTopicCreatePath } from '@/lib/url';
-import { isSignedMediaUrl } from '@/lib/media';
 
 const CAT_ICONS: Record<string, string> = {
   'teknoloji': 'T', 'is-Girişimcilik': 'G', 'egitim': 'E',
@@ -398,13 +396,12 @@ function SlideoPreviewCard({ slideo }: { slideo: any }) {
     <Link href={buildSlideoPath({ id: slideo.id, title: slideo.title })} prefetch={false} className="shrink-0 w-[140px] flex flex-col rounded-xl border border-border bg-card hover:border-primary/40 transition-colors overflow-hidden group">
       <div className="h-[90px] bg-black/80 relative flex items-center justify-center overflow-hidden">
         {slideo.slide?.thumbnailUrl ? (
-          <Image
+          <img
             src={thumbSrc}
             alt=""
-            fill
-            sizes="140px"
-            className="object-cover opacity-90"
-            unoptimized={isSignedMediaUrl(thumbSrc)}
+            className="absolute inset-0 w-full h-full object-cover opacity-90"
+            loading="lazy"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
           />
         ) : (
           <Play className="w-8 h-8 text-white/20" fill="currentColor" />
@@ -417,7 +414,7 @@ function SlideoPreviewCard({ slideo }: { slideo: any }) {
         <div className="flex items-center gap-1 mt-auto">
           <div className={cn('w-4 h-4 rounded-full shrink-0 flex items-center justify-center text-[7px] font-black text-white overflow-hidden relative', SLIDEO_AVATAR_COLORS[slideo.user.id % SLIDEO_AVATAR_COLORS.length])}>
             {slideo.user.avatarUrl
-              ? <Image src={avatarSrc} alt="" fill sizes="16px" className="object-cover" unoptimized={isSignedMediaUrl(avatarSrc)} />
+              ? <img src={avatarSrc} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
               : slideo.user.username.slice(0, 1).toUpperCase()}
           </div>
           <span className="text-[9px] text-muted-foreground truncate">{slideo.user.username}</span>

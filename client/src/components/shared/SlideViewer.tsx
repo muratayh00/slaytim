@@ -11,6 +11,8 @@ import { loadPdfDocument, renderPageToCanvas, resolveFileUrl } from '@/lib/pdfRe
 interface SlideViewerProps {
   pdfUrl: string;
   slideId: number;
+  /** Thumbnail / cover image shown immediately while the PDF is loading */
+  coverUrl?: string;
   className?: string;
   transitionMode?: 'instant' | 'fade' | 'slide' | 'snap' | 'swipe' | 'auto';
   autoStepMs?: number;
@@ -101,6 +103,7 @@ async function setThumbIdb(slideId: number, pageNum: number, dataUrl: string): P
 export default function SlideViewer({
   pdfUrl,
   slideId,
+  coverUrl,
   className = '',
   transitionMode = 'fade',
   autoStepMs = 0,
@@ -118,6 +121,10 @@ export default function SlideViewer({
   const [showGrid, setShowGrid] = useState(false);
   const [activeTransition, setActiveTransition] = useState(transitionMode);
 
+  // firstRenderDone: tracks whether the canvas has painted at least one page.
+  // Used to keep the cover image visible until the canvas is ready.
+  const [firstRenderDone, setFirstRenderDone] = useState(false);
+  const firstRenderDoneRef = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const thumbStripRef = useRef<HTMLDivElement>(null);
@@ -139,6 +146,8 @@ export default function SlideViewer({
     setNumPages(0);
     setCurrentPage(1);
     setResumePage(null);
+    firstRenderDoneRef.current = false;
+    setFirstRenderDone(false);
 
     const loadWithRetry = async () => {
       // Always route through the Next.js proxy to stay same-origin.
@@ -231,12 +240,19 @@ export default function SlideViewer({
         isFs ? 2 : 1.5,
       );
       // Constrain height so portrait/A4 slides don't require vertical scrolling.
+      // Cap height so slides never overflow the viewport on first view.
+      // 640 px feels readable without being overwhelming; fullscreen is uncapped.
       const maxH = isFs
         ? undefined
-        : Math.min(Math.max((typeof window !== 'undefined' ? window.innerHeight : 800) - 260, 400), 800);
+        : Math.min(Math.max((typeof window !== 'undefined' ? window.innerHeight : 800) - 280, 360), 640);
       await renderPageToCanvas(doc, pageNum, canvasRef.current, w, dpr, maxH);
       if (seq === renderSeqRef.current) {
         localStorage.setItem(storageKey, String(pageNum));
+        // Signal that the canvas has painted its first frame so the cover can hide.
+        if (!firstRenderDoneRef.current) {
+          firstRenderDoneRef.current = true;
+          setFirstRenderDone(true);
+        }
       }
     } catch (err) {
       console.error('[SlideViewer] renderPage failed:', err);
@@ -395,12 +411,37 @@ export default function SlideViewer({
     );
   }
 
+  // ── Cover-aware loading state ─────────────────────────────────────────────
+  // While the PDF document is being fetched/parsed, show the slide thumbnail
+  // so users see real content instantly instead of a blank spinner.
   if (!doc) {
     return (
-      <div className={`flex items-center justify-center bg-muted rounded-2xl ${className}`} style={{ minHeight: '60vh' }}>
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-primary/40" />
-          <p className="text-sm text-muted-foreground">Slayt yükleniyor…</p>
+      <div className={`${className}`}>
+        <div className="relative rounded-2xl overflow-hidden bg-zinc-900">
+          {coverUrl ? (
+            <>
+              <img
+                src={coverUrl}
+                alt="Slayt önizlemesi"
+                className="w-full block"
+                style={{ maxHeight: '640px', objectFit: 'contain', background: '#18181b' }}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+              />
+              <div className="absolute inset-0 flex items-end justify-center pb-6 pointer-events-none">
+                <div className="flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1.5">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-white/80" />
+                  <span className="text-xs text-white/80 font-medium">PDF hazırlanıyor…</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-center" style={{ minHeight: '40vh' }}>
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="w-8 h-8 animate-spin text-primary/40" />
+                <p className="text-sm text-muted-foreground">Slayt yükleniyor…</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -489,6 +530,19 @@ export default function SlideViewer({
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
+        {/* Cover overlay: keeps cover visible for the ~100-300 ms gap between
+            setDoc() and the first canvas paint so the canvas never flashes blank. */}
+        {!firstRenderDone && coverUrl && (
+          <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden rounded-2xl">
+            <img
+              src={coverUrl}
+              alt=""
+              className="w-full h-full object-contain"
+              style={{ background: '#18181b' }}
+            />
+          </div>
+        )}
+
         {/* Resume banner */}
         <AnimatePresence>
           {resumePage !== null && resumePage > 1 && currentPage === resumePage && (

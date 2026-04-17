@@ -6,6 +6,7 @@ import { Loader2, Presentation } from 'lucide-react';
 import SlideViewer from '@/components/shared/SlideViewer';
 import { buildSlidePath } from '@/lib/url';
 import { getApiOrigin } from '@/lib/api-origin';
+import { resolveFileUrl } from '@/lib/pdfRenderer';
 
 const API_BASE = getApiOrigin();
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
@@ -73,7 +74,11 @@ export default function EmbedSlidePage() {
 
       {status === 'ready' && slide && (
         <div className="flex-1 overflow-auto px-2 py-2">
-          <SlideViewer pdfUrl={slide.pdfUrl} slideId={Number(id)} />
+          <SlideViewer
+            pdfUrl={slide.pdfUrl}
+            slideId={Number(id)}
+            coverUrl={resolveFileUrl(slide.thumbnailUrl) || undefined}
+          />
         </div>
       )}
 

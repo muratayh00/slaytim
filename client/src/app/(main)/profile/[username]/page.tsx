@@ -190,7 +190,8 @@ export default function ProfilePage({ forcedUsername }: ProfilePageProps) {
                 <div className="aspect-video bg-black/80 flex items-center justify-center relative">
                   {s.slide?.thumbnailUrl ? (
                     <img src={resolveFileUrl(s.slide.thumbnailUrl)}
-                      alt={s.title} className="w-full h-full object-cover opacity-80" />
+                      alt={s.title} className="w-full h-full object-cover opacity-80"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
                   ) : (
                     <Play className="w-10 h-10 text-white/30" fill="currentColor" />
                   )}

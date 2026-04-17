@@ -1,11 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Heart, Eye, Layers, ArrowUpRight } from 'lucide-react';
 import { formatRelative } from '@/lib/utils';
 import { buildTopicPath } from '@/lib/url';
-import { resolveMediaUrl, isSignedMediaUrl } from '@/lib/media';
+import { resolveMediaUrl } from '@/lib/media';
 
 interface TopicCardProps {
   topic: {
@@ -28,9 +28,13 @@ export default function TopicCard({ topic }: TopicCardProps) {
   const avatarColor = AVATAR_COLORS[topic.user.id % AVATAR_COLORS.length];
   const href = buildTopicPath(topic);
   const avatarSrc = resolveMediaUrl(topic.user.avatarUrl);
+  const [avatarError, setAvatarError] = useState(false);
 
   return (
-    <Link href={href} className="block group">
+    // prefetch={false}: topic cards appear in grids of 20+; aggressive prefetching
+    // fires an RSC request for every card entering the viewport, creating network
+    // spam.  Users navigate to topics on demand, so on-hover prefetch is enough.
+    <Link href={href} className="block group" prefetch={false}>
       <article className="bg-card border border-border rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all card-hover">
         <div className="px-4 py-3 border-b border-border/60 bg-muted/30 flex items-center justify-between">
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
@@ -46,10 +50,19 @@ export default function TopicCard({ topic }: TopicCardProps) {
 
         <div className="p-4">
           <div className="flex items-center gap-2 mb-2.5">
+            {/* Avatar: always render initials underneath; overlay img on top.
+                If the img fails (404, expired URL), onError hides it and the
+                coloured initial shows through — no broken-image icon ever. */}
             <div className={`w-6 h-6 rounded-full ${avatarColor} flex items-center justify-center text-[9px] font-black text-white shrink-0 overflow-hidden relative`}>
-              {avatarSrc
-                ? <Image src={avatarSrc} alt={topic.user.username} fill sizes="24px" className="object-cover" unoptimized={isSignedMediaUrl(avatarSrc)} />
-                : topic.user.username.slice(0, 2).toUpperCase()}
+              {topic.user.username.slice(0, 2).toUpperCase()}
+              {avatarSrc && !avatarError && (
+                <img
+                  src={avatarSrc}
+                  alt={topic.user.username}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={() => setAvatarError(true)}
+                />
+              )}
             </div>
             <span className="text-[12px] font-medium text-muted-foreground truncate">{topic.user.username}</span>
             <span className="text-[11px] text-muted-foreground/70 ml-auto shrink-0">{formatRelative(topic.createdAt)}</span>

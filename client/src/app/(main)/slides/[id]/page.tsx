@@ -785,6 +785,7 @@ export default function SlideDetailPage() {
           <SlideViewer
             pdfUrl={slide.pdfUrl}
             slideId={Number(id)}
+            coverUrl={resolveFileUrl(slide.thumbnailUrl) || undefined}
             className="mb-6"
             transitionMode="fade"
             onPageChange={setCurrentPage}

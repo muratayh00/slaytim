@@ -1,7 +1,6 @@
 ﻿'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Home, Compass, LayoutGrid, Play, FolderOpen,
@@ -189,9 +188,12 @@ export default function Sidebar() {
                 className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-muted/70 transition-colors w-full text-left"
               >
                 <div className="w-7 h-7 rounded-lg border border-border bg-muted/70 flex items-center justify-center text-[10px] font-black text-primary shrink-0 overflow-hidden relative">
-                  {resolveMediaUrl(user.avatarUrl)
-                    ? <Image src={resolveMediaUrl(user.avatarUrl)!} alt={user.username} fill sizes="28px" className="object-cover" />
-                    : user.username.slice(0, 2).toUpperCase()}
+                  {user.username.slice(0, 2).toUpperCase()}
+                  {resolveMediaUrl(user.avatarUrl) && (
+                    <img src={resolveMediaUrl(user.avatarUrl)!} alt={user.username}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[12.5px] font-bold truncate">{user.username}</p>
