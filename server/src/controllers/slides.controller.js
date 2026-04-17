@@ -18,6 +18,7 @@ const {
 const { notifyTopicSubscribers } = require('../services/topic-subscription.service');
 const logger = require('../lib/logger');
 const dedup = require('../lib/dedup');
+const { normalizeMediaUrls } = require('../lib/media-normalize');
 
 const slideSelect = {
   id: true,
@@ -115,15 +116,11 @@ const mapSlideUploadError = (err) => {
   };
 };
 
-const normalizeSlideMedia = (slide) => {
-  if (!slide || typeof slide !== 'object') return slide;
-  return {
-    ...slide,
-    fileUrl: toCanonicalMediaUrl(slide.fileUrl),
-    pdfUrl: toCanonicalMediaUrl(slide.pdfUrl),
-    thumbnailUrl: toCanonicalMediaUrl(slide.thumbnailUrl),
-  };
-};
+// normalizeSlideMedia: recursively normalises all media URL fields (fileUrl,
+// pdfUrl, thumbnailUrl, avatarUrl, …) in a slide object and any nested objects
+// (e.g. slide.user).  Uses the shared recursive normalizeMediaUrls helper so
+// that new fields added to slideSelect are covered automatically.
+const normalizeSlideMedia = (slide) => normalizeMediaUrls(slide);
 
 const upsertPageStat = async (slideId, pageNumber, increments = {}) => {
   const inc = {

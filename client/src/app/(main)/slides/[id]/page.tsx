@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useSearchParams, usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -510,7 +510,7 @@ export default function SlideDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [id, user, sessionId]);
+  }, [id, user?.id, sessionId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -539,7 +539,7 @@ export default function SlideDetailPage() {
     } catch {
       setFlashcardSets([]);
     }
-  }, [id, slide?.user?.id, user]);
+  }, [id, slide?.user?.id, user?.id]);
 
   useEffect(() => {
     loadFlashcards();
@@ -594,23 +594,30 @@ export default function SlideDetailPage() {
   }, [openSlideoWhenReady, slide]);
 
   // Poll conversion status
+  // Use a ref to read the latest status inside the interval without making
+  // conversionStatus a dep — otherwise the effect re-fires (and restarts the
+  // interval) on every 4-second tick, creating a cascade of redundant requests.
   const conversionStatus = slide?.conversionStatus;
+  const conversionStatusRef = useRef(conversionStatus);
+  useEffect(() => { conversionStatusRef.current = conversionStatus; }, [conversionStatus]);
 
   useEffect(() => {
-    if (!conversionStatus) return;
-    const status = conversionStatus;
-    if (status === 'done' || status === 'failed' || status === 'unsupported') return;
+    const initial = conversionStatusRef.current;
+    if (!initial) return;
+    if (initial === 'done' || initial === 'failed' || initial === 'unsupported') return;
+    let pollCount = 0;
+    const MAX_POLLS = 60; // 60 × 4 s = 4 minutes max
     const timer = setInterval(async () => {
+      if (++pollCount > MAX_POLLS) { clearInterval(timer); return; }
       try {
         const { data } = await api.get(`/slides/${id}`);
         setSlide((prev: any) => ({ ...prev, pdfUrl: data.pdfUrl, conversionStatus: data.conversionStatus }));
-        if (data.conversionStatus !== 'pending' && data.conversionStatus !== 'processing') {
-          clearInterval(timer);
-        }
+        const done = data.conversionStatus !== 'pending' && data.conversionStatus !== 'processing';
+        if (done) clearInterval(timer);
       } catch { clearInterval(timer); }
     }, 4000);
     return () => clearInterval(timer);
-  }, [conversionStatus, id]);
+  }, [id]); // intentionally omit conversionStatus — read via ref above
 
   const handleLike = async () => {
     if (!user) return toast.error('Beğenmek için giriş yapmalısın');

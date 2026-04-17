@@ -33,7 +33,7 @@ const TYPE_ICONS: Record<string, any> = {
 };
 
 // Keep fallback poll aggressive so users do not feel gaps when stream reconnects.
-const POLL_ACTIVE = 4000;
+const POLL_ACTIVE = 8000;
 const POLL_HIDDEN = 15000;
 const SSE_RECONNECT_BASE_MS = 500;
 const SSE_RECONNECT_MAX_MS = 5000;
@@ -229,21 +229,6 @@ export default function NotificationBell() {
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [user, realtimeConnected, fetchCount, syncMissedNotifications]);
-
-  useEffect(() => {
-    if (!open) return;
-    const interval = setInterval(async () => {
-      try {
-        await syncMissedNotifications();
-        if (!realtimeConnected) {
-          const { data } = await api.get('/notifications');
-          setNotifications(data);
-          setUnread(data.filter((n: Notification) => !n.isRead).length);
-        }
-      } catch {}
-    }, POLL_ACTIVE);
-    return () => clearInterval(interval);
-  }, [open, realtimeConnected, syncMissedNotifications]);
 
   const openPanel = async () => {
     if (open) {
