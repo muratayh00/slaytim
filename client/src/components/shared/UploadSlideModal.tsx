@@ -16,7 +16,7 @@ interface Props {
 }
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
-const CONVERSION_TIMEOUT_MS = 180_000; // 3 dakika
+const CONVERSION_TIMEOUT_MS = 45_000; // Kullanıcıyı bekletmemek için kısa polling, sonrası arka planda devam eder
 type UploadPhase = 'uploading' | 'converting';
 
 function navigateSafely(router: ReturnType<typeof useRouter>, path: string) {

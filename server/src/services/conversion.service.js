@@ -7,6 +7,7 @@ const {
   putLocalFile,
   deleteStoredObject,
   extractStorageKeyFromUrl,
+  resolveStorageReadUrl,
 } = require('./storage.service');
 const { scanFile, hasClamAv, getClamScanBinary, isScanRequired } = require('./file-scan.service');
 const logger = require('../lib/logger');
@@ -551,13 +552,28 @@ async function convertSlide(slideId) {
   const libreOfficePath = getLibreOfficeBinary();
 
   if (sourceIsRemote) {
-    const response = await fetch(slide.fileUrl);
-    if (!response.ok) throw new Error(`Remote source download failed (${response.status})`);
+    const sourceReadUrl = await resolveStorageReadUrl(slide.fileUrl);
+    const response = await fetch(sourceReadUrl);
+    if (!response.ok) {
+      throw new Error(`Remote source download failed (${response.status})`);
+    }
     const tempName = `source-${slideId}-${Date.now()}${ext || '.bin'}`;
     tempInputPath = path.join(UPLOADS_DIR, tempName);
     const arr = await response.arrayBuffer();
-    await fs.promises.writeFile(tempInputPath, Buffer.from(arr));
+    const sourceBuffer = Buffer.from(arr);
+    await fs.promises.writeFile(tempInputPath, sourceBuffer);
     inputPath = tempInputPath;
+    logger.info('[conversion] Source file downloaded', {
+      slideId,
+      sourceHost: (() => {
+        try {
+          return new URL(sourceReadUrl).hostname;
+        } catch {
+          return 'unknown';
+        }
+      })(),
+      bytes: sourceBuffer.length,
+    });
   }
 
   try {

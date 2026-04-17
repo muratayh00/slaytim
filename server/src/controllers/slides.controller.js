@@ -7,7 +7,12 @@ const { enqueueSlideConversion } = require('../services/conversion.service');
 const { sanitizeText } = require('../lib/sanitize');
 const { toSlug, uniqueSlug, randomSuffix } = require('../lib/slug');
 const { cleanupUploadedFile } = require('../middleware/upload');
-const { putLocalFile, isRemoteEnabled, deleteStoredObject } = require('../services/storage.service');
+const {
+  putLocalFile,
+  isRemoteEnabled,
+  deleteStoredObject,
+  resolveStorageReadUrl,
+} = require('../services/storage.service');
 const { notifyTopicSubscribers } = require('../services/topic-subscription.service');
 const logger = require('../lib/logger');
 const dedup = require('../lib/dedup');
@@ -209,8 +214,12 @@ const getOne = async (req, res) => {
       where: { slideId },
       select: { status: true, lastError: true, attempts: true, updatedAt: true },
     });
+    let hydrated = slide;
+    if (slide?.pdfUrl) hydrated = { ...hydrated, pdfUrl: await resolveStorageReadUrl(slide.pdfUrl) };
+    if (slide?.thumbnailUrl) hydrated = { ...hydrated, thumbnailUrl: await resolveStorageReadUrl(slide.thumbnailUrl) };
+    if (slide?.fileUrl) hydrated = { ...hydrated, fileUrl: await resolveStorageReadUrl(slide.fileUrl) };
     res.json({
-      ...slide,
+      ...hydrated,
       conversionJob: job || null,
     });
   } catch (err) {
@@ -763,8 +772,12 @@ const getBySlug = async (req, res) => {
       where: { slideId: slide.id },
       select: { status: true, lastError: true, attempts: true, updatedAt: true },
     });
+    let hydrated = slide;
+    if (slide?.pdfUrl) hydrated = { ...hydrated, pdfUrl: await resolveStorageReadUrl(slide.pdfUrl) };
+    if (slide?.thumbnailUrl) hydrated = { ...hydrated, thumbnailUrl: await resolveStorageReadUrl(slide.thumbnailUrl) };
+    if (slide?.fileUrl) hydrated = { ...hydrated, fileUrl: await resolveStorageReadUrl(slide.fileUrl) };
     res.json({
-      ...slide,
+      ...hydrated,
       conversionJob: job || null,
     });
   } catch (err) {
@@ -826,7 +839,8 @@ const getPdfForPreview = async (req, res) => {
           return res.status(403).json({ error: 'Forbidden URL' });
         }
       }
-      const upstream = await fetch(slide.pdfUrl);
+      const readUrl = await resolveStorageReadUrl(slide.pdfUrl);
+      const upstream = await fetch(readUrl);
       if (!upstream.ok) {
         return res.status(502).json({ error: 'Remote PDF fetch failed' });
       }
@@ -881,7 +895,8 @@ const getPreviewMeta = async (req, res) => {
         let pdfBuffer = null;
         const isRemote = /^https?:\/\//i.test(slide.pdfUrl);
         if (isRemote) {
-          const upstream = await fetch(slide.pdfUrl);
+          const readUrl = await resolveStorageReadUrl(slide.pdfUrl);
+          const upstream = await fetch(readUrl);
           if (!upstream.ok) throw new Error('Remote PDF fetch failed');
           const raw = await upstream.arrayBuffer();
           pdfBuffer = Buffer.from(raw);

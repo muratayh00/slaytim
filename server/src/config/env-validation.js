@@ -182,6 +182,8 @@ function validateEnv() {
   }
 
   const storageDriver = String(process.env.STORAGE_DRIVER || '').toLowerCase();
+  const storageRegion = String(process.env.STORAGE_REGION || '').trim();
+  const storageEndpoint = String(process.env.STORAGE_ENDPOINT || '').trim();
   if (storageDriver) {
     if (!['s3', 'r2'].includes(storageDriver)) {
       rows.push({
@@ -192,6 +194,46 @@ function validateEnv() {
       hasFatal = true;
     } else {
       rows.push({ key: 'STORAGE_DRIVER(format)', status: 'OK', note: storageDriver });
+    }
+  }
+
+  if (storageDriver === 's3' && storageRegion.toLowerCase() === 'auto') {
+    rows.push({
+      key: 'STORAGE_REGION(s3)',
+      status: 'FAIL',
+      note: 'S3 icin STORAGE_REGION=auto gecersiz. Gercek AWS region kullanin (ornek: eu-central-1).',
+    });
+    hasFatal = true;
+  } else if (storageDriver === 's3' && storageRegion) {
+    rows.push({
+      key: 'STORAGE_REGION(s3)',
+      status: 'OK',
+      note: storageRegion,
+    });
+  }
+
+  if (storageDriver === 'r2') {
+    if (!storageEndpoint || !/^https?:\/\//i.test(storageEndpoint)) {
+      rows.push({
+        key: 'STORAGE_ENDPOINT(r2)',
+        status: 'FAIL',
+        note: 'R2 icin STORAGE_ENDPOINT zorunlu ve tam URL olmali (https://<account>.r2.cloudflarestorage.com).',
+      });
+      hasFatal = true;
+    } else {
+      rows.push({
+        key: 'STORAGE_ENDPOINT(r2)',
+        status: 'OK',
+        note: storageEndpoint,
+      });
+    }
+    if (storageRegion && storageRegion.toLowerCase() !== 'auto') {
+      rows.push({
+        key: 'STORAGE_REGION(r2)',
+        status: isProd ? 'FAIL' : 'WARN',
+        note: 'R2 ile STORAGE_REGION=auto onerilir.',
+      });
+      if (isProd) hasFatal = true;
     }
   }
 

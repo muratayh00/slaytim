@@ -58,6 +58,17 @@ function getClient() {
   return client;
 }
 
+async function signStorageKey(key) {
+  const c = getClient();
+  if (!c) return null;
+  if (!key || typeof key !== 'string') return null;
+  return getSignedUrl(
+    c,
+    new GetObjectCommand({ Bucket: BUCKET, Key: key }),
+    { expiresIn: SIGNED_URL_TTL_SECONDS },
+  );
+}
+
 async function putLocalFile(filePath, key, contentType) {
   const c = getClient();
   if (!c) {
@@ -150,6 +161,23 @@ function extractStorageKeyFromUrl(fileUrl) {
   }
 }
 
+async function resolveStorageReadUrl(fileUrl) {
+  if (!fileUrl || typeof fileUrl !== 'string') return fileUrl;
+  if (fileUrl.startsWith('/uploads/')) return fileUrl;
+  if (!/^https?:\/\//i.test(fileUrl)) return fileUrl;
+  if (!isRemoteEnabled()) return fileUrl;
+
+  const key = extractStorageKeyFromUrl(fileUrl);
+  if (!key) return fileUrl;
+
+  try {
+    const signed = await signStorageKey(key);
+    return signed || fileUrl;
+  } catch {
+    return fileUrl;
+  }
+}
+
 async function deleteStoredObject(fileUrl) {
   if (!fileUrl) return { deleted: false, reason: 'empty' };
 
@@ -189,6 +217,7 @@ module.exports = {
   assertRemoteStorageConfigured,
   putLocalFile,
   putBuffer,
+  resolveStorageReadUrl,
   toUploadsUrl,
   extractStorageKeyFromUrl,
   deleteStoredObject,
