@@ -8,6 +8,7 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import toast from 'react-hot-toast';
 import { buildTopicCreatePath, buildTopicPath } from '@/lib/url';
+import { getApiOrigin } from '@/lib/api-origin';
 
 type RoomMessage = {
   id: number;
@@ -20,7 +21,7 @@ type RoomMessage = {
   };
 };
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5001/api').replace(/\/api$/, '');
+const API_ORIGIN = getApiOrigin();
 
 export default function RoomDetailPage() {
   const { id } = useParams();
@@ -99,7 +100,7 @@ export default function RoomDetailPage() {
       streamRef.current = null;
     }
 
-    const url = `${API_BASE}/api/rooms/${roomId}/messages/stream`;
+    const url = `${API_ORIGIN}/api/rooms/${roomId}/messages/stream`;
     const stream = new EventSource(url, { withCredentials: true });
     streamRef.current = stream;
 

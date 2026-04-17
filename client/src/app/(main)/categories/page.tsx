@@ -2,8 +2,9 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { FolderTree } from 'lucide-react';
 import { CategoryItem, groupCategories } from '@/lib/categorySeo';
+import { getApiBaseUrl } from '@/lib/api-origin';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+const API_URL = getApiBaseUrl();
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
 
 export const revalidate = 3600;

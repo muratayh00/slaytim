@@ -7,6 +7,7 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { formatDate } from '@/lib/utils';
+import { getApiOrigin } from '@/lib/api-origin';
 
 interface Notification {
   id: number;
@@ -36,7 +37,7 @@ const POLL_ACTIVE = 4000;
 const POLL_HIDDEN = 15000;
 const SSE_RECONNECT_BASE_MS = 500;
 const SSE_RECONNECT_MAX_MS = 5000;
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api').replace(/\/api\/?$/, '');
+const API_ORIGIN = getApiOrigin();
 const logSoftError = (scope: string, err?: unknown) => {
   if (process.env.NODE_ENV !== 'production') {
     console.warn(`[NotificationBell] ${scope}`, err);
@@ -144,7 +145,7 @@ export default function NotificationBell() {
       sseRef.current = null;
     }
 
-    const stream = new EventSource(`${API_BASE}/api/notifications/stream`, { withCredentials: true });
+    const stream = new EventSource(`${API_ORIGIN}/api/notifications/stream`, { withCredentials: true });
     sseRef.current = stream;
 
     stream.addEventListener('unread_count', (ev: MessageEvent) => {

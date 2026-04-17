@@ -22,6 +22,7 @@ import CreateSlideoModal from '@/components/slideo/CreateSlideoModal';
 import { analytics } from '@/lib/analytics';
 import { resolveFileUrl } from '@/lib/pdfRenderer';
 import { buildProfilePath, buildSlideoPath, buildTopicPath, splitIdSlug } from '@/lib/url';
+import { getApiOrigin } from '@/lib/api-origin';
 import AdUnit from '@/components/shared/AdUnit';
 
 const logSoftError = (scope: string, err?: unknown) => {
@@ -45,7 +46,7 @@ const BG_GRADIENTS = [
   'from-amber-500/10 via-orange-500/5 to-transparent',
 ];
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5001/api').replace(/\/api$/, '');
+const API_BASE = getApiOrigin();
 
 function ConversionBanner({
   status,

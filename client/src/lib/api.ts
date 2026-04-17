@@ -1,13 +1,8 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { getApiBaseUrl } from './api-origin';
 
-// In production the env var must be set. In development fall back to localhost
-// so `npm run dev` works without extra configuration.
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  (process.env.NODE_ENV === 'production'
-    ? (() => { throw new Error('NEXT_PUBLIC_API_URL env var is required in production'); })()
-    : 'http://localhost:5001/api');
+const API_BASE_URL = getApiBaseUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,

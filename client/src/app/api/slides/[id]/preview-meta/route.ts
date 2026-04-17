@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
+import { getApiBaseUrl } from '@/lib/api-origin';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+const API_BASE = getApiBaseUrl();
 
 function getBackendUrl(id: string, search: string): string {
   const base = API_BASE.replace(/\/+$/, '');
@@ -33,4 +34,3 @@ export async function GET(
     },
   });
 }
-

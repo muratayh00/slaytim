@@ -2,10 +2,11 @@ import type { Metadata } from 'next';
 import Script from 'next/script';
 import { Suspense } from 'react';
 import { buildProfilePath, buildSlidePath, buildTopicPath, splitIdSlug } from '@/lib/url';
+import { getApiBaseUrl, getApiOrigin } from '@/lib/api-origin';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+const API_URL = getApiBaseUrl();
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
-const SERVER_BASE = API_URL.replace(/\/api$/, '');
+const SERVER_BASE = getApiOrigin();
 
 function resolveUrl(path: string | null | undefined): string | undefined {
   if (!path) return undefined;

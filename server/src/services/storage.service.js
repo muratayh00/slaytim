@@ -24,21 +24,22 @@ function isRemoteEnabled() {
   return Boolean(BUCKET && ACCESS_KEY_ID && SECRET_ACCESS_KEY);
 }
 
+// Whether the operator explicitly chose a remote driver (s3/r2).
+// Absence of STORAGE_DRIVER (or STORAGE_DRIVER=local) means "use local disk".
+function remoteDriverIntended() {
+  return ['s3', 'r2'].includes(STORAGE_DRIVER);
+}
+
 function assertRemoteStorageConfigured() {
-  const allowLocalDev = NODE_ENV !== 'production' && String(process.env.ALLOW_LOCAL_STORAGE_DEV || 'true') !== 'false';
-  if (!['s3', 'r2'].includes(STORAGE_DRIVER)) {
-    if (allowLocalDev) {
-      console.warn('[storage] Remote storage disabled in development; using local uploads fallback.');
-      return;
-    }
-    throw new Error('STORAGE_DRIVER must be "s3" or "r2". Local storage fallback is disabled.');
+  if (!remoteDriverIntended()) {
+    // Local disk mode — valid for self-hosted VPS deployments.
+    console.warn('[storage] No remote storage driver configured (STORAGE_DRIVER not set or "local"); using local disk uploads.');
+    return;
   }
   if (!BUCKET || !ACCESS_KEY_ID || !SECRET_ACCESS_KEY) {
-    if (allowLocalDev) {
-      console.warn('[storage] Remote storage credentials missing in development; using local uploads fallback.');
-      return;
-    }
-    throw new Error('Remote storage credentials are missing (STORAGE_BUCKET/STORAGE_ACCESS_KEY_ID/STORAGE_SECRET_ACCESS_KEY).');
+    const msg = 'Remote storage credentials are missing (STORAGE_BUCKET / STORAGE_ACCESS_KEY_ID / STORAGE_SECRET_ACCESS_KEY).';
+    if (NODE_ENV === 'production') throw new Error(msg);
+    console.warn(`[storage] ${msg} Using local uploads fallback.`);
   }
 }
 
@@ -60,12 +61,16 @@ function getClient() {
 async function putLocalFile(filePath, key, contentType) {
   const c = getClient();
   if (!c) {
-    if (NODE_ENV === 'production') {
-      throw new Error('Remote storage is required in production');
+    // No remote client — fall back to local disk.
+    // This is valid for self-hosted VPS deployments where the filesystem is
+    // persistent.  Only throw when the operator explicitly chose s3/r2 but
+    // the credentials are misconfigured (remoteDriverIntended() + no client).
+    if (remoteDriverIntended()) {
+      throw new Error('Remote storage driver is configured but client could not be initialised — check STORAGE_BUCKET / STORAGE_ACCESS_KEY_ID / STORAGE_SECRET_ACCESS_KEY.');
     }
     const fallbackUrl = toUploadsUrl(filePath);
     if (fallbackUrl) return fallbackUrl;
-    throw new Error('Remote storage is not configured');
+    throw new Error('Could not resolve upload path for local storage.');
   }
   const body = await fs.promises.readFile(filePath);
   await c.send(

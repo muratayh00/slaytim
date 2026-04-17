@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Users, Plus, Lock, Globe, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
@@ -18,6 +19,7 @@ type Room = {
 };
 
 export default function RoomsPage() {
+  const router = useRouter();
   const { user } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -29,6 +31,24 @@ export default function RoomsPage() {
   const [privateAccessBusy, setPrivateAccessBusy] = useState(false);
 
   const myRoomIds = useMemo(() => new Set(myRooms.map((r) => r.id)), [myRooms]);
+
+  const navigateSafely = useCallback((path: string) => {
+    try {
+      router.push(path);
+      setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          const expectedPath = path.split('?')[0];
+          if (window.location.pathname !== expectedPath) {
+            window.location.assign(path);
+          }
+        }
+      }, 1200);
+    } catch {
+      if (typeof window !== 'undefined') {
+        window.location.assign(path);
+      }
+    }
+  }, [router]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -55,7 +75,7 @@ export default function RoomsPage() {
     if (!form.name.trim()) return;
     setCreateBusy(true);
     try {
-      await api.post('/rooms', {
+      const { data } = await api.post('/rooms', {
         name: form.name.trim(),
         description: form.description.trim() || undefined,
         isPublic: form.isPublic,
@@ -63,8 +83,12 @@ export default function RoomsPage() {
       });
       setForm({ name: '', description: '', isPublic: true, accessPassword: '' });
       setCreateOpen(false);
-      await load();
       toast.success('Oda olusturuldu');
+      if (data?.id) {
+        navigateSafely(`/rooms/${data.id}`);
+        return;
+      }
+      await load();
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Oda olusturulamadi');
     } finally {

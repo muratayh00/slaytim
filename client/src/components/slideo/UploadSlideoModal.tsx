@@ -6,6 +6,7 @@ import { AlertTriangle, Check, ChevronRight, Loader2, Play, Upload, X } from 'lu
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
+import { getApiOrigin } from '@/lib/api-origin';
 
 type Step = 'upload' | 'converting' | 'select';
 type ConversionPhase = 'uploading' | 'converting' | 'preparing';
@@ -131,8 +132,7 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
     const previewUrl = String(data?.previewUrl || '').trim();
     if (!previewUrl) throw new Error('Preview URL missing');
 
-    const apiBase = String(api.defaults.baseURL || 'http://localhost:5001/api').replace(/\/+$/, '');
-    const apiOrigin = apiBase.replace(/\/api\/?$/, '');
+    const apiOrigin = getApiOrigin();
     const absolutePreview = previewUrl.startsWith('http')
       ? previewUrl
       : `${apiOrigin}${previewUrl.startsWith('/') ? '' : '/'}${previewUrl}`;

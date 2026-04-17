@@ -57,6 +57,57 @@ const toPageNumber = (value) => {
   return n;
 };
 
+const mapSlideUploadError = (err) => {
+  const message = String(err?.message || '').toLowerCase();
+
+  if (message.includes('topic not found')) {
+    return { status: 404, error: 'Topic not found', code: 'TOPIC_NOT_FOUND' };
+  }
+  if (message.includes('remote storage driver is configured but client could not be initialised')) {
+    return {
+      status: 503,
+      error: 'Depolama servisi hazir degil. STORAGE_* ayarlarini kontrol edin.',
+      code: 'STORAGE_NOT_READY',
+    };
+  }
+  if (message.includes('remote storage credentials are missing')) {
+    return {
+      status: 503,
+      error: 'Depolama kimlik bilgileri eksik. STORAGE_* env degerlerini tamamlayin.',
+      code: 'STORAGE_CONFIG_MISSING',
+    };
+  }
+  if (message.includes('could not resolve upload path for local storage')) {
+    return {
+      status: 500,
+      error: 'Yerel depolama yolu cozumlenemedi.',
+      code: 'STORAGE_PATH_INVALID',
+    };
+  }
+  if (
+    message.includes('credentialsprovidererror')
+    || message.includes('accessdenied')
+    || message.includes('invalidaccesskeyid')
+    || message.includes('signaturedoesnotmatch')
+    || message.includes('nosuchbucket')
+    || message.includes('requesttimeout')
+    || message.includes('getaddrinfo')
+    || message.includes('econnrefused')
+  ) {
+    return {
+      status: 503,
+      error: 'Depolama servisine baglanti basarisiz. Bucket ve kimlik bilgilerini kontrol edin.',
+      code: 'STORAGE_UNAVAILABLE',
+    };
+  }
+
+  return {
+    status: 500,
+    error: 'Failed to upload slide',
+    code: 'UPLOAD_FAILED',
+  };
+};
+
 const upsertPageStat = async (slideId, pageNumber, increments = {}) => {
   const inc = {
     viewCount: Number(increments.viewCount || 0),
@@ -695,7 +746,11 @@ const create = async (req, res) => {
   } catch (err) {
     logger.error('Failed to upload slide', { error: err.message, stack: err.stack });
     cleanupUploadedFile(req.file);
-    res.status(500).json({ error: 'Failed to upload slide' });
+    const mapped = mapSlideUploadError(err);
+    res.status(mapped.status).json({
+      error: mapped.error,
+      code: mapped.code || 'UPLOAD_FAILED',
+    });
   }
 };
 

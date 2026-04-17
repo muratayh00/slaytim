@@ -3,10 +3,11 @@ import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import SlideoDetailPreview from '@/components/slideo/SlideoDetailPreview';
 import { buildSlidePath, buildSlideoPath, buildTopicPath, splitIdSlug } from '@/lib/url';
+import { getApiBaseUrl, getApiOrigin } from '@/lib/api-origin';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+const API_URL = getApiBaseUrl();
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
-const SERVER_BASE = API_URL.replace(/\/api$/, '');
+const SERVER_BASE = getApiOrigin();
 
 type SlideoDetail = {
   id: number;

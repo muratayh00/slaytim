@@ -14,14 +14,9 @@
  *  4. Fix accidental double /api/api/ segment produced by some legacy helpers
  */
 
-// Derive the server origin from the API URL env var.
-// NEXT_PUBLIC_API_URL is expected to be "https://api.slaytim.com/api".
-// Stripping the trailing /api gives us the upload-serving origin.
-const _apiBase =
-  process.env.NEXT_PUBLIC_API_URL ??
-  (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001/api');
+import { getApiOrigin } from './api-origin';
 
-const _serverBase = _apiBase.replace(/\/api$/, '');
+const _serverBase = getApiOrigin();
 
 export function resolveMediaUrl(url: string | null | undefined): string | null {
   if (!url || typeof url !== 'string') return null;

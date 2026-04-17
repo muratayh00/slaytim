@@ -1,6 +1,7 @@
 /**
  * Type-safe access to NEXT_PUBLIC_* environment variables.
  */
+import { getApiBaseUrl } from './api-origin';
 
 const forbiddenPublicDbKeys = [
   'NEXT_PUBLIC_SUPABASE_URL',
@@ -20,7 +21,7 @@ if (leakedPublicDbKeys.length > 0) {
 }
 
 export const env = {
-  API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api',
+  API_URL: getApiBaseUrl(),
   SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
   UPLOAD_HOST: process.env.NEXT_PUBLIC_UPLOAD_HOST || '',
   GA_MEASUREMENT_ID: process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || '',

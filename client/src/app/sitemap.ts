@@ -1,8 +1,9 @@
 import { MetadataRoute } from 'next';
 import { buildCategoryPath, buildSlideoPath, buildSlidePath, buildTopicPath } from '@/lib/url';
+import { getApiBaseUrl } from '@/lib/api-origin';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+const API_URL = getApiBaseUrl().replace(/\/+$/, '');
 const FETCH_TIMEOUT_MS = 5000;
 
 function toSafeDate(input?: string): Date {

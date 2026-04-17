@@ -25,8 +25,39 @@ function isPublicAsset(pathname: string): boolean {
   );
 }
 
+function getCanonicalHost(): string | null {
+  const fromSiteUrl = String(process.env.NEXT_PUBLIC_SITE_URL || "").trim();
+  if (fromSiteUrl) {
+    try {
+      const parsed = new URL(fromSiteUrl);
+      return parsed.host.toLowerCase();
+    } catch {
+      // fallthrough
+    }
+  }
+  const fromEnv = String(process.env.CANONICAL_HOST || "").trim().toLowerCase();
+  return fromEnv || null;
+}
+
+function enforceCanonicalHost(request: NextRequest): NextResponse | null {
+  if (process.env.NODE_ENV !== "production") return null;
+  const canonicalHost = getCanonicalHost();
+  if (!canonicalHost) return null;
+
+  const currentHost = request.nextUrl.host.toLowerCase();
+  if (currentHost === canonicalHost) return null;
+
+  const url = request.nextUrl.clone();
+  url.protocol = "https:";
+  url.host = canonicalHost;
+  return NextResponse.redirect(url, 308);
+}
+
 export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
+
+  const canonicalRedirect = enforceCanonicalHost(request);
+  if (canonicalRedirect) return canonicalRedirect;
 
   if (isPublicAsset(pathname)) return NextResponse.next();
 

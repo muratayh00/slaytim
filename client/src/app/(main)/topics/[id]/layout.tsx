@@ -1,8 +1,9 @@
 ﻿import type { Metadata } from 'next';
 import Script from 'next/script';
+import { getApiBaseUrl } from '@/lib/api-origin';
 import { buildProfilePath, buildTopicPath } from '@/lib/url';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+const API_URL = getApiBaseUrl();
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
 
 type RouteParams = { id?: string; slug?: string };
@@ -101,3 +102,4 @@ export default async function TopicLayout({
     </>
   );
 }
+

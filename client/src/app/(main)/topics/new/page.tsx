@@ -13,6 +13,24 @@ import { buildTopicPath } from '@/lib/url';
 const TITLE_MAX = 200;
 const DESC_MAX  = 1000;
 
+function navigateSafely(router: ReturnType<typeof useRouter>, path: string) {
+  try {
+    router.push(path);
+    setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        const expectedPath = path.split('?')[0];
+        if (window.location.pathname !== expectedPath) {
+          window.location.assign(path);
+        }
+      }
+    }, 1200);
+  } catch {
+    if (typeof window !== 'undefined') {
+      window.location.assign(path);
+    }
+  }
+}
+
 function NewTopicContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -74,7 +92,8 @@ function NewTopicContent() {
       }
       const { data } = await api.post('/topics', payload);
       toast.success('Konu başarıyla açıldı!');
-      router.push(buildTopicPath({ id: data.id, slug: data.slug, title: data.title }));
+      const targetPath = buildTopicPath({ id: data.id, slug: data.slug, title: data.title });
+      navigateSafely(router, targetPath);
     } catch (err: any) {
       toast.error(err?.response?.data?.error || err?.message || 'Konu açılamadı');
     } finally {

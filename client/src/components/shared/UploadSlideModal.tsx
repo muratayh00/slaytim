@@ -19,6 +19,24 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const CONVERSION_TIMEOUT_MS = 180_000; // 3 dakika
 type UploadPhase = 'uploading' | 'converting';
 
+function navigateSafely(router: ReturnType<typeof useRouter>, path: string) {
+  try {
+    router.push(path);
+    setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        const expectedPath = path.split('?')[0];
+        if (window.location.pathname !== expectedPath) {
+          window.location.assign(path);
+        }
+      }
+    }, 1200);
+  } catch {
+    if (typeof window !== 'undefined') {
+      window.location.assign(path);
+    }
+  }
+}
+
 export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props) {
   const router = useRouter();
   const [form, setForm] = useState({ title: '', description: '' });
@@ -88,7 +106,9 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
               toast('Sunucuda dönüştürücü görünmüyor. Önizleme gecikebilir.', { icon: '⚠️' });
             }
           })
-          .catch(() => {});
+          .catch((healthErr) => {
+            console.warn('[upload] conversion health check failed:', healthErr?.message || healthErr);
+          });
       }
 
       const fd = new FormData();
@@ -156,7 +176,7 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
           sessionStorage.setItem(`slideo:prompt:${data.id}`, '1');
         }
         const slidePath = buildSlidePath({ id: data.id, slug: data.slug, title: data.title });
-        router.push(`${slidePath}?fromUpload=1`);
+        navigateSafely(router, `${slidePath}?fromUpload=1`);
       }
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.message || 'Yükleme başarısız';

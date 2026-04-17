@@ -1,4 +1,5 @@
 import api from '@/lib/api';
+import { getApiBaseUrl } from './api-origin';
 
 type BufferedEvent = {
   eventId: string;
@@ -10,7 +11,7 @@ type BufferedEvent = {
 
 const FLUSH_MS = 10_000;
 const MAX_BUFFER = 100;
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+const API_BASE = getApiBaseUrl();
 let seq = 0;
 let timer: ReturnType<typeof setInterval> | null = null;
 let buffer: BufferedEvent[] = [];
