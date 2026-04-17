@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { Readable } = require('stream');
 const pdfParse = require('../lib/pdf-parse');
 const prisma = require('../lib/prisma');
 const { checkBadges, awardBadge } = require('../services/badge.service');
@@ -823,7 +824,8 @@ const getPdfForPreview = async (req, res) => {
     }
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Cache-Control', 'no-store');
+    // Allow short-lived browser caching for repeat opens while keeping user-scoped privacy.
+    res.setHeader('Cache-Control', 'private, max-age=120, must-revalidate');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
     const isRemote = /^https?:\/\//i.test(slide.pdfUrl);
@@ -840,12 +842,36 @@ const getPdfForPreview = async (req, res) => {
         }
       }
       const readUrl = await resolveStorageReadUrl(slide.pdfUrl);
-      const upstream = await fetch(readUrl);
+      const upstreamHeaders = {};
+      if (req.headers.range) upstreamHeaders.Range = String(req.headers.range);
+
+      const upstream = await fetch(readUrl, { headers: upstreamHeaders });
       if (!upstream.ok) {
         return res.status(502).json({ error: 'Remote PDF fetch failed' });
       }
-      const raw = await upstream.arrayBuffer();
-      res.end(Buffer.from(raw));
+
+      // Preserve partial-content semantics for fast PDF first-page rendering.
+      res.status(upstream.status);
+      const contentType = upstream.headers.get('content-type');
+      const contentLength = upstream.headers.get('content-length');
+      const contentRange = upstream.headers.get('content-range');
+      const acceptRanges = upstream.headers.get('accept-ranges');
+      const etag = upstream.headers.get('etag');
+      const lastModified = upstream.headers.get('last-modified');
+
+      if (contentType) res.setHeader('Content-Type', contentType);
+      if (contentLength) res.setHeader('Content-Length', contentLength);
+      if (contentRange) res.setHeader('Content-Range', contentRange);
+      if (acceptRanges) res.setHeader('Accept-Ranges', acceptRanges);
+      if (etag) res.setHeader('ETag', etag);
+      if (lastModified) res.setHeader('Last-Modified', lastModified);
+
+      if (upstream.body) {
+        Readable.fromWeb(upstream.body).pipe(res);
+      } else {
+        const raw = await upstream.arrayBuffer();
+        res.end(Buffer.from(raw));
+      }
       return;
     }
 

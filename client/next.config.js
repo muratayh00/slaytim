@@ -27,6 +27,11 @@ const nextConfig = {
         : []),
       // Apex domain (OG images, static assets hosted on slaytim.com itself)
       { protocol: 'https', hostname: 'slaytim.com' },
+      // Cloudflare R2 public host pattern used by signed URLs
+      // (e.g. <accountid>.r2.cloudflarestorage.com)
+      { protocol: 'https', hostname: '*.r2.cloudflarestorage.com' },
+      // Optional safety for S3-hosted signed media
+      { protocol: 'https', hostname: '*.amazonaws.com' },
     ],
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 3600,
@@ -127,4 +132,3 @@ module.exports = SENTRY_DSN
       disableLogger: true,
     })
   : nextConfig;
-
