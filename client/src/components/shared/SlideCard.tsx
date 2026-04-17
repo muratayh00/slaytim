@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Heart, Bookmark, ArrowUpRight, Presentation, Lock, Eye } from 'lucide-react';
@@ -30,18 +31,21 @@ export default function SlideCard({ slide }: SlideCardProps) {
   const { user } = useAuthStore();
   const avatarColor = AVATAR_COLORS[slide.user.id % AVATAR_COLORS.length];
   const fileExt = slide.fileUrl?.split('.').pop()?.toUpperCase() ?? 'PPTX';
+  const [thumbError, setThumbError] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
 
   return (
     <Link href={buildSlidePath(slide)} className="block group">
       <article className="bg-card border border-border rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all card-hover">
         <div className="aspect-video relative overflow-hidden bg-muted border-b border-border/60">
-          {slide.thumbnailUrl ? (
+          {slide.thumbnailUrl && !thumbError ? (
             <Image
               src={resolveFileUrl(slide.thumbnailUrl)}
               alt={slide.title}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               className="object-cover"
+              onError={() => setThumbError(true)}
             />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground">
@@ -78,10 +82,9 @@ export default function SlideCard({ slide }: SlideCardProps) {
           <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-border/60">
             <div className="flex items-center gap-2 min-w-0">
               <div className={`w-5 h-5 rounded-full ${avatarColor} flex items-center justify-center text-[8px] font-black text-white overflow-hidden shrink-0 relative`}>
-                {slide.user.avatarUrl ? (
-                  <Image src={resolveFileUrl(slide.user.avatarUrl)} alt={slide.user.username} fill sizes="20px" className="object-cover" />
-                ) : (
-                  slide.user.username.slice(0, 1).toUpperCase()
+                {slide.user.username.slice(0, 1).toUpperCase()}
+                {slide.user.avatarUrl && !avatarError && (
+                  <Image src={resolveFileUrl(slide.user.avatarUrl)} alt={slide.user.username} fill sizes="20px" className="object-cover" onError={() => setAvatarError(true)} />
                 )}
               </div>
               <span className="text-[11.5px] text-muted-foreground font-medium truncate">{slide.user.username}</span>

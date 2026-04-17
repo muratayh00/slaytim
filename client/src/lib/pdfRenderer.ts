@@ -46,10 +46,14 @@ async function getPdfjs() {
 // stay type-compatible; the truthy check in callers guards against rendering.
 export function resolveFileUrl(path: string | null | undefined): string {
   if (!path) return '';
-  // /api/ paths are same-origin Next.js routes — return as-is without prefixing
   const cleaned = path.replace(/\/api\/api\//g, '/api/');
-  if (cleaned.startsWith('/api/')) return cleaned;
-  return resolveMediaUrl(path) ?? '';
+  // Route all paths (including /api/ proxy paths) through resolveMediaUrl so that
+  // the browser always fetches from the absolute backend origin rather than a
+  // relative Vercel/Next.js URL.  This avoids proxy timeouts on Vercel and
+  // ensures credentials are sent to the correct host.
+  // slaytim.com and api.slaytim.com share the same eTLD+1, so SameSite=Lax
+  // cookies are forwarded correctly on cross-subdomain fetch calls.
+  return resolveMediaUrl(cleaned) ?? cleaned;
 }
 
 /**

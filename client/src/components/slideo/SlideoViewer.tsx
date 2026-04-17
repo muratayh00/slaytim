@@ -575,12 +575,18 @@ export default function SlideoViewer({
             {/* Creator row */}
             <div className="flex items-center gap-2 mb-1.5">
               <div className={cn(
-                'w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-black text-white overflow-hidden',
+                'w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-black text-white overflow-hidden relative',
                 avatarColor,
               )}>
-                {slideo.user.avatarUrl
-                  ? <img src={resolveFileUrl(slideo.user.avatarUrl)} alt="" className="w-full h-full object-cover" />
-                  : slideo.user.username.slice(0, 1).toUpperCase()}
+                {slideo.user.username.slice(0, 1).toUpperCase()}
+                {slideo.user.avatarUrl && (
+                  <img
+                    src={resolveFileUrl(slideo.user.avatarUrl)}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                  />
+                )}
               </div>
               <span className="text-[12px] text-white/80 font-semibold">@{slideo.user.username}</span>
               <span className="text-white/30 text-[10px] ml-auto font-bold tabular-nums">
@@ -677,10 +683,14 @@ function MiniSlideoCard({ slideo: s }: { slideo: SlideoItem }) {
   return (
     <Link href={`/slideo?focus=${s.id}`} className="shrink-0 w-[70px] flex flex-col gap-1.5 group">
       <div className="w-[70px] h-[54px] rounded-xl overflow-hidden bg-white/8 border border-white/12 flex items-center justify-center relative">
-        {s.slide.thumbnailUrl ? (
-          <img src={resolveFileUrl(s.slide.thumbnailUrl)} alt="" className="w-full h-full object-cover" />
-        ) : (
-          <Play className="w-4 h-4 text-white/30" fill="currentColor" />
+        <Play className="w-4 h-4 text-white/30" fill="currentColor" />
+        {s.slide.thumbnailUrl && (
+          <img
+            src={resolveFileUrl(s.slide.thumbnailUrl)}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+          />
         )}
         <span className="absolute bottom-1 right-1 text-[7px] font-black text-white/75 bg-black/65 px-1 rounded">
           {s.pageIndices.length}
@@ -691,12 +701,18 @@ function MiniSlideoCard({ slideo: s }: { slideo: SlideoItem }) {
       </p>
       <div className="flex items-center gap-1">
         <div className={cn(
-          'w-3 h-3 rounded-full shrink-0 flex items-center justify-center text-[5px] font-black text-white overflow-hidden',
+          'w-3 h-3 rounded-full shrink-0 flex items-center justify-center text-[5px] font-black text-white overflow-hidden relative',
           avatarColor,
         )}>
-          {s.user.avatarUrl
-            ? <img src={resolveFileUrl(s.user.avatarUrl)} alt="" className="w-full h-full object-cover" />
-            : s.user.username.slice(0, 1).toUpperCase()}
+          {s.user.username.slice(0, 1).toUpperCase()}
+          {s.user.avatarUrl && (
+            <img
+              src={resolveFileUrl(s.user.avatarUrl)}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+          )}
         </div>
         <span className="text-[8px] text-white/40 font-medium truncate">{s.user.username}</span>
       </div>
