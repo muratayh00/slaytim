@@ -315,7 +315,7 @@ export default function SlideoViewer({
   }, [user, slideo.id, feedVariant, feedSubjectKey]);
 
     const handleSave = useCallback(async () => {
-    if (!user) return toast.error('Kaydetmek için giriş yap');
+    if (!user) return toast.error('kaydetmek için giriş yap');
     try {
       const { data } = await api.post(`/slideo/${slideo.id}/save`, { variant: feedVariant, subjectKey: feedSubjectKey });
       if (feedSubjectKey) api.post('/slideo/feed/evaluate', { items: [{ slideoId: slideo.id, eventType: 'save', page: 1, position: 0 }] }).catch(() => {});
@@ -323,7 +323,7 @@ export default function SlideoViewer({
       setSavesCount((c) => c + (data.saved ? 1 : -1));
       toast.success(data.saved ? 'Kaydedildi' : 'Kaldırıldı');
     } catch {
-      toast.error('Kaydetme işlemi tamamlanamadı');
+      toast.error('kaydetme işlemi tamamlanamadı');
     }
   }, [user, slideo.id, feedVariant, feedSubjectKey]);
 
@@ -432,7 +432,7 @@ export default function SlideoViewer({
     <div
       ref={containerRef}
       className={cn(
-        'relative w-full h-full bg-black select-none overflow-hidden touch-none',
+        'relative w-full h-full bg-black select-none overFlow-hidden touch-none',
         isFullscreen && 'min-h-full',
       )}
       onPointerDown={onPtrDown}
@@ -509,7 +509,7 @@ export default function SlideoViewer({
               key={i}
               type="button"
               onClick={() => { goToPage(i); showUI(); }}
-              className="h-[3px] flex-1 rounded-full bg-white/25 overflow-hidden focus:outline-none"
+              className="h-[3px] flex-1 rounded-full bg-white/25 overFlow-hidden focus:outline-none"
             >
               <div
                 className="h-full bg-white rounded-full transition-all duration-150"
@@ -575,7 +575,7 @@ export default function SlideoViewer({
             {/* Creator row */}
             <div className="flex items-center gap-2 mb-1.5">
               <div className={cn(
-                'w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-black text-white overflow-hidden relative',
+                'w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-black text-white overFlow-hidden relative',
                 avatarColor,
               )}>
                 {slideo.user.username.slice(0, 1).toUpperCase()}
@@ -596,14 +596,14 @@ export default function SlideoViewer({
 
             {/* Persistent CTA + title */}
             <div className="flex flex-col gap-2">
-              <Link
+              <a
                 href={buildSlidePath({ id: slideo.slide.id, title: slideo.slide.title })}
                 onClick={(e) => e.stopPropagation()}
                 className="self-start shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl bg-white/15 border border-white/25 backdrop-blur-md text-white text-[11px] font-bold hover:bg-white/25 transition-all active:scale-95"
               >
                 <ExternalLink className="w-3 h-3" />
                 Tam sunuma git
-              </Link>
+              </a>
               <div className="min-w-0">
                 <p className="text-white font-bold text-[14px] leading-snug line-clamp-2">{slideo.title}</p>
                 {slideo.slide.topic && (
@@ -631,13 +631,13 @@ export default function SlideoViewer({
             onPointerUp={(e) => e.stopPropagation()}
           >
             {/* Full slide CTA */}
-            <Link
+            <a
               href={buildSlidePath({ id: slideo.slide.id, title: slideo.slide.title })}
               className="flex items-center justify-center gap-2 w-full max-w-[520px] mx-auto py-3.5 rounded-2xl bg-white text-black font-bold text-[13px] shadow-xl hover:bg-white/90 active:scale-98 transition-all mb-2.5"
             >
               <ExternalLink className="w-4 h-4" />
               Tam sunuma git
-            </Link>
+            </a>
 
             {/* Continue in feed */}
             <button
@@ -655,7 +655,7 @@ export default function SlideoViewer({
                 <p className="text-white/40 text-[10px] font-bold uppercase tracking-wider mb-2 pl-1">
                   Aynı konudan
                 </p>
-                <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1">
+                <div className="flex gap-2.5 overFlow-x-auto scrollbar-none pb-1">
                   {(related?.sameTopic ?? []).map((r) => (
                     <MiniSlideoCard key={r.id} slideo={r} />
                   ))}
@@ -682,7 +682,7 @@ function MiniSlideoCard({ slideo: s }: { slideo: SlideoItem }) {
   const avatarColor = AVATAR_COLORS[s.user.id % AVATAR_COLORS.length];
   return (
     <Link href={`/slideo?focus=${s.id}`} className="shrink-0 w-[70px] flex flex-col gap-1.5 group">
-      <div className="w-[70px] h-[54px] rounded-xl overflow-hidden bg-white/8 border border-white/12 flex items-center justify-center relative">
+      <div className="w-[70px] h-[54px] rounded-xl overFlow-hidden bg-white/8 border border-white/12 flex items-center justify-center relative">
         <Play className="w-4 h-4 text-white/30" fill="currentColor" />
         {s.slide.thumbnailUrl && (
           <img
@@ -701,7 +701,7 @@ function MiniSlideoCard({ slideo: s }: { slideo: SlideoItem }) {
       </p>
       <div className="flex items-center gap-1">
         <div className={cn(
-          'w-3 h-3 rounded-full shrink-0 flex items-center justify-center text-[5px] font-black text-white overflow-hidden relative',
+          'w-3 h-3 rounded-full shrink-0 flex items-center justify-center text-[5px] font-black text-white overFlow-hidden relative',
           avatarColor,
         )}>
           {s.user.username.slice(0, 1).toUpperCase()}

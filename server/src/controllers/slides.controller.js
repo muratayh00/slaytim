@@ -840,7 +840,8 @@ const getPdfForPreview = async (req, res) => {
       /^https?:\/\//i.test(slide.pdfUrl)
       || (String(slide.pdfUrl || '').startsWith('/uploads/') && isRemoteEnabled() && (!localCandidatePath || !fs.existsSync(localCandidatePath)));
     if (isRemote) {
-      const parsed = new URL(slide.pdfUrl);
+      const readUrl = await resolveStorageReadUrl(slide.pdfUrl);
+      const parsed = new URL(readUrl);
       const allowedHosts = (process.env.ALLOWED_CDN_HOSTS || '').split(',').filter(Boolean);
       const isAllowed = allowedHosts.length === 0 || allowedHosts.some(h => parsed.hostname === h || parsed.hostname.endsWith(`.${h}`));
       if (!isAllowed) {
@@ -851,7 +852,6 @@ const getPdfForPreview = async (req, res) => {
           return res.status(403).json({ error: 'Forbidden URL' });
         }
       }
-      const readUrl = await resolveStorageReadUrl(slide.pdfUrl);
       const upstreamHeaders = {};
       if (req.headers.range) upstreamHeaders.Range = String(req.headers.range);
 

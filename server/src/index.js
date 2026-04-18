@@ -186,7 +186,14 @@ app.use((req, res, next) => {
 app.use('/uploads', (req, res, next) => {
   res.removeHeader('X-Frame-Options');
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-  res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+  const reqPath = String(req.path || '').toLowerCase();
+  if (reqPath.startsWith('/thumbnails/')) {
+    res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+  } else if (reqPath.startsWith('/pdfs/')) {
+    res.setHeader('Cache-Control', 'public, max-age=600, stale-while-revalidate=3600');
+  } else {
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+  }
   next();
 }, async (req, res, next) => {
   if (!isRemoteEnabled()) return next();

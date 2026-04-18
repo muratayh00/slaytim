@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { Heart, Bookmark, ArrowUpRight, Presentation, Lock, Eye } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
-import { resolveFileUrl } from '@/lib/pdfRenderer';
+import { resolveMediaUrl } from '@/lib/media';
 import { buildSlidePath } from '@/lib/url';
 
 const AVATAR_COLORS = ['bg-violet-500', 'bg-blue-500', 'bg-emerald-500', 'bg-orange-500', 'bg-pink-500', 'bg-cyan-500'];
@@ -32,14 +31,15 @@ export default function SlideCard({ slide }: SlideCardProps) {
   const fileExt = slide.fileUrl?.split('.').pop()?.toUpperCase() ?? 'PPTX';
   const [thumbError, setThumbError] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
-  const thumbSrc = resolveFileUrl(slide.thumbnailUrl || '');
-  const avatarSrc = resolveFileUrl(slide.user.avatarUrl || '');
+  const href = buildSlidePath(slide);
+  const thumbSrc = resolveMediaUrl(slide.thumbnailUrl);
+  const avatarSrc = resolveMediaUrl(slide.user.avatarUrl);
 
   return (
-    <Link href={buildSlidePath(slide)} className="block group" prefetch={false}>
+    <a href={href} className="block group">
       <article className="bg-card border border-border rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all card-hover">
         <div className="aspect-video relative overflow-hidden bg-muted border-b border-border/60">
-          {slide.thumbnailUrl && !thumbError ? (
+          {thumbSrc && !thumbError ? (
             // Plain <img> avoids the Next.js image-optimizer round-trip.
             // Thumbnails are already small server-side images; optimizer adds
             // latency and a failure point without meaningful quality gain here.
@@ -86,7 +86,7 @@ export default function SlideCard({ slide }: SlideCardProps) {
             <div className="flex items-center gap-2 min-w-0">
               <div className={`w-5 h-5 rounded-full ${avatarColor} flex items-center justify-center text-[8px] font-black text-white overflow-hidden shrink-0 relative`}>
                 {slide.user.username.slice(0, 1).toUpperCase()}
-                {slide.user.avatarUrl && !avatarError && (
+                {avatarSrc && !avatarError && (
                   <img
                     src={avatarSrc}
                     alt={slide.user.username}
@@ -106,6 +106,6 @@ export default function SlideCard({ slide }: SlideCardProps) {
           </div>
         </div>
       </article>
-    </Link>
+    </a>
   );
 }

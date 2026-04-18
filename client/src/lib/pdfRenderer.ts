@@ -73,9 +73,9 @@ export async function loadPdfDocument(pdfPath: string) {
       url: resolved,
       withCredentials: true,   // send same-site cookies (SameSite=Lax ok across slaytim.com subdomains)
       disableRange: false,     // enable byte-range requests
-      rangeChunkSize: 65536,   // 64 KB chunks — good balance for typical slide PDFs
+      rangeChunkSize: 262144,  // 256 KB chunks reduce request churn on high-latency networks
       disableStream: false,    // allow PDF.js to start rendering before full download
-      disableAutoFetch: false, // allow pre-fetching of remaining pages in background
+      disableAutoFetch: true,  // prioritize first visible page; fetch additional pages on demand
     }).promise;
     console.log('[PDF] Loaded OK — pages:', doc.numPages);
     return doc;

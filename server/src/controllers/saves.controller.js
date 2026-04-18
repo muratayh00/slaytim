@@ -3,6 +3,7 @@ const { checkBadges } = require('../services/badge.service');
 const { createNotification } = require('../lib/notify');
 const { slidePath } = require('../lib/route-paths');
 const logger = require('../lib/logger');
+const { normalizeMediaUrls } = require('../lib/media-normalize');
 
 const isPrismaCode = (err, code) => err && typeof err === 'object' && err.code === code;
 
@@ -80,7 +81,7 @@ const getSaved = async (req, res) => {
       },
       orderBy: { createdAt: 'desc' },
     });
-    return res.json(saved.map((s) => s.slide));
+    return res.json(normalizeMediaUrls(saved.map((s) => s.slide)));
   } catch (err) {
     logger.error('Failed to fetch saved slides', { error: err.message, stack: err.stack });
     return res.status(500).json({ error: 'Failed to fetch saved slides' });

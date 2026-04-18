@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -138,7 +138,7 @@ export default function SlideViewer({
   const fullscreenRef = useRef(fullscreen);
   useEffect(() => { fullscreenRef.current = fullscreen; }, [fullscreen]);
 
-  // ── Load PDF ───────────────────────────────────────────────────────────────
+  // â”€â”€ Load PDF â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     setDoc(null);
     setLoadError(null);
@@ -152,7 +152,7 @@ export default function SlideViewer({
     const loadWithRetry = async () => {
       // Always route through the Next.js proxy to stay same-origin.
       // Direct pdfUrl (e.g. http://localhost:5001/uploads/...) is cross-origin
-      // and blocked by browser CORS/CORP — use /api/slides/:id/pdf instead.
+      // and blocked by browser CORS/CORP â€” use /api/slides/:id/pdf instead.
       const apiPath = `/api/slides/${slideId}/pdf`;
       try {
         return await loadPdfDocument(apiPath);
@@ -220,7 +220,7 @@ export default function SlideViewer({
     return () => clearInterval(id);
   }, [autoStepMs, doc, numPages]);
 
-  // ── Render current page ────────────────────────────────────────────────────
+  // â”€â”€ Render current page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const renderPage = useCallback(async (pageNum: number) => {
     if (!doc || !canvasRef.current) return;
     const seq = ++renderSeqRef.current;
@@ -273,13 +273,13 @@ export default function SlideViewer({
     }
   }, [fullscreen]); // eslint-disable-line
 
-  // ── Generate thumbnails progressively ─────────────────────────────────────
+  // â”€â”€ Generate thumbnails progressively â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!doc || numPages === 0) return;
     let cancelled = false;
     const before = 1;
     // Grid mode prefetches up to 10 visible thumbnails; normal mode only fetches
-    // the next 3 pages — enough to avoid loading spinners on fast swipes.
+    // the next 3 pages â€” enough to avoid loading spinners on fast swipes.
     const after = showGrid ? 10 : 3;
     const yieldMs = showGrid ? 20 : 12; // yield so main thread stays responsive
     const from = Math.max(1, currentPage - before);
@@ -295,7 +295,7 @@ export default function SlideViewer({
         if (cancelled) break;
         try {
           const canvas = document.createElement('canvas');
-          // Thumbnail'ler için DPR = 1 (küçük boyut, ekstra piksel anlamsız)
+          // Thumbnail'ler iÃ§in DPR = 1 (kÃ¼Ã§Ã¼k boyut, ekstra piksel anlamsÄ±z)
           await renderPageToCanvas(doc, i, canvas, THUMB_W, 1);
           const url = canvas.toDataURL('image/jpeg', 0.75);
           if (!cancelled) {
@@ -308,24 +308,24 @@ export default function SlideViewer({
           }
           setThumbMem(slideId, i, url);
           setThumbIdb(slideId, i, url).catch(() => {});
-          // Ana iş parçacığına yield et; grid modda daha uzun bekleme → daha akıcı scroll
+          // Ana iÅŸ parÃ§acÄ±ÄŸÄ±na yield et; grid modda daha uzun bekleme â†’ daha akÄ±cÄ± scroll
           await new Promise(r => setTimeout(r, yieldMs));
         } catch {
-          // Tek sayfa thumbnail hatalarını yoksay.
+          // Tek sayfa thumbnail hatalarÄ±nÄ± yoksay.
         }
       }
     })();
     return () => { cancelled = true; };
   }, [doc, numPages, currentPage, showGrid, thumbnails, slideId]);
 
-  // ── Scroll active thumbnail into view ─────────────────────────────────────
+  // â”€â”€ Scroll active thumbnail into view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!thumbStripRef.current) return;
     const el = thumbStripRef.current.children[currentPage - 1] as HTMLElement | undefined;
     el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
   }, [currentPage]);
 
-  // ── Keyboard navigation ────────────────────────────────────────────────────
+  // â”€â”€ Keyboard navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
@@ -361,7 +361,7 @@ export default function SlideViewer({
     return () => window.removeEventListener('keydown', onKey);
   }, [numPages]);
 
-  // ── Touch swipe ────────────────────────────────────────────────────────────
+  // â”€â”€ Touch swipe â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const onTouchStart = (e: React.TouchEvent) => {
     touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   };
@@ -376,7 +376,7 @@ export default function SlideViewer({
     touchStartRef.current = null;
   };
 
-  // ── Fullscreen API ─────────────────────────────────────────────────────────
+  // â”€â”€ Fullscreen API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) {
@@ -392,7 +392,7 @@ export default function SlideViewer({
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
 
-  // ── Loading state ──────────────────────────────────────────────────────────
+  // â”€â”€ Loading state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (loadError) {
     return (
       <div className={`flex items-center justify-center bg-muted rounded-2xl ${className}`} style={{ minHeight: '60vh' }}>
@@ -404,14 +404,14 @@ export default function SlideViewer({
             rel="noopener noreferrer"
             className="text-sm font-semibold text-primary hover:underline"
           >
-            PDF'i yeni sekmede ac
+            PDF'i yeni sekmede aç
           </a>
         </div>
       </div>
     );
   }
 
-  // ── Cover-aware loading state ─────────────────────────────────────────────
+  // â”€â”€ Cover-aware loading state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // While the PDF document is being fetched/parsed, show the slide thumbnail
   // so users see real content instantly instead of a blank spinner.
   if (!doc) {
@@ -435,10 +435,15 @@ export default function SlideViewer({
               </div>
             </>
           ) : (
-            <div className="flex items-center justify-center" style={{ minHeight: '40vh' }}>
+            <div
+              className="flex items-center justify-center"
+              style={{ minHeight: '40vh', background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(17,24,39,0.55))' }}
+            >
               <div className="flex flex-col items-center gap-3">
-                <Loader2 className="w-8 h-8 animate-spin text-primary/40" />
-                <p className="text-sm text-muted-foreground">Slayt yükleniyor…</p>
+                <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center">
+                  <Grid3X3 className="w-7 h-7 text-white/70" />
+                </div>
+                <p className="text-sm text-white/85 font-medium">Önizleme hazırlanıyor…</p>
               </div>
             </div>
           )}
@@ -473,7 +478,7 @@ export default function SlideViewer({
   return (
     <div ref={containerRef} className={`${className} ${fullscreen ? 'bg-black' : ''}`}>
 
-      {/* ── Grid overview ──────────────────────────────────────────────────── */}
+      {/* â”€â”€ Grid overview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <AnimatePresence>
         {showGrid && (
           <motion.div
@@ -521,7 +526,7 @@ export default function SlideViewer({
         )}
       </AnimatePresence>
 
-      {/* ── Main viewer area ───────────────────────────────────────────────── */}
+      {/* â”€â”€ Main viewer area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div
         className={`relative rounded-2xl overflow-hidden bg-zinc-900 select-none ${
           fullscreen ? 'rounded-none flex flex-col justify-center' : ''
@@ -627,7 +632,7 @@ export default function SlideViewer({
           <button
             onClick={() => setShowGrid(true)}
             className="w-8 h-8 flex items-center justify-center rounded-lg bg-black/50  text-white hover:bg-black/70 transition"
-            title="Genel görünüm (G)"
+            title="Genel gÃ¶rÃ¼nÃ¼m (G)"
           >
             <Grid3X3 className="w-4 h-4" />
           </button>
@@ -644,7 +649,7 @@ export default function SlideViewer({
         </div>
       </div>
 
-      {/* ── Thumbnail strip ────────────────────────────────────────────────── */}
+      {/* â”€â”€ Thumbnail strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {!fullscreen && thumbnails.length > 0 && (
         <div
           ref={thumbStripRef}
@@ -672,7 +677,7 @@ export default function SlideViewer({
         </div>
       )}
 
-      {/* ── Controls bar ──────────────────────────────────────────────────── */}
+      {/* â”€â”€ Controls bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {!fullscreen && (
         <div className="flex items-center justify-between mt-1.5 px-0.5">
           <button
@@ -680,7 +685,7 @@ export default function SlideViewer({
             disabled={isFirst}
             className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
           >
-            <SkipBack className="w-3.5 h-3.5" /> İlk sayfa
+            <SkipBack className="w-3.5 h-3.5" /> Ä°lk sayfa
           </button>
 
           <div className="flex items-center gap-2">
@@ -713,12 +718,13 @@ export default function SlideViewer({
         </div>
       )}
 
-      {/* ── Keyboard hint ─────────────────────────────────────────────────── */}
+      {/* â”€â”€ Keyboard hint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {!fullscreen && numPages > 1 && (
         <p className="text-[10px] text-muted-foreground/40 text-center mt-2">
-          ← → tuşları · kaydır · G: genel görünüm · F11: tam ekran
+          â† â†’ tuÅŸlarÄ± Â· kaydÄ±r Â· G: genel gÃ¶rÃ¼nÃ¼m Â· F11: tam ekran
         </p>
       )}
     </div>
   );
 }
+

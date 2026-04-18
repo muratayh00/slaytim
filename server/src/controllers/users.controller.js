@@ -2,6 +2,7 @@ const prisma = require('../lib/prisma');
 const { sanitizeText } = require('../lib/sanitize');
 const { hasAdminAccess } = require('../lib/rbac');
 const logger = require('../lib/logger');
+const { normalizeMediaUrls } = require('../lib/media-normalize');
 
 const getProfile = async (req, res) => {
   try {
@@ -44,7 +45,7 @@ const getProfile = async (req, res) => {
       if (cat) topCategory = { name: cat.name, slug: cat.slug };
     }
 
-    res.json({
+    res.json(normalizeMediaUrls({
       ...user,
       stats: {
         totalSlideViews: slideAgg._sum.viewsCount || 0,
@@ -54,7 +55,7 @@ const getProfile = async (req, res) => {
         totalSlideoLikes: slideoAgg._sum.likesCount || 0,
         topCategory,
       },
-    });
+    }));
   } catch (err) {
     logger.error('Failed to fetch profile', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch profile' });
@@ -150,7 +151,7 @@ const getProfileDetails = async (req, res) => {
         }),
       ]);
 
-    res.json({
+    res.json(normalizeMediaUrls({
       likedSlides: likedSlides.map((l) => l.slide),
       likedTopics: likedTopics.map((l) => l.topic),
       savedSlides: savedSlides.map((s) => s.slide),
@@ -158,7 +159,7 @@ const getProfileDetails = async (req, res) => {
       followedUsers: followedUsers.map((f) => f.following),
       followers: followers.map((f) => f.follower),
       visitedTopics: visitedTopics.map((v) => v.topic),
-    });
+    }));
   } catch (err) {
     logger.error('Failed to fetch profile details', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch profile details' });
@@ -240,11 +241,11 @@ const getUserSlideos = async (req, res) => {
         },
       },
     });
-    res.json(slideos.map(s => {
+    res.json(normalizeMediaUrls(slideos.map(s => {
       let pageIndices = [];
       try { pageIndices = JSON.parse(s.pageIndices || '[]'); } catch {}
       return { ...s, pageIndices };
-    }));
+    })));
   } catch (err) {
     logger.error('Failed to fetch user slideos', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch user slideos' });
@@ -269,7 +270,7 @@ const searchUsers = async (req, res) => {
       },
       take: 20,
     });
-    res.json(users);
+    res.json(normalizeMediaUrls(users));
   } catch (err) {
     logger.error('User search failed', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'User search failed' });

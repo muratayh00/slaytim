@@ -1,5 +1,6 @@
 const prisma = require('../lib/prisma');
 const logger = require('../lib/logger');
+const { normalizeMediaUrls } = require('../lib/media-normalize');
 
 const slideSelect = {
   id: true, title: true, description: true, fileUrl: true,
@@ -20,7 +21,7 @@ const getMine = async (req, res) => {
         slides: { orderBy: { addedAt: 'desc' }, select: { slideId: true, slide: { select: { thumbnailUrl: true, pdfUrl: true } } } },
       },
     });
-    res.json(collections);
+    res.json(normalizeMediaUrls(collections));
   } catch (err) {
     logger.error('Failed to fetch collections', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch collections' });
@@ -41,7 +42,7 @@ const getByUser = async (req, res) => {
         slides: { orderBy: { addedAt: 'desc' }, select: { slideId: true, slide: { select: { thumbnailUrl: true, pdfUrl: true } } } },
       },
     });
-    res.json(collections);
+    res.json(normalizeMediaUrls(collections));
   } catch (err) {
     logger.error('Failed to fetch collections', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch collections' });
@@ -70,7 +71,7 @@ const getOne = async (req, res) => {
       });
       isFollowing = Boolean(follow);
     }
-    res.json({ ...col, isFollowing });
+    res.json(normalizeMediaUrls({ ...col, isFollowing }));
   } catch (err) {
     logger.error('Failed to fetch collection', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch collection' });
@@ -97,7 +98,7 @@ const create = async (req, res) => {
       },
       include: { _count: { select: { slides: true, followers: true } } },
     });
-    res.status(201).json(col);
+    res.status(201).json(normalizeMediaUrls(col));
   } catch (err) {
     logger.error('Failed to create collection', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to create collection' });
@@ -129,7 +130,7 @@ const update = async (req, res) => {
       data: nextData,
       include: { _count: { select: { slides: true, followers: true } } },
     });
-    res.json(updated);
+    res.json(normalizeMediaUrls(updated));
   } catch (err) {
     logger.error('Failed to update collection', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to update collection' });

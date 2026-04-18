@@ -136,12 +136,12 @@ export default async function SlideoDetailPage({
           >
             Slideo akista ac
           </Link>
-          <Link
+          <a
             href={buildSlidePath({ id: slideo.slide.id, title: slideo.slide.title })}
             className="inline-flex items-center justify-center rounded-xl border border-border px-4 py-2 text-sm font-bold hover:bg-accent"
           >
             Tam sunuma git
-          </Link>
+          </a>
           {slideo.slide.topic?.id && (
             <Link
               href={buildTopicPath({

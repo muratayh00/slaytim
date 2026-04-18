@@ -466,6 +466,24 @@ export default function SlideDetailPage() {
   const [retryingConversion, setRetryingConversion] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
+  const userId = user?.id ? Number(user.id) : null;
+
+  const navigateSafely = useCallback((path: string) => {
+    try {
+      router.push(path);
+      setTimeout(() => {
+        if (typeof window === 'undefined') return;
+        const expectedPath = path.split('?')[0];
+        if (window.location.pathname !== expectedPath) {
+          window.location.assign(path);
+        }
+      }, 1200);
+    } catch {
+      if (typeof window !== 'undefined') {
+        window.location.assign(path);
+      }
+    }
+  }, [router]);
 
   useEffect(() => {
     if (!slide || !Number.isInteger(id) || id <= 0) return;
@@ -492,27 +510,39 @@ export default function SlideDetailPage() {
 
   const load = useCallback(async () => {
     if (!sessionId) return;
+    setLoading(true);
     try {
       const { data } = await api.get(`/slides/${id}`);
       setSlide(data);
+      setLoading(false);
       api
         .post(`/slides/${id}/view`, {}, sessionId ? { headers: { 'X-View-Session': sessionId } } : undefined)
         .catch((err) => logSoftError('view tracking failed', err));
       analytics.viewContent({ content_type: 'slide', content_id: Number(id), title: data.title });
-      if (user) {
-        const [likes, saves] = await Promise.all([
-          api.get('/likes/me'),
-          api.get('/saves/me'),
-        ]);
-        setLiked(likes.data.slides.includes(Number(id)));
-        setSaved(saves.data.some((s: any) => s.id === Number(id)));
-      }
-    } finally {
+    } catch {
+      setSlide(null);
       setLoading(false);
     }
-  }, [id, user?.id, sessionId]);
+  }, [id, sessionId]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!userId || !id) return;
+    let cancelled = false;
+    Promise.allSettled([api.get('/likes/me'), api.get('/saves/me')]).then(([likes, saves]) => {
+      if (cancelled) return;
+      const likedSlides = likes.status === 'fulfilled' && Array.isArray(likes.value?.data?.slides)
+        ? likes.value.data.slides
+        : [];
+      const savedSlides = saves.status === 'fulfilled' && Array.isArray(saves.value?.data)
+        ? saves.value.data
+        : [];
+      setLiked(likedSlides.includes(Number(id)));
+      setSaved(savedSlides.some((s: any) => Number(s?.id) === Number(id)));
+    });
+    return () => { cancelled = true; };
+  }, [userId, id]);
 
   // Load related slides
   useEffect(() => {
@@ -530,8 +560,9 @@ export default function SlideDetailPage() {
   const loadFlashcards = useCallback(async () => {
     if (!id) return;
     try {
+      const slideOwnerId = slide?.user?.id ? Number(slide.user.id) : null;
       const endpoint =
-        user && slide?.user?.id === user.id
+        userId && slideOwnerId === userId
           ? `/flashcards/mine/slide/${id}`
           : `/flashcards/slide/${id}`;
       const { data } = await api.get(endpoint);
@@ -539,7 +570,7 @@ export default function SlideDetailPage() {
     } catch {
       setFlashcardSets([]);
     }
-  }, [id, slide?.user?.id, user?.id]);
+  }, [id, slide?.user?.id, userId]);
 
   useEffect(() => {
     loadFlashcards();
@@ -726,7 +757,7 @@ export default function SlideDetailPage() {
       const nextPath = slide?.topic?.id
         ? buildTopicPath({ id: slide.topic.id, slug: slide.topic.slug, title: slide.topic.title })
         : '/kesfet';
-      router.push(nextPath);
+      navigateSafely(nextPath);
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Slayt silinemedi');
     } finally {
@@ -1048,11 +1079,10 @@ export default function SlideDetailPage() {
                     className="group rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-card transition-all overflow-hidden"
                   >
                     <div className="aspect-video bg-black/80 relative flex items-center justify-center overflow-hidden">
+                      <Play className="w-8 h-8 text-white/20" fill="currentColor" />
                       {s.slide?.thumbnailUrl ? (
                         <img src={resolveFileUrl(s.slide.thumbnailUrl)} alt="" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-                      ) : (
-                        <Play className="w-8 h-8 text-white/20" fill="currentColor" />
-                      )}
+                      ) : null}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                       <span className="absolute top-1.5 right-1.5 bg-black/70 text-white/80 text-[9px] font-bold px-1.5 py-0.5 rounded-full">
                         {pages.length} s

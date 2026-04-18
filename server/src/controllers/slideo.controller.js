@@ -415,7 +415,7 @@ const getBySlide = async (req, res) => {
       select: slideoSelect,
     });
     const result = await enrich(slideos, req.user?.id);
-    res.json(result);
+    res.json(normalizeMediaUrls(result));
   } catch (err) {
     logger.error('Failed to fetch slideos for slide', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch slideos for slide' });
@@ -461,10 +461,10 @@ const getRelated = async (req, res) => {
     const allSlideos = [...sameCreator, ...sameTopic];
     const enriched = await enrich(allSlideos, req.user?.id);
 
-    res.json({
+    res.json(normalizeMediaUrls({
       sameCreator: enriched.slice(0, sameCreator.length),
       sameTopic: enriched.slice(sameCreator.length),
-    });
+    }));
   } catch (err) {
     logger.error('Failed to fetch related slideos', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch related slideos' });

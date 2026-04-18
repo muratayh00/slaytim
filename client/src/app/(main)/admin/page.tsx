@@ -11,7 +11,6 @@ import {
   UserCheck, ArrowUpRight, CheckCheck, XCircle,
 } from 'lucide-react';
 import Link from 'next/link';
-import Image from 'next/image';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { formatDate } from '@/lib/utils';
@@ -1146,7 +1145,7 @@ function UsersTab() {
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden relative">
                     {resolveMediaUrl(u.avatarUrl)
-                      ? <Image src={resolveMediaUrl(u.avatarUrl)!} alt={u.username} fill sizes="40px" className="object-cover" />
+                      ? <img src={resolveMediaUrl(u.avatarUrl) || ''} alt={u.username} className="absolute inset-0 w-full h-full object-cover" />
                       : u.username.slice(0, 2).toUpperCase()
                     }
                   </div>
@@ -1661,4 +1660,3 @@ function RoleModal({ user, onConfirm, onClose }: { user: any; onConfirm: (role: 
     </motion.div>
   );
 }
-

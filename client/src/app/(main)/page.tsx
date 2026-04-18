@@ -395,6 +395,7 @@ function SlideoPreviewCard({ slideo }: { slideo: any }) {
   return (
     <Link href={buildSlideoPath({ id: slideo.id, title: slideo.title })} prefetch={false} className="shrink-0 w-[140px] flex flex-col rounded-xl border border-border bg-card hover:border-primary/40 transition-colors overflow-hidden group">
       <div className="h-[90px] bg-black/80 relative flex items-center justify-center overflow-hidden">
+        <Play className="w-8 h-8 text-white/20" fill="currentColor" />
         {slideo.slide?.thumbnailUrl ? (
           <img
             src={thumbSrc}
@@ -403,9 +404,7 @@ function SlideoPreviewCard({ slideo }: { slideo: any }) {
             loading="lazy"
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
           />
-        ) : (
-          <Play className="w-8 h-8 text-white/20" fill="currentColor" />
-        )}
+        ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
         <span className="absolute top-1.5 right-1.5 bg-black/70 text-white/80 text-[9px] font-semibold px-1.5 py-0.5 rounded-full">{pages.length} s</span>
       </div>

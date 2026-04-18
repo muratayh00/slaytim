@@ -9,15 +9,35 @@ type BufferedEvent = {
   payload: Record<string, unknown>;
 };
 
-const FLUSH_MS = 10_000;
+const FLUSH_MS_VISIBLE = 30_000;
+const FLUSH_MS_HIDDEN = 120_000;
 const MAX_BUFFER = 100;
 const API_BASE = getApiBaseUrl();
 let seq = 0;
-let timer: ReturnType<typeof setInterval> | null = null;
+let timer: ReturnType<typeof setTimeout> | null = null;
 let buffer: BufferedEvent[] = [];
 let started = false;
 let consecutiveFlushFailures = 0;
 let flushPausedUntil = 0;
+let boundBeforeUnload: (() => void) | null = null;
+let boundPageHide: (() => void) | null = null;
+let boundVisibility: (() => void) | null = null;
+
+const clearFlushTimer = () => {
+  if (timer) clearTimeout(timer);
+  timer = null;
+};
+
+const scheduleFlush = () => {
+  if (!started || typeof document === 'undefined') return;
+  clearFlushTimer();
+  if (!buffer.length) return;
+  const interval = document.visibilityState === 'hidden' ? FLUSH_MS_HIDDEN : FLUSH_MS_VISIBLE;
+  timer = setTimeout(() => {
+    flushTelemetry().catch(() => {});
+    scheduleFlush();
+  }, interval);
+};
 
 const randomId = () =>
   `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -60,6 +80,8 @@ export const flushTelemetry = async (opts?: { forceBeacon?: boolean }) => {
     if (consecutiveFlushFailures >= 3) {
       flushPausedUntil = Date.now() + 60_000;
     }
+  } finally {
+    scheduleFlush();
   }
 };
 
@@ -68,7 +90,9 @@ export const pushTelemetryEvent = (eventType: string, sessionId: string, payload
   buffer.push(makeEvent(eventType, sessionId, payload));
   if (buffer.length >= MAX_BUFFER) {
     flushTelemetry().catch(() => {});
+    return;
   }
+  scheduleFlush();
 };
 
 export const pushSessionSnapshot = async (snapshot: {
@@ -91,18 +115,33 @@ export const pushSessionSnapshot = async (snapshot: {
 export const startTelemetryBuffer = () => {
   if (started || typeof window === 'undefined') return;
   started = true;
-  timer = setInterval(() => flushTelemetry().catch(() => {}), FLUSH_MS);
-
   const flushWithBeacon = () => flushTelemetry({ forceBeacon: true }).catch(() => {});
-  window.addEventListener('beforeunload', flushWithBeacon);
-  window.addEventListener('pagehide', flushWithBeacon);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') flushWithBeacon();
-  });
+  boundBeforeUnload = () => { flushWithBeacon(); };
+  boundPageHide = () => { flushWithBeacon(); };
+  boundVisibility = () => {
+    if (document.visibilityState === 'hidden') {
+      flushWithBeacon();
+      return;
+    }
+    scheduleFlush();
+  };
+  window.addEventListener('beforeunload', boundBeforeUnload);
+  window.addEventListener('pagehide', boundPageHide);
+  document.addEventListener('visibilitychange', boundVisibility);
+  scheduleFlush();
 };
 
 export const stopTelemetryBuffer = () => {
-  if (timer) clearInterval(timer);
-  timer = null;
+  clearFlushTimer();
+  if (typeof window !== 'undefined') {
+    if (boundBeforeUnload) window.removeEventListener('beforeunload', boundBeforeUnload);
+    if (boundPageHide) window.removeEventListener('pagehide', boundPageHide);
+  }
+  if (typeof document !== 'undefined' && boundVisibility) {
+    document.removeEventListener('visibilitychange', boundVisibility);
+  }
+  boundBeforeUnload = null;
+  boundPageHide = null;
+  boundVisibility = null;
   started = false;
 };

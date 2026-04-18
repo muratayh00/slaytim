@@ -32,9 +32,9 @@ const TYPE_ICONS: Record<string, any> = {
   slide: Layers,
 };
 
-// Keep fallback poll aggressive so users do not feel gaps when stream reconnects.
-const POLL_ACTIVE = 8000;
-const POLL_HIDDEN = 15000;
+// Keep fallback polling conservative to avoid background network noise.
+const POLL_ACTIVE = 30000;
+const POLL_HIDDEN = 90000;
 const SSE_RECONNECT_BASE_MS = 500;
 const SSE_RECONNECT_MAX_MS = 5000;
 const API_ORIGIN = getApiOrigin();

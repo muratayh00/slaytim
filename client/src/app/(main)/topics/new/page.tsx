@@ -47,7 +47,7 @@ function NewTopicContent() {
 
   /* Auth guard */
   useEffect(() => {
-    if (!isLoading && !user) router.push('/login');
+    if (!isLoading && !user) navigateSafely(router, '/login');
   }, [user, isLoading, router]);
 
   /* Load categories */

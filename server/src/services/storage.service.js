@@ -151,6 +151,20 @@ function extractStorageKeyFromUrl(fileUrl) {
     if (rawPath.startsWith(`${BUCKET}/`)) {
       return rawPath.slice(BUCKET.length + 1);
     }
+    // Heuristic fallback for path-style object storage URLs when BUCKET env
+    // differs from historical paths (e.g., old bucket names in persisted URLs).
+    // Example:
+    //   /slaytim-uploads/thumbnails/source-1.png  -> thumbnails/source-1.png
+    const parts = rawPath.split('/').filter(Boolean);
+    if (parts.length >= 2) {
+      const first = parts[0].toLowerCase();
+      const second = parts[1].toLowerCase();
+      const likelyBucketPrefix = first.includes('upload') || first.includes('bucket');
+      const knownMediaRoot = ['thumbnails', 'pdfs', 'slides', 'avatars', 'originals'].includes(second);
+      if (likelyBucketPrefix && knownMediaRoot) {
+        return parts.slice(1).join('/');
+      }
+    }
     return rawPath;
   } catch {
     return null;
