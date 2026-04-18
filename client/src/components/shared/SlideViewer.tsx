@@ -229,15 +229,15 @@ export default function SlideViewer({
     try {
       const isFs = fullscreenRef.current;
       const containerW = canvasRef.current.parentElement?.clientWidth ?? 800;
-      // Cap render width: 1200 px non-fullscreen keeps quality high without wasting pixels;
-      // fullscreen uses actual container width (can be larger on big monitors).
+      // Keep the first visual fast by limiting non-fullscreen render size.
+      // This cuts render pixel count materially on large displays.
       const w = isFs
         ? Math.max(containerW, 400)
-        : Math.min(Math.max(containerW, 400), 1200);
-      // DPR 1.5 saves ~44% pixels vs 2 on Retina while remaining visually sharp.
+        : Math.min(Math.max(containerW, 360), 960);
+      // Lower DPR on normal mode for quicker page paint while remaining readable.
       const dpr = Math.min(
         typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1,
-        isFs ? 2 : 1.5,
+        isFs ? 1.75 : 1.2,
       );
       // Constrain height so portrait/A4 slides don't require vertical scrolling.
       // Cap height so slides never overflow the viewport on first view.

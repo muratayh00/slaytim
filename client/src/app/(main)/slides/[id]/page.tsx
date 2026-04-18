@@ -466,7 +466,14 @@ export default function SlideDetailPage() {
   const [retryingConversion, setRetryingConversion] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
+  const [coverSaving, setCoverSaving] = useState(false);
+  const viewerWrapRef = useRef<HTMLDivElement | null>(null);
   const userId = user?.id ? Number(user.id) : null;
+  const isSlideOwner = Boolean(
+    user &&
+    slide?.user &&
+    (Number(user.id) === Number(slide.user.id) || user.username === slide.user.username)
+  );
 
   const navigateSafely = useCallback((path: string) => {
     try {
@@ -624,6 +631,14 @@ export default function SlideDetailPage() {
     setOpenSlideoWhenReady(false);
   }, [openSlideoWhenReady, slide]);
 
+  useEffect(() => {
+    if (!slide || !isSlideOwner) return;
+    const fromUpload = searchParams.get('fromUpload') === '1';
+    if (!fromUpload) return;
+    if (slide.conversionStatus !== 'done' || !slide.pdfUrl) return;
+    toast('İstediğin sayfaya gel ve "Sayfa X kapak yap" ile kapak fotoğrafını seç.');
+  }, [slide, isSlideOwner, searchParams]);
+
   // Poll conversion status
   // Use a ref to read the latest status inside the interval without making
   // conversionStatus a dep — otherwise the effect re-fires (and restarts the
@@ -735,6 +750,51 @@ export default function SlideDetailPage() {
     openSlideoComposer();
   };
 
+  const handleSetCoverFromCurrentPage = async () => {
+    if (!slide || !isSlideOwner || !hasPdf || coverSaving) return;
+    const canvas = viewerWrapRef.current?.querySelector('canvas');
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      toast.error('Sayfa görseli henüz hazır değil. Lütfen tekrar dene.');
+      return;
+    }
+
+    let imageDataUrl = '';
+    try {
+      const srcW = canvas.width || 0;
+      const srcH = canvas.height || 0;
+      if (!srcW || !srcH) throw new Error('empty_canvas');
+      const targetW = Math.min(720, srcW);
+      const targetH = Math.max(1, Math.round((targetW / srcW) * srcH));
+      const thumbCanvas = document.createElement('canvas');
+      thumbCanvas.width = targetW;
+      thumbCanvas.height = targetH;
+      const ctx = thumbCanvas.getContext('2d');
+      if (!ctx) throw new Error('ctx_unavailable');
+      ctx.drawImage(canvas, 0, 0, targetW, targetH);
+      imageDataUrl = thumbCanvas.toDataURL('image/jpeg', 0.78);
+    } catch {
+      toast.error('Kapak görseli oluşturulamadı. Lütfen tekrar dene.');
+      return;
+    }
+
+    setCoverSaving(true);
+    try {
+      const { data } = await api.patch(`/slides/${id}/thumbnail`, {
+        imageDataUrl,
+        pageNumber: currentPage,
+      });
+      setSlide((prev: any) => ({
+        ...prev,
+        thumbnailUrl: data?.thumbnailUrl || prev?.thumbnailUrl,
+      }));
+      toast.success(`Sayfa ${currentPage} kapak olarak kaydedildi.`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Kapak güncellenemedi.');
+    } finally {
+      setCoverSaving(false);
+    }
+  };
+
   const handleDownload = async () => {
     try {
       await api.post(`/slides/${id}/download`);
@@ -784,11 +844,6 @@ export default function SlideDetailPage() {
   const avatarGradient = AVATAR_COLORS[slide.user.id % AVATAR_COLORS.length];
   const hasPdf = slide.conversionStatus === 'done' && slide.pdfUrl;
   const fileExt = slide.fileUrl?.split('.').pop()?.toUpperCase() ?? 'PPTX';
-  const isSlideOwner = Boolean(
-    user &&
-    slide?.user &&
-    (Number(user.id) === Number(slide.user.id) || user.username === slide.user.username)
-  );
   const canDeleteSlide = Boolean(user && (isSlideOwner || user.isAdmin));
 
   return (
@@ -813,15 +868,17 @@ export default function SlideDetailPage() {
         />
 
         {hasPdf ? (
-          <SlideViewer
-            pdfUrl={slide.pdfUrl}
-            slideId={Number(id)}
-            coverUrl={resolveFileUrl(slide.thumbnailUrl) || undefined}
-            className="mb-6"
-            transitionMode="fade"
-            onPageChange={setCurrentPage}
-            onPageCount={setPageCount}
-          />
+          <div ref={viewerWrapRef}>
+            <SlideViewer
+              pdfUrl={slide.pdfUrl}
+              slideId={Number(id)}
+              coverUrl={resolveFileUrl(slide.thumbnailUrl) || undefined}
+              className="mb-6"
+              transitionMode="fade"
+              onPageChange={setCurrentPage}
+              onPageCount={setPageCount}
+            />
+          </div>
         ) : (
           <div className={`aspect-video bg-gradient-to-br ${bgGradient} border border-border rounded-2xl flex items-center justify-center mb-6 overflow-hidden relative`}>
             {slide.thumbnailUrl ? (
@@ -906,6 +963,17 @@ export default function SlideDetailPage() {
                 >
                   <Play className="w-4 h-4" fill="currentColor" />
                   Slideo
+                </button>
+              )}
+              {user && hasPdf && isSlideOwner && (
+                <button
+                  onClick={handleSetCoverFromCurrentPage}
+                  disabled={coverSaving}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border font-bold text-sm hover:bg-muted hover:border-primary/30 transition-all disabled:opacity-60"
+                  title="Açık sayfayı kapak olarak kaydet"
+                >
+                  {coverSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Presentation className="w-4 h-4" />}
+                  {coverSaving ? 'Kaydediliyor...' : `Sayfa ${currentPage} kapak yap`}
                 </button>
               )}
               {/* Share buttons */}

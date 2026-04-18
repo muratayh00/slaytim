@@ -22,6 +22,7 @@ const {
   trackDownload,
   getPreviewMeta,
   getPdfForPreview,
+  updateThumbnail,
 } = require('../controllers/slides.controller');
 const { authenticate, optionalAuth } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -69,6 +70,7 @@ router.post('/:id/comments', validateNumericParam('id'), authenticate, commentCr
 router.delete('/:id/comments/:commentId', validateNumericParam('id'), authenticate, removeSlideComment);
 router.post('/', authenticate, spamGuard, uploadIpLimiter, upload.single('file'), validateMagicBytes, create);
 router.patch('/:id', validateNumericParam('id'), authenticate, update);
+router.patch('/:id/thumbnail', validateNumericParam('id'), authenticate, updateThumbnail);
 router.delete('/:id', validateNumericParam('id'), authenticate, remove);
 
 module.exports = router;

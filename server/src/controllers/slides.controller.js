@@ -10,6 +10,7 @@ const { toSlug, uniqueSlug, randomSuffix } = require('../lib/slug');
 const { cleanupUploadedFile } = require('../middleware/upload');
 const {
   putLocalFile,
+  putBuffer,
   isRemoteEnabled,
   deleteStoredObject,
   resolveStorageReadUrl,
@@ -114,6 +115,17 @@ const mapSlideUploadError = (err) => {
     error: 'Failed to upload slide',
     code: 'UPLOAD_FAILED',
   };
+};
+
+const decodeDataUrlImage = (value) => {
+  if (!value || typeof value !== 'string') return null;
+  const m = value.match(/^data:(image\/(?:png|jpeg|jpg|webp));base64,([a-z0-9+/=]+)$/i);
+  if (!m) return null;
+  const mime = m[1].toLowerCase() === 'image/jpg' ? 'image/jpeg' : m[1].toLowerCase();
+  const base64 = m[2];
+  const bytes = Buffer.from(base64, 'base64');
+  if (!bytes?.length) return null;
+  return { mime, bytes };
 };
 
 // normalizeSlideMedia: recursively normalises all media URL fields (fileUrl,
@@ -1073,6 +1085,78 @@ const update = async (req, res) => {
   }
 };
 
+const updateThumbnail = async (req, res) => {
+  try {
+    const slideId = Number(req.params.id);
+    if (!Number.isInteger(slideId) || slideId <= 0) {
+      return res.status(400).json({ error: 'Invalid slide id' });
+    }
+
+    const slide = await prisma.slide.findUnique({
+      where: { id: slideId },
+      select: {
+        id: true,
+        userId: true,
+        conversionStatus: true,
+        thumbnailUrl: true,
+      },
+    });
+    if (!slide) return res.status(404).json({ error: 'Slide not found' });
+    if (slide.userId !== req.user.id && !req.user.isAdmin) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    if (slide.conversionStatus !== 'done') {
+      return res.status(409).json({ error: 'Slide preview is not ready yet' });
+    }
+
+    const { imageDataUrl } = req.body || {};
+    const decoded = decodeDataUrlImage(imageDataUrl);
+    if (!decoded) {
+      return res.status(422).json({
+        code: 'INVALID_THUMBNAIL_PAYLOAD',
+        error: 'Geçersiz kapak görseli. Lütfen tekrar deneyin.',
+      });
+    }
+    if (decoded.bytes.length > 4 * 1024 * 1024) {
+      return res.status(413).json({
+        code: 'THUMBNAIL_TOO_LARGE',
+        error: 'Kapak görseli çok büyük. Lütfen tekrar deneyin.',
+      });
+    }
+
+    const ext = decoded.mime === 'image/png'
+      ? 'png'
+      : decoded.mime === 'image/webp'
+      ? 'webp'
+      : 'jpg';
+    const key = `thumbnails/slide-${slideId}-cover-${Date.now()}.${ext}`;
+    const uploaded = await putBuffer(decoded.bytes, key, decoded.mime);
+
+    const updated = await prisma.slide.update({
+      where: { id: slideId },
+      data: { thumbnailUrl: uploaded },
+      select: slideSelect,
+    });
+
+    const previous = slide.thumbnailUrl ? toCanonicalMediaUrl(slide.thumbnailUrl) : null;
+    const next = uploaded ? toCanonicalMediaUrl(uploaded) : null;
+    if (previous && next && previous !== next) {
+      deleteStoredObject(previous).catch((cleanupErr) => {
+        logger.warn('Failed to cleanup old thumbnail after update', {
+          slideId,
+          previous,
+          error: cleanupErr?.message || String(cleanupErr),
+        });
+      });
+    }
+
+    return res.json(normalizeSlideMedia(updated));
+  } catch (err) {
+    logger.error('Failed to update thumbnail', { error: err.message, stack: err.stack });
+    return res.status(500).json({ error: 'Failed to update thumbnail' });
+  }
+};
+
 const remove = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1206,6 +1290,7 @@ module.exports = {
   getMine,
   create,
   update,
+  updateThumbnail,
   getPopular,
   incrementView,
   trackPageEvent,
