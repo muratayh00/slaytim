@@ -13,6 +13,8 @@ interface SlideViewerProps {
   slideId: number;
   /** Thumbnail / cover image shown immediately while the PDF is loading */
   coverUrl?: string;
+  /** Slide title — shown in the no-thumbnail loading placeholder */
+  title?: string;
   className?: string;
   transitionMode?: 'instant' | 'fade' | 'slide' | 'snap' | 'swipe' | 'auto';
   autoStepMs?: number;
@@ -104,6 +106,7 @@ export default function SlideViewer({
   pdfUrl,
   slideId,
   coverUrl,
+  title,
   className = '',
   transitionMode = 'fade',
   autoStepMs = 0,
@@ -439,11 +442,14 @@ export default function SlideViewer({
               className="flex items-center justify-center"
               style={{ minHeight: '40vh', background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(17,24,39,0.55))' }}
             >
-              <div className="flex flex-col items-center gap-3">
+              <div className="flex flex-col items-center gap-3 px-6 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center">
                   <Grid3X3 className="w-7 h-7 text-white/70" />
                 </div>
-                <p className="text-sm text-white/85 font-medium">Önizleme hazırlanıyor…</p>
+                {title && (
+                  <p className="text-base font-bold text-white/90 leading-snug max-w-xs line-clamp-2">{title}</p>
+                )}
+                <p className="text-xs text-white/55 font-medium">Önizleme hazırlanıyor…</p>
               </div>
             </div>
           )}
@@ -632,7 +638,7 @@ export default function SlideViewer({
           <button
             onClick={() => setShowGrid(true)}
             className="w-8 h-8 flex items-center justify-center rounded-lg bg-black/50  text-white hover:bg-black/70 transition"
-            title="Genel gÃ¶rÃ¼nÃ¼m (G)"
+            title="Genel görünüm (G)"
           >
             <Grid3X3 className="w-4 h-4" />
           </button>
@@ -685,7 +691,7 @@ export default function SlideViewer({
             disabled={isFirst}
             className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
           >
-            <SkipBack className="w-3.5 h-3.5" /> Ä°lk sayfa
+            <SkipBack className="w-3.5 h-3.5" /> İlk sayfa
           </button>
 
           <div className="flex items-center gap-2">
@@ -721,7 +727,7 @@ export default function SlideViewer({
       {/* â”€â”€ Keyboard hint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {!fullscreen && numPages > 1 && (
         <p className="text-[10px] text-muted-foreground/40 text-center mt-2">
-          â† â†’ tuÅŸlarÄ± Â· kaydÄ±r Â· G: genel gÃ¶rÃ¼nÃ¼m Â· F11: tam ekran
+          ← → tuşları · kaydır · G: genel görünüm · F11: tam ekran
         </p>
       )}
     </div>

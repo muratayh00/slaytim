@@ -500,7 +500,16 @@ export default function SlideDetailPage() {
     if (!shouldFixSlug && !shouldFixLegacy) return;
     const canonical = `/slayt/${id}-${expectedSlug || String(id)}`;
     const query = searchParams.toString();
-    router.replace(query ? `${canonical}?${query}` : canonical);
+    const nextUrl = query ? `${canonical}?${query}` : canonical;
+
+    // Avoid fragile RSC transition fetches for canonical URL correction.
+    // This keeps the current page mounted and only rewrites the URL bar.
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(window.history.state, '', nextUrl);
+      return;
+    }
+
+    router.replace(nextUrl);
   }, [slide, id, parsedSlug, pathname, searchParams, router]);
 
   useEffect(() => {
@@ -873,6 +882,7 @@ export default function SlideDetailPage() {
               pdfUrl={slide.pdfUrl}
               slideId={Number(id)}
               coverUrl={resolveFileUrl(slide.thumbnailUrl) || undefined}
+              title={slide.title}
               className="mb-6"
               transitionMode="fade"
               onPageChange={setCurrentPage}

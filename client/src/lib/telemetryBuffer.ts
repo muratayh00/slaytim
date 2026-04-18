@@ -9,8 +9,9 @@ type BufferedEvent = {
   payload: Record<string, unknown>;
 };
 
-const FLUSH_MS_VISIBLE = 30_000;
-const FLUSH_MS_HIDDEN = 120_000;
+const FLUSH_MS_VISIBLE = 120_000;
+const FLUSH_MS_HIDDEN = 600_000;
+const SOFT_BATCH_SIZE = 5;
 const MAX_BUFFER = 100;
 const API_BASE = getApiBaseUrl();
 let seq = 0;
@@ -32,7 +33,9 @@ const scheduleFlush = () => {
   if (!started || typeof document === 'undefined') return;
   clearFlushTimer();
   if (!buffer.length) return;
-  const interval = document.visibilityState === 'hidden' ? FLUSH_MS_HIDDEN : FLUSH_MS_VISIBLE;
+  const hidden = document.visibilityState === 'hidden';
+  const baseInterval = hidden ? FLUSH_MS_HIDDEN : FLUSH_MS_VISIBLE;
+  const interval = buffer.length >= SOFT_BATCH_SIZE ? Math.min(baseInterval, 30_000) : baseInterval;
   timer = setTimeout(() => {
     flushTelemetry().catch(() => {});
     scheduleFlush();

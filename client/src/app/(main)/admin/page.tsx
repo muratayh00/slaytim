@@ -71,7 +71,7 @@ export default function AdminPage() {
   if (!user) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
-        <p className="text-muted-foreground">Bu sayfaya eriÅŸmek iÃ§in giriÅŸ yapmalÄ±sÄ±n.</p>
+        <p className="text-muted-foreground">Bu sayfaya erişmek için giriş yapmalısın.</p>
       </div>
     );
   }
@@ -80,9 +80,9 @@ export default function AdminPage() {
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
         <Shield className="w-16 h-16 mx-auto text-muted-foreground/20 mb-4" />
-        <h1 className="text-xl font-extrabold mb-2">EriÅŸim Yok</h1>
-        <p className="text-muted-foreground">Bu sayfa yalnÄ±zca yÃ¶neticiler iÃ§in.</p>
-        <p className="text-sm text-muted-foreground mt-2">Admin panele giriÅŸ URL&apos;i: <span className="font-semibold">/admin</span>. EriÅŸim iÃ§in hesabÄ±nda <span className="font-semibold">isAdmin=true</span> olmalÄ±.</p>
+        <h1 className="text-xl font-extrabold mb-2">Erişim Yok</h1>
+        <p className="text-muted-foreground">Bu sayfa yalnızca yöneticiler için.</p>
+        <p className="text-sm text-muted-foreground mt-2">Admin panele giriş URL&apos;i: <span className="font-semibold">/admin</span>. Erişim için hesabında <span className="font-semibold">isAdmin=true</span> olmalı.</p>
       </div>
     );
   }
@@ -95,13 +95,13 @@ export default function AdminPage() {
         </div>
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Admin Paneli</h1>
-          <p className="text-sm text-muted-foreground">Platform yÃ¶netimi ve moderasyon merkezi</p>
+          <p className="text-sm text-muted-foreground">Platform yönetimi ve moderasyon merkezi</p>
         </div>
       </div>
 
       <div className="mb-6 p-4 rounded-2xl border border-border bg-card/60 text-sm text-muted-foreground">
-        <p className="font-semibold text-foreground mb-1">Admin panele eriÅŸim ve kullanÄ±m</p>
-        <p>GiriÅŸ URL: <span className="font-semibold">/admin</span>. Bu panelde moderasyon, dÃ¶nÃ¼ÅŸÃ¼m kuyruÄŸu, iÃ§erik zekasÄ±, analitik ve denetim loglarÄ±nÄ± tek yerden yÃ¶netebilirsin.</p>
+        <p className="font-semibold text-foreground mb-1">Admin panele erişim ve kullanım</p>
+        <p>Giriş URL: <span className="font-semibold">/admin</span>. Bu panelde moderasyon, dönüşüm kuyruğu, içerik zekası, analitik ve denetim loglarını tek yerden yönetebilirsin.</p>
       </div>
 
       {/* Tab Navigation */}
@@ -153,7 +153,7 @@ function OverviewTab() {
         setStats(statsRes?.data || null);
         setFeedExperiment(feedRes?.data || null);
       })
-      .catch(() => toast.error('Ä°statistikler yÃ¼klenemedi'))
+      .catch(() => toast.error('İstatistikler yüklenemedi'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -161,8 +161,8 @@ function OverviewTab() {
   if (!stats) return (
     <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl text-center">
       <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-      <h3 className="text-lg font-bold text-red-600 mb-1">Sunucu HatasÄ± (500)</h3>
-      <p className="text-sm text-red-600/80">Veriler yÃ¼klenemedi. LÃ¼tfen backend konsolundaki 500 hata loglarÄ±nÄ± kontrol edin.</p>
+      <h3 className="text-lg font-bold text-red-600 mb-1">Sunucu Hatası (500)</h3>
+      <p className="text-sm text-red-600/80">Veriler yüklenemedi. Lütfen backend konsolundaki 500 hata loglarını kontrol edin.</p>
     </div>
   );
 
@@ -177,39 +177,39 @@ function OverviewTab() {
           </div>
           <div className="flex flex-wrap gap-3 text-xs font-semibold">
             {stats.reports.critical > 0 && (
-              <span className="text-red-600">ğŸš¨ {stats.reports.critical} kritik rapor bekliyor</span>
+              <span className="text-red-600">🚨 {stats.reports.critical} kritik rapor bekliyor</span>
             )}
             {stats.slides.failedConversions > 0 && (
-              <span className="text-orange-600">âš ï¸ {stats.slides.failedConversions} dÃ¶nÃ¼ÅŸtÃ¼rme baÅŸarÄ±sÄ±z</span>
+              <span className="text-orange-600">⚠️ {stats.slides.failedConversions} dönüştürme başarısız</span>
             )}
           </div>
         </div>
       )}
 
       {/* User KPIs */}
-      <Section title="KullanÄ±cÄ±lar">
+      <Section title="Kullanıcılar">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <StatCard label="Toplam"       value={stats.users.total}  color="primary" />
-          <StatCard label="BugÃ¼n"        value={stats.users.today}  color="emerald" />
+          <StatCard label="Bugün"        value={stats.users.today}  color="emerald" />
           <StatCard label="Bu Hafta"     value={stats.users.week}   color="blue" />
           <StatCard label="Bu Ay"        value={stats.users.month}  color="violet" />
-          <StatCard label="BanlÄ±"        value={stats.users.banned} color="red" />
-          <StatCard label="SusturulmuÅŸ"  value={stats.users.muted}  color="orange" />
+          <StatCard label="Banlı"        value={stats.users.banned} color="red" />
+          <StatCard label="Susturulmuş"  value={stats.users.muted}  color="orange" />
         </div>
       </Section>
 
       {/* Content KPIs */}
-      <Section title="Ä°Ã§erik">
+      <Section title="İçerik">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <StatCard label="Toplam Konu"   value={stats.topics.total}  color="primary" />
-          <StatCard label="BugÃ¼n Konu"    value={stats.topics.today}  color="emerald" />
+          <StatCard label="Bugün Konu"    value={stats.topics.today}  color="emerald" />
           <StatCard label="Gizli Konu"    value={stats.topics.hidden} color="slate" />
           <StatCard label="Toplam Slayt"  value={stats.slides.total}  color="blue" />
-          <StatCard label="BugÃ¼n Slayt"   value={stats.slides.today}  color="cyan" />
+          <StatCard label="Bugün Slayt"   value={stats.slides.today}  color="cyan" />
           <StatCard label="Gizli Slayt"   value={stats.slides.hidden} color="slate" />
-          <StatCard label="DÃ¶nÃ¼ÅŸtÃ¼rme âœ—"  value={stats.slides.failedConversions} color="red" />
+          <StatCard label="Dönüştürme ✗"  value={stats.slides.failedConversions} color="red" />
           <StatCard label="Toplam Slideo" value={stats.slideos.total} color="violet" />
-          <StatCard label="BugÃ¼n Slideo"  value={stats.slideos.today} color="pink" />
+          <StatCard label="Bugün Slideo"  value={stats.slideos.today} color="pink" />
           <StatCard label="Toplam Yorum"  value={stats.comments.total} color="amber" />
         </div>
       </Section>
@@ -224,7 +224,7 @@ function OverviewTab() {
       </Section>
 
       {/* Top Topics */}
-      <Section title="En Ã‡ok GÃ¶rÃ¼ntÃ¼lenen Konular">
+      <Section title="En Çok Görüntülenen Konular">
         <div className="space-y-2">
           {stats.topTopics.map((t: any, i: number) => (
             <div key={t.id} className="flex items-center gap-3 p-3 bg-card border border-border rounded-xl">
@@ -919,10 +919,10 @@ const INTEL_TYPES = [
 ];
 
 const INTEL_SORTS = [
-  { value: 'quality',     label: 'Kalite PuanÄ±', desc: 'savesÃ—5 + likesÃ—1 + viewsÃ—0.01' },
-  { value: 'saves',       label: 'KayÄ±t SayÄ±sÄ±', desc: 'En Ã§ok kaydedilen' },
-  { value: 'views',       label: 'GÃ¶rÃ¼ntÃ¼lenme', desc: 'En Ã§ok gÃ¶rÃ¼ntÃ¼lenen' },
-  { value: 'underexposed',label: 'Gizli MÃ¼cevherler', desc: 'YÃ¼ksek kalite, dÃ¼ÅŸÃ¼k gÃ¶rÃ¼ntÃ¼lenme' },
+  { value: 'quality', label: 'Kalite Puanı', desc: 'saves×5 + likes×1 + views×0.01' },
+  { value: 'saves', label: 'Kayıt Sayısı', desc: 'En çok kaydedilen' },
+  { value: 'views', label: 'Görüntülenme', desc: 'En çok görüntülenen' },
+  { value: 'underexposed', label: 'Gizli Mücevherler', desc: 'Yüksek kalite, düşük görüntülenme' },
 ];
 
 function ContentIntelTab() {
