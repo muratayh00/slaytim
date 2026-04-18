@@ -63,6 +63,16 @@ export function resolveFileUrl(path: string | null | undefined): string {
  * supports them (our backend does), so only the pages actually needed are
  * downloaded — dramatically reducing time-to-first-page for large PDFs.
  */
+/**
+ * Eagerly initialise the PDF.js module + worker so the singleton is warm
+ * before the user navigates to a slide.  Call this early (e.g. Navbar mount)
+ * with a setTimeout so it doesn't compete with critical page resources.
+ * Safe to call multiple times — getPdfjs() is idempotent.
+ */
+export async function warmupPdfjs(): Promise<void> {
+  try { await getPdfjs(); } catch { /* ignore — caller doesn't need the result */ }
+}
+
 export async function loadPdfDocument(pdfPath: string) {
   const lib = await getPdfjs();
   const resolved = resolveFileUrl(pdfPath);

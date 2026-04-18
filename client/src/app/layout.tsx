@@ -56,6 +56,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="tr" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
+        {/*
+          Pre-download PDF.js files so they are browser-cached before the user
+          navigates to any slide.  Without this, /pdf.min.mjs (2-5 MB) must be
+          fetched cold on first slide open, adding 5-30 s on slow connections.
+          modulepreload parses and compiles the ES module, not just downloads it.
+        */}
+        <link rel="modulepreload" href="/pdf.min.mjs" />
+        <link rel="preload" href="/pdf.worker.min.mjs" as="script" crossOrigin="anonymous" />
       </head>
       <body className={`${font.variable} font-sans`}>
         <Providers>

@@ -279,6 +279,10 @@ export default function SlideViewer({
   // â”€â”€ Generate thumbnails progressively â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!doc || numPages === 0) return;
+    // Don't start thumbnail rendering until first canvas page is visible.
+    // PDF.js processes one render task at a time; starting thumbnails immediately
+    // forces page-1 to queue behind them, delaying first paint.
+    if (!firstRenderDone && !showGrid) return;
     let cancelled = false;
     const before = 1;
     // Grid mode prefetches up to 10 visible thumbnails; normal mode only fetches
@@ -319,7 +323,11 @@ export default function SlideViewer({
       }
     })();
     return () => { cancelled = true; };
-  }, [doc, numPages, currentPage, showGrid, thumbnails, slideId]);
+  // firstRenderDone is intentionally a dep: thumbnail generation only starts
+  // after the first canvas page has painted.  This gives renderPage() exclusive
+  // access to the PDF.js task queue on initial load (cuts time-to-first-paint).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc, numPages, currentPage, showGrid, thumbnails, slideId, firstRenderDone]);
 
   // â”€â”€ Scroll active thumbnail into view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {

@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { buildProfilePath, buildTopicCreatePath } from '@/lib/url';
 import { resolveMediaUrl } from '@/lib/media';
+import { warmupPdfjs } from '@/lib/pdfRenderer';
 
 export default function Navbar() {
   const { user, logout } = useAuthStore();
@@ -30,6 +31,13 @@ export default function Navbar() {
     const onScroll = () => setScrolled(window.scrollY > 8);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Warm up the PDF.js singleton in the background so slide previews open
+  // instantly.  Deferred 4 s so it doesn't compete with critical page resources.
+  useEffect(() => {
+    const t = setTimeout(() => { warmupPdfjs(); }, 4000);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {

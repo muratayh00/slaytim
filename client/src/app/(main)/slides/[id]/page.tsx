@@ -648,6 +648,47 @@ export default function SlideDetailPage() {
     toast('İstediğin sayfaya gel ve "Sayfa X kapak yap" ile kapak fotoğrafını seç.');
   }, [slide, isSlideOwner, searchParams]);
 
+  // ── Auto-generate cover thumbnail ─────────────────────────────────────────
+  // When the slide owner views a slide that has no thumbnail yet (e.g. uploaded
+  // before the thumbnail-generation fix), automatically capture page-1 from the
+  // rendered canvas and save it via PATCH /slides/:id/thumbnail.
+  // This is a silent, best-effort background action — no toast, no blocking UI.
+  const autoThumbDoneRef = useRef(false);
+  useEffect(() => {
+    if (!isSlideOwner) return;
+    if (!slide || slide.thumbnailUrl) return;             // already has one
+    if (slide.conversionStatus !== 'done' || !slide.pdfUrl) return;
+    if (autoThumbDoneRef.current) return;
+
+    // Wait 2 s after first PDF page renders to ensure canvas is stable
+    const t = setTimeout(async () => {
+      if (autoThumbDoneRef.current) return;
+      const canvas = viewerWrapRef.current?.querySelector('canvas');
+      if (!(canvas instanceof HTMLCanvasElement)) return;
+      const srcW = canvas.width || 0;
+      const srcH = canvas.height || 0;
+      if (!srcW || !srcH) return;
+
+      try {
+        const targetW = Math.min(720, srcW);
+        const targetH = Math.max(1, Math.round((targetW / srcW) * srcH));
+        const tmp = document.createElement('canvas');
+        tmp.width = targetW; tmp.height = targetH;
+        const ctx = tmp.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(canvas, 0, 0, targetW, targetH);
+        const imageDataUrl = tmp.toDataURL('image/jpeg', 0.78);
+        const { data } = await api.patch(`/slides/${id}/thumbnail`, { imageDataUrl, pageNumber: 1 });
+        autoThumbDoneRef.current = true;
+        setSlide((prev: any) => ({ ...prev, thumbnailUrl: data?.thumbnailUrl || prev?.thumbnailUrl }));
+      } catch {
+        // best-effort — silent failure
+      }
+    }, 2000);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSlideOwner, slide?.thumbnailUrl, slide?.conversionStatus, slide?.pdfUrl]);
+
   // Poll conversion status
   // Use a ref to read the latest status inside the interval without making
   // conversionStatus a dep — otherwise the effect re-fires (and restarts the
