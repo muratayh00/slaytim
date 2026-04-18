@@ -78,6 +78,7 @@ export default function EmbedSlidePage() {
             pdfUrl={slide.pdfUrl}
             slideId={Number(id)}
             coverUrl={resolveFileUrl(slide.thumbnailUrl) || undefined}
+            title={slide.title}
           />
         </div>
       )}
