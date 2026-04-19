@@ -46,13 +46,14 @@ interface ImageSlideViewerProps {
   navStartMs?: number;
 }
 
+// Max height for the slide image area — tall enough to read, small enough not
+// to dominate the page. Fullscreen mode ignores this via the viewer container.
+const SLIDE_MAX_H = 'max-h-[460px]';
+
 // ── Skeleton ─────────────────────────────────────────────────────────────────
-function PageSkeleton({ aspectRatio }: { aspectRatio?: number }) {
-  const pt = aspectRatio ? `${(1 / aspectRatio) * 100}%` : '56.25%'; // 16:9 default
+function PageSkeleton() {
   return (
-    <div className="w-full relative" style={{ paddingTop: pt }}>
-      <div className="absolute inset-0 bg-muted/60 animate-pulse rounded-lg" />
-    </div>
+    <div className={cn('w-full bg-muted/60 animate-pulse rounded-lg', SLIDE_MAX_H, 'aspect-video')} />
   );
 }
 
@@ -68,41 +69,41 @@ function SlidePageImage({
 }) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
-  const aspectRatio = page.width && page.height ? page.width / page.height : 16 / 9;
 
   const handleLoad = () => {
     setLoaded(true);
     onLoad?.();
   };
 
+  if (error) {
+    return (
+      <div className={cn('w-full flex items-center justify-center bg-muted/40 rounded-lg aspect-video', SLIDE_MAX_H)}>
+        <span className="text-xs text-muted-foreground">Sayfa yüklenemedi</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="relative w-full" style={{ paddingTop: `${(1 / aspectRatio) * 100}%` }}>
-      {/* Skeleton behind the image */}
-      {!loaded && !error && (
-        <div className="absolute inset-0 bg-muted/60 animate-pulse rounded-lg" />
+    <div className="relative w-full flex items-center justify-center">
+      {/* Skeleton shown until image loads */}
+      {!loaded && (
+        <div className={cn('w-full bg-muted/60 animate-pulse rounded-lg aspect-video', SLIDE_MAX_H)} />
       )}
-      {/* Error state */}
-      {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted/40 rounded-lg">
-          <span className="text-xs text-muted-foreground">Sayfa yüklenemedi</span>
-        </div>
-      )}
-      {/* Image */}
-      {!error && (
-        <img
-          src={page.url}
-          alt={`Sayfa ${page.pageNumber}`}
-          loading={eager ? 'eager' : 'lazy'}
-          decoding={eager ? 'sync' : 'async'}
-          draggable={false}
-          className={cn(
-            'absolute inset-0 w-full h-full object-contain rounded-lg select-none transition-opacity duration-200',
-            loaded ? 'opacity-100' : 'opacity-0'
-          )}
-          onLoad={handleLoad}
-          onError={() => setError(true)}
-        />
-      )}
+      {/* Image — scales to fill width, never taller than SLIDE_MAX_H */}
+      <img
+        src={page.url}
+        alt={`Sayfa ${page.pageNumber}`}
+        loading={eager ? 'eager' : 'lazy'}
+        decoding={eager ? 'sync' : 'async'}
+        draggable={false}
+        className={cn(
+          'w-full h-auto object-contain rounded-lg select-none transition-opacity duration-200',
+          SLIDE_MAX_H,
+          loaded ? 'opacity-100' : 'absolute opacity-0 pointer-events-none'
+        )}
+        onLoad={handleLoad}
+        onError={() => setError(true)}
+      />
     </div>
   );
 }
@@ -259,23 +260,37 @@ export default function ImageSlideViewer({
       {/* ── Main slide area ── */}
       <div
         className={cn(
-          'flex-1 flex items-center justify-center p-2 sm:p-4',
-          isFullscreen ? 'bg-black' : 'bg-muted/20'
+          'flex items-center justify-center p-3 sm:p-4',
+          isFullscreen ? 'flex-1 bg-black' : 'bg-muted/20'
         )}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
         {currentPageData ? (
           <div className={cn(
-            'w-full max-w-4xl',
-            isFullscreen && 'max-w-full max-h-full flex items-center justify-center'
+            'w-full',
+            isFullscreen
+              ? 'flex items-center justify-center h-full'
+              : 'max-w-3xl mx-auto'
           )}>
-            <SlidePageImage
-              key={currentPageData.pageNumber}
-              page={currentPageData}
-              eager={currentPageData.pageNumber === 1}
-              onLoad={currentPageData.pageNumber === 1 ? handleFirstPageLoad : undefined}
-            />
+            {isFullscreen ? (
+              // Fullscreen: fill available height, no max-h cap
+              <img
+                src={currentPageData.url}
+                alt={`Sayfa ${currentPageData.pageNumber}`}
+                loading="eager"
+                decoding="sync"
+                draggable={false}
+                className="max-w-full max-h-full object-contain select-none"
+              />
+            ) : (
+              <SlidePageImage
+                key={currentPageData.pageNumber}
+                page={currentPageData}
+                eager={currentPageData.pageNumber === 1}
+                onLoad={currentPageData.pageNumber === 1 ? handleFirstPageLoad : undefined}
+              />
+            )}
           </div>
         ) : (
           <PageSkeleton />
