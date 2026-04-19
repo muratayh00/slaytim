@@ -10,6 +10,8 @@ const {
   resolveStorageReadUrl,
   isRemoteEnabled,
 } = require('./storage.service');
+const { enqueueFirstPagePreview, REDIS_ENABLED: PREVIEW_REDIS_ENABLED } = require('../queues/preview.queue');
+const { generateAllPagesLocal, PREVIEW_ENABLED } = require('./preview-generator.service');
 const { scanFile, hasClamAv, getClamScanBinary, isScanRequired } = require('./file-scan.service');
 const logger = require('../lib/logger');
 const {
@@ -165,10 +167,21 @@ function hasPowerPoint() {
   return paths.some((p) => fs.existsSync(p));
 }
 
-function buildLibreOfficeProfileDir() {
+// One persistent profile per worker process.
+// LibreOffice reuses the existing profile → eliminates the 15-30 s cold-start
+// that a fresh profile creation causes on every conversion invocation.
+const _loProfileDir = (() => {
   const base = path.join(UPLOADS_DIR, '.lo-profiles');
   if (!fs.existsSync(base)) fs.mkdirSync(base, { recursive: true });
-  return path.join(base, `profile-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  return path.join(base, `profile-${process.pid}`);
+})();
+
+function buildLibreOfficeProfileDir() {
+  // Create on first access (may already exist from a prior conversion in this process)
+  if (!fs.existsSync(_loProfileDir)) {
+    fs.mkdirSync(_loProfileDir, { recursive: true });
+  }
+  return _loProfileDir;
 }
 
 function convertWithLibreOffice(inputPath, outDir, sofficeBinary, outputFormat = 'pdf', timeoutMs = 120_000) {
@@ -190,9 +203,7 @@ function convertWithLibreOffice(inputPath, outDir, sofficeBinary, outputFormat =
 
   return new Promise((resolve, reject) => {
     execFile(sofficeBinary, args, { timeout: timeoutMs, windowsHide: true }, (err, stdout, stderr) => {
-      try {
-        fs.rmSync(profileDir, { recursive: true, force: true });
-      } catch {}
+      // Profile dir is intentionally kept alive (reused per process) — do NOT rmSync here
       if (err) {
         return reject(new Error((stderr || stdout || err.message || 'LibreOffice conversion failed').trim()));
       }
@@ -389,6 +400,41 @@ function isUnrecoverableError(err) {
     || msg.includes('libreoffice')
     || msg.includes('microsoft office')
   );
+}
+
+/**
+ * Dispatch preview generation for a slide.
+ *
+ * When Redis is available: enqueues a BullMQ job (crash-safe, survives restarts).
+ * When Redis is disabled:  falls back to in-process generation via setImmediate
+ *                          so the conversion response is never blocked.
+ *
+ * This function is intentionally fire-and-forget — call with `void`.
+ */
+async function dispatchPreviewGeneration(slideId, pdfUrl) {
+  try {
+    if (PREVIEW_REDIS_ENABLED) {
+      await enqueueFirstPagePreview(slideId, pdfUrl);
+      logger.info('[conversion] Preview generation enqueued (BullMQ)', { slideId });
+    } else if (PREVIEW_ENABLED) {
+      // Local fallback — runs in background so it doesn't block the caller
+      setImmediate(() => {
+        generateAllPagesLocal(slideId, pdfUrl).catch((err) => {
+          logger.error('[conversion] Local preview generation failed', {
+            slideId,
+            error: err?.message || String(err),
+          });
+        });
+      });
+      logger.info('[conversion] Preview generation scheduled (local setImmediate)', { slideId });
+    }
+  } catch (err) {
+    // Never let preview dispatch break the conversion success path
+    logger.warn('[conversion] Preview dispatch failed (non-fatal)', {
+      slideId,
+      error: err?.message || String(err),
+    });
+  }
 }
 
 function withTimeout(promise, timeoutMs, timeoutMessage) {
@@ -638,6 +684,9 @@ async function convertSlide(slideId) {
         },
       });
 
+      // Fire-and-forget: generate per-page image previews in the background
+      void dispatchPreviewGeneration(slideId, resolvedPdfUrl);
+
       return;
     }
 
@@ -731,6 +780,9 @@ async function convertSlide(slideId) {
         conversionStatus: updatedSlide.conversionStatus,
       },
     });
+
+    // Fire-and-forget: enqueue per-page image preview generation
+    void dispatchPreviewGeneration(slideId, finalPdfUrl);
   } catch (err) {
     if (uploadedThumbUrl) {
       await deleteStoredObject(uploadedThumbUrl).catch((cleanupErr) => {

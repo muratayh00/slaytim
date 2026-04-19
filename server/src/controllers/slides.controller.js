@@ -947,6 +947,8 @@ const getPreviewMeta = async (req, res) => {
         deletedAt: true,
         pdfUrl: true,
         conversionStatus: true,
+        previewStatus: true,
+        previewPageCount: true,
       },
     });
     if (!slide || slide.deletedAt) {
@@ -959,41 +961,94 @@ const getPreviewMeta = async (req, res) => {
       return res.status(409).json({ error: 'Preview is not ready yet' });
     }
 
-    let pageCount = 0;
-    let lastError = null;
-    for (let attempt = 1; attempt <= 4; attempt += 1) {
-      try {
-        let pdfBuffer = null;
-        const localCandidatePath = toUploadAbsPath(slide.pdfUrl);
-        const isRemote =
-          /^https?:\/\//i.test(slide.pdfUrl)
-          || (String(slide.pdfUrl || '').startsWith('/uploads/') && isRemoteEnabled() && (!localCandidatePath || !fs.existsSync(localCandidatePath)));
-        if (isRemote) {
-          const readUrl = await resolveStorageReadUrl(slide.pdfUrl);
-          const upstream = await fetch(readUrl);
-          if (!upstream.ok) throw new Error('Remote PDF fetch failed');
-          const raw = await upstream.arrayBuffer();
-          pdfBuffer = Buffer.from(raw);
-        } else {
-          const filePath = localCandidatePath;
-          if (!filePath || !fs.existsSync(filePath)) throw new Error('PDF file not found');
-          pdfBuffer = await fs.promises.readFile(filePath);
-        }
-        const parsed = await pdfParse(pdfBuffer);
-        pageCount = Math.max(1, Number(parsed?.numpages || 0));
-        if (pageCount > 0) break;
-      } catch (err) {
-        lastError = err;
-        if (attempt < 4) await sleep(300 * attempt);
+    // ── Image preview path ─────────────────────────────────────────────────
+    //
+    // Serve available WebP assets whenever ANY exist in the DB, regardless of
+    // whether previewStatus is 'ready' or 'processing'.  This implements the
+    // graceful degradation requirement: page 1 becomes visible the instant the
+    // first-page BullMQ job completes, while remaining pages are still being
+    // generated.
+    //
+    // State machine the frontend can rely on:
+    //   previewStatus=processing + pages.length>0  → show page 1, keep polling
+    //   previewStatus=ready                         → show all pages, stop polling
+    //   previewStatus=failed / pages.length=0       → fall back to PDF.js
+    //
+    if (slide.previewStatus === 'ready' || slide.previewStatus === 'processing') {
+      const assets = await prisma.slidePreviewAsset.findMany({
+        where:   { slideId },
+        orderBy: { pageNumber: 'asc' },
+        select:  { pageNumber: true, url: true, width: true, height: true },
+      });
+
+      if (assets.length > 0) {
+        // Resolve to direct CDN / storage URLs (no app-server proxy).
+        // For S3/R2: resolveStorageReadUrl returns the public/presigned URL directly.
+        // For local: returns /uploads/... served by Express static middleware.
+        const pages = await Promise.all(
+          assets.map(async (a) => {
+            let url = a.url;
+            try { url = await resolveStorageReadUrl(a.url); } catch {}
+            return { pageNumber: a.pageNumber, url, width: a.width, height: a.height };
+          })
+        );
+
+        return res.json({
+          slideId,
+          previewMode:   'images',
+          previewStatus: slide.previewStatus,          // 'processing' | 'ready'
+          pageCount:     pages.length,
+          totalPages:    slide.previewPageCount || pages.length, // total incl. not-yet-generated
+          previewUrl:    `/api/slides/${slideId}/pdf`, // always include as PDF.js fallback
+          conversionStatus: 'done',
+          pages,
+        });
       }
     }
+
+    // ── PDF fallback path ──────────────────────────────────────────────────
+    // Handles previewStatus = 'none' | 'failed' | 'processing' (no assets yet)
+    let pageCount = slide.previewPageCount || 0;
+
     if (!pageCount) {
-      return res.status(409).json({
-        error: String(lastError?.message || 'PDF sayfa sayısı okunamadı. Lütfen kısa süre sonra tekrar deneyin.'),
-      });
+      let lastError = null;
+      for (let attempt = 1; attempt <= 4; attempt += 1) {
+        try {
+          let pdfBuffer = null;
+          const localCandidatePath = toUploadAbsPath(slide.pdfUrl);
+          const isRemote =
+            /^https?:\/\//i.test(slide.pdfUrl)
+            || (String(slide.pdfUrl || '').startsWith('/uploads/') && isRemoteEnabled() && (!localCandidatePath || !fs.existsSync(localCandidatePath)));
+          if (isRemote) {
+            const readUrl = await resolveStorageReadUrl(slide.pdfUrl);
+            const upstream = await fetch(readUrl);
+            if (!upstream.ok) throw new Error('Remote PDF fetch failed');
+            const raw = await upstream.arrayBuffer();
+            pdfBuffer = Buffer.from(raw);
+          } else {
+            const filePath = localCandidatePath;
+            if (!filePath || !fs.existsSync(filePath)) throw new Error('PDF file not found');
+            pdfBuffer = await fs.promises.readFile(filePath);
+          }
+          const parsed = await pdfParse(pdfBuffer);
+          pageCount = Math.max(1, Number(parsed?.numpages || 0));
+          if (pageCount > 0) break;
+        } catch (err) {
+          lastError = err;
+          if (attempt < 4) await sleep(300 * attempt);
+        }
+      }
+      if (!pageCount) {
+        return res.status(409).json({
+          error: String(lastError?.message || 'PDF sayfa sayısı okunamadı. Lütfen kısa süre sonra tekrar deneyin.'),
+        });
+      }
     }
+
     return res.json({
       slideId,
+      previewMode: 'pdf',
+      previewStatus: slide.previewStatus || 'none',
       pageCount,
       previewUrl: `/api/slides/${slideId}/pdf`,
       conversionStatus: 'done',

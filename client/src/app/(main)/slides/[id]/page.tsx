@@ -16,6 +16,7 @@ import toast from 'react-hot-toast';
 import ReportModal from '@/components/shared/ReportModal';
 import SlideCard from '@/components/shared/SlideCard';
 import SlideViewer from '@/components/shared/SlideViewer';
+import ImageSlideViewer, { type SlidePreviewPage } from '@/components/shared/ImageSlideViewer';
 import SlideAnalyticsPanel from '@/components/shared/SlideAnalyticsPanel';
 import SlideFlashcardsPanel from '@/components/shared/SlideFlashcardsPanel';
 import CreateSlideoModal from '@/components/slideo/CreateSlideoModal';
@@ -467,6 +468,12 @@ export default function SlideDetailPage() {
   const [likeBusy, setLikeBusy] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
   const [coverSaving, setCoverSaving] = useState(false);
+  const [previewMeta, setPreviewMeta] = useState<{
+    previewMode: 'images' | 'pdf';
+    previewStatus: string;  // none | processing | ready | failed
+    pages: SlidePreviewPage[];
+    pageCount: number;      // available pages (may be < totalPages while processing)
+  } | null>(null);
   const viewerWrapRef = useRef<HTMLDivElement | null>(null);
   const userId = user?.id ? Number(user.id) : null;
   const isSlideOwner = Boolean(
@@ -649,9 +656,9 @@ export default function SlideDetailPage() {
   }, [slide, isSlideOwner, searchParams]);
 
   // ── Auto-generate cover thumbnail ─────────────────────────────────────────
-  // When the slide owner views a slide that has no thumbnail yet (e.g. uploaded
-  // before the thumbnail-generation fix), automatically capture page-1 from the
-  // rendered canvas and save it via PATCH /slides/:id/thumbnail.
+  // When the slide owner views a slide that has no thumbnail yet, automatically
+  // capture page-1 and save it via PATCH /slides/:id/thumbnail.
+  // Works with both ImageSlideViewer (uses img src) and SlideViewer (uses canvas).
   // This is a silent, best-effort background action — no toast, no blocking UI.
   const autoThumbDoneRef = useRef(false);
   useEffect(() => {
@@ -660,24 +667,47 @@ export default function SlideDetailPage() {
     if (slide.conversionStatus !== 'done' || !slide.pdfUrl) return;
     if (autoThumbDoneRef.current) return;
 
-    // Wait 2 s after first PDF page renders to ensure canvas is stable
     const t = setTimeout(async () => {
       if (autoThumbDoneRef.current) return;
-      const canvas = viewerWrapRef.current?.querySelector('canvas');
-      if (!(canvas instanceof HTMLCanvasElement)) return;
-      const srcW = canvas.width || 0;
-      const srcH = canvas.height || 0;
-      if (!srcW || !srcH) return;
-
       try {
-        const targetW = Math.min(720, srcW);
-        const targetH = Math.max(1, Math.round((targetW / srcW) * srcH));
-        const tmp = document.createElement('canvas');
-        tmp.width = targetW; tmp.height = targetH;
-        const ctx = tmp.getContext('2d');
-        if (!ctx) return;
-        ctx.drawImage(canvas, 0, 0, targetW, targetH);
-        const imageDataUrl = tmp.toDataURL('image/jpeg', 0.78);
+        let imageDataUrl = '';
+
+        // Prefer ImageSlideViewer page-1 URL (available immediately, no canvas needed)
+        const page1 = previewMeta?.pages?.find((p) => p.pageNumber === 1);
+        if (page1?.url) {
+          const img = new window.Image();
+          img.crossOrigin = 'anonymous';
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = reject;
+            img.src = page1.url;
+          });
+          const targetW = Math.min(720, img.naturalWidth);
+          const targetH = Math.max(1, Math.round((targetW / img.naturalWidth) * img.naturalHeight));
+          const tmp = document.createElement('canvas');
+          tmp.width = targetW; tmp.height = targetH;
+          const ctx = tmp.getContext('2d');
+          if (!ctx) return;
+          ctx.drawImage(img, 0, 0, targetW, targetH);
+          imageDataUrl = tmp.toDataURL('image/jpeg', 0.78);
+        } else {
+          // Fallback: grab from PDF.js canvas
+          const canvas = viewerWrapRef.current?.querySelector('canvas');
+          if (!(canvas instanceof HTMLCanvasElement)) return;
+          const srcW = canvas.width || 0;
+          const srcH = canvas.height || 0;
+          if (!srcW || !srcH) return;
+          const targetW = Math.min(720, srcW);
+          const targetH = Math.max(1, Math.round((targetW / srcW) * srcH));
+          const tmp = document.createElement('canvas');
+          tmp.width = targetW; tmp.height = targetH;
+          const ctx = tmp.getContext('2d');
+          if (!ctx) return;
+          ctx.drawImage(canvas, 0, 0, targetW, targetH);
+          imageDataUrl = tmp.toDataURL('image/jpeg', 0.78);
+        }
+
+        if (!imageDataUrl) return;
         const { data } = await api.patch(`/slides/${id}/thumbnail`, { imageDataUrl, pageNumber: 1 });
         autoThumbDoneRef.current = true;
         setSlide((prev: any) => ({ ...prev, thumbnailUrl: data?.thumbnailUrl || prev?.thumbnailUrl }));
@@ -687,7 +717,7 @@ export default function SlideDetailPage() {
     }, 2000);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSlideOwner, slide?.thumbnailUrl, slide?.conversionStatus, slide?.pdfUrl]);
+  }, [isSlideOwner, slide?.thumbnailUrl, slide?.conversionStatus, slide?.pdfUrl, previewMeta?.pages]);
 
   // Poll conversion status
   // Use a ref to read the latest status inside the interval without making
@@ -714,6 +744,67 @@ export default function SlideDetailPage() {
     }, 4000);
     return () => clearInterval(timer);
   }, [id]); // intentionally omit conversionStatus — read via ref above
+
+  // ── Fetch preview-meta (image assets or PDF page count) ───────────────────
+  useEffect(() => {
+    if (slide?.conversionStatus !== 'done' || !slide?.pdfUrl) return;
+    let cancelled = false;
+
+    const fetchMeta = async () => {
+      try {
+        const { data } = await api.get(`/slides/${id}/preview-meta`);
+        if (cancelled) return;
+        setPreviewMeta({
+          previewMode:   data.previewMode === 'images' ? 'images' : 'pdf',
+          previewStatus: data.previewStatus || 'none',
+          pages:         Array.isArray(data.pages) ? data.pages : [],
+          pageCount:     Number(data.pageCount || data.totalPages || 1),
+        });
+      } catch {
+        if (cancelled) return;
+        setPreviewMeta({ previewMode: 'pdf', previewStatus: 'none', pages: [], pageCount: 1 });
+      }
+    };
+
+    fetchMeta();
+    return () => { cancelled = true; };
+  }, [id, slide?.conversionStatus, slide?.pdfUrl]);
+
+  // ── Poll preview-meta while preview generation is in progress ────────────
+  //
+  // Polling continues as long as previewStatus === 'processing'.
+  // Even when images are already showing (page 1 visible), we keep polling
+  // so newly completed pages are added to the viewer without a manual refresh.
+  //
+  // Stops when:  previewStatus === 'ready' (all pages done)
+  //              previewStatus === 'failed' (permanent failure → PDF.js fallback)
+  //              MAX_PREVIEW_POLLS exceeded
+  useEffect(() => {
+    if (!previewMeta) return;
+    if (previewMeta.previewStatus === 'ready' || previewMeta.previewStatus === 'failed') return;
+    if (previewMeta.previewStatus !== 'processing' && previewMeta.previewStatus !== 'none') return;
+    if (slide?.conversionStatus !== 'done') return;
+
+    let pollCount = 0;
+    const MAX_PREVIEW_POLLS = 36; // 36 × 5 s = 3 minutes
+    const timer = setInterval(async () => {
+      if (++pollCount > MAX_PREVIEW_POLLS) { clearInterval(timer); return; }
+      try {
+        const { data } = await api.get(`/slides/${id}/preview-meta`);
+        const newMode   = data.previewMode === 'images' ? 'images' : 'pdf';
+        const newStatus = data.previewStatus || 'none';
+        const newPages  = Array.isArray(data.pages) ? data.pages : [];
+        const newCount  = Number(data.pageCount || data.totalPages || 1);
+
+        setPreviewMeta({ previewMode: newMode, previewStatus: newStatus, pages: newPages, pageCount: newCount });
+
+        // Stop polling once generation is complete or permanently failed
+        if (newStatus === 'ready' || newStatus === 'failed') clearInterval(timer);
+      } catch { /* silent — keep polling */ }
+    }, 5000);
+    return () => clearInterval(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, previewMeta?.previewStatus, slide?.conversionStatus]);
 
   const handleLike = async () => {
     if (!user) return toast.error('Beğenmek için giriş yapmalısın');
@@ -802,29 +893,57 @@ export default function SlideDetailPage() {
 
   const handleSetCoverFromCurrentPage = async () => {
     if (!slide || !isSlideOwner || !hasPdf || coverSaving) return;
-    const canvas = viewerWrapRef.current?.querySelector('canvas');
-    if (!(canvas instanceof HTMLCanvasElement)) {
-      toast.error('Sayfa görseli henüz hazır değil. Lütfen tekrar dene.');
-      return;
-    }
 
     let imageDataUrl = '';
-    try {
-      const srcW = canvas.width || 0;
-      const srcH = canvas.height || 0;
-      if (!srcW || !srcH) throw new Error('empty_canvas');
-      const targetW = Math.min(720, srcW);
-      const targetH = Math.max(1, Math.round((targetW / srcW) * srcH));
-      const thumbCanvas = document.createElement('canvas');
-      thumbCanvas.width = targetW;
-      thumbCanvas.height = targetH;
-      const ctx = thumbCanvas.getContext('2d');
-      if (!ctx) throw new Error('ctx_unavailable');
-      ctx.drawImage(canvas, 0, 0, targetW, targetH);
-      imageDataUrl = thumbCanvas.toDataURL('image/jpeg', 0.78);
-    } catch {
-      toast.error('Kapak görseli oluşturulamadı. Lütfen tekrar dene.');
-      return;
+
+    // If ImageSlideViewer is active, capture from the <img> element of the current page
+    if (previewMeta?.previewMode === 'images' && previewMeta.pages.length > 0) {
+      const pageData = previewMeta.pages.find((p) => p.pageNumber === currentPage) ?? previewMeta.pages[0];
+      try {
+        const img = new window.Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = reject;
+          img.src = pageData.url;
+        });
+        const targetW = Math.min(720, img.naturalWidth);
+        const targetH = Math.max(1, Math.round((targetW / img.naturalWidth) * img.naturalHeight));
+        const thumbCanvas = document.createElement('canvas');
+        thumbCanvas.width = targetW;
+        thumbCanvas.height = targetH;
+        const ctx = thumbCanvas.getContext('2d');
+        if (!ctx) throw new Error('ctx_unavailable');
+        ctx.drawImage(img, 0, 0, targetW, targetH);
+        imageDataUrl = thumbCanvas.toDataURL('image/jpeg', 0.78);
+      } catch {
+        toast.error('Kapak görseli oluşturulamadı. Lütfen tekrar dene.');
+        return;
+      }
+    } else {
+      // PDF.js canvas path
+      const canvas = viewerWrapRef.current?.querySelector('canvas');
+      if (!(canvas instanceof HTMLCanvasElement)) {
+        toast.error('Sayfa görseli henüz hazır değil. Lütfen tekrar dene.');
+        return;
+      }
+      try {
+        const srcW = canvas.width || 0;
+        const srcH = canvas.height || 0;
+        if (!srcW || !srcH) throw new Error('empty_canvas');
+        const targetW = Math.min(720, srcW);
+        const targetH = Math.max(1, Math.round((targetW / srcW) * srcH));
+        const thumbCanvas = document.createElement('canvas');
+        thumbCanvas.width = targetW;
+        thumbCanvas.height = targetH;
+        const ctx = thumbCanvas.getContext('2d');
+        if (!ctx) throw new Error('ctx_unavailable');
+        ctx.drawImage(canvas, 0, 0, targetW, targetH);
+        imageDataUrl = thumbCanvas.toDataURL('image/jpeg', 0.78);
+      } catch {
+        toast.error('Kapak görseli oluşturulamadı. Lütfen tekrar dene.');
+        return;
+      }
     }
 
     setCoverSaving(true);
@@ -919,16 +1038,27 @@ export default function SlideDetailPage() {
 
         {hasPdf ? (
           <div ref={viewerWrapRef}>
-            <SlideViewer
-              pdfUrl={slide.pdfUrl}
-              slideId={Number(id)}
-              coverUrl={resolveFileUrl(slide.thumbnailUrl) || undefined}
-              title={slide.title}
-              className="mb-6"
-              transitionMode="fade"
-              onPageChange={setCurrentPage}
-              onPageCount={setPageCount}
-            />
+            {previewMeta?.previewMode === 'images' && previewMeta.pages.length > 0 ? (
+              <ImageSlideViewer
+                pages={previewMeta.pages}
+                totalPages={previewMeta.pageCount}
+                previewStatus={previewMeta.previewStatus}
+                title={slide.title}
+                className="mb-6"
+                onPageChange={(p) => { setCurrentPage(p); setPageCount(previewMeta.pageCount); }}
+              />
+            ) : (
+              <SlideViewer
+                pdfUrl={slide.pdfUrl}
+                slideId={Number(id)}
+                coverUrl={resolveFileUrl(slide.thumbnailUrl) || undefined}
+                title={slide.title}
+                className="mb-6"
+                transitionMode="fade"
+                onPageChange={setCurrentPage}
+                onPageCount={setPageCount}
+              />
+            )}
           </div>
         ) : (
           <div className={`aspect-video bg-gradient-to-br ${bgGradient} border border-border rounded-2xl flex items-center justify-center mb-6 overflow-hidden relative`}>

@@ -119,6 +119,9 @@ model Slide {
   thumbnailUrl     String?   @map("thumbnail_url")
   pdfUrl           String?   @map("pdf_url")
   conversionStatus String    @default("pending") @map("conversion_status")
+  previewStatus    String    @default("none") @map("preview_status") // none | processing | ready | failed
+  previewPageCount Int?      @map("preview_page_count")
+  previewGeneratedAt DateTime? @map("preview_generated_at")
   likesCount       Int       @default(0) @map("likes_count")
   savesCount       Int       @default(0) @map("saves_count")
   viewsCount       Int       @default(0) @map("views_count")
@@ -142,12 +145,30 @@ model Slide {
   viewSessions   SlideViewSession[]
   flashcardSets  FlashcardSet[]
   pinnedInTopics Topic[]          @relation("pinnedSlide")
+  previewAssets  SlidePreviewAsset[]
 
   @@index([userId])
   @@index([topicId])
   @@index([likesCount])
   @@index([isHidden])
   @@map("slides")
+}
+
+model SlidePreviewAsset {
+  id            Int      @id @default(autoincrement())
+  slideId       Int      @map("slide_id")
+  pageNumber    Int      @map("page_number")
+  url           String
+  width         Int
+  height        Int
+  fileSizeBytes Int      @default(0) @map("file_size_bytes")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  slide Slide @relation(fields: [slideId], references: [id], onDelete: Cascade)
+
+  @@unique([slideId, pageNumber])
+  @@index([slideId])
+  @@map("slide_preview_assets")
 }
 
 model ConversionJob {
