@@ -8,15 +8,24 @@ const API_URL = getApiBaseUrl();
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
 const SERVER_BASE = getApiOrigin();
 
+// force-dynamic: slide IDs are user-generated; build-time API calls cause
+// ECONNREFUSED in CI. Metadata and JSON-LD are generated at request time.
+export const dynamic = 'force-dynamic';
+
 function resolveUrl(path: string | null | undefined): string | undefined {
   if (!path) return undefined;
   return path.startsWith('http') ? path : `${SERVER_BASE}${path}`;
 }
 
 async function fetchSlide(id: string) {
-  const res = await fetch(`${API_URL}/slides/${id}`, { next: { revalidate: 3600 } });
-  if (!res.ok) return null;
-  return res.json();
+  if (!API_URL) return null;
+  try {
+    const res = await fetch(`${API_URL}/slides/${id}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
 }
 
 function getParamId(params: { id?: string; slug?: string }): string {

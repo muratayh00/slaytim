@@ -6,6 +6,10 @@ const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
 const API_URL = getApiBaseUrl().replace(/\/+$/, '');
 const FETCH_TIMEOUT_MS = 5000;
 
+// force-dynamic: sitemap must reflect current content, not a build-time snapshot.
+// Prevents ECONNREFUSED errors when the API is unreachable during CI builds.
+export const dynamic = 'force-dynamic';
+
 function toSafeDate(input?: string): Date {
   if (!input) return new Date();
   const parsed = new Date(input);

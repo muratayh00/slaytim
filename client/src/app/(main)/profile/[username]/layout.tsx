@@ -1,15 +1,29 @@
-﻿import type { Metadata } from 'next';
+import type { Metadata } from 'next';
 import { buildProfilePath } from '@/lib/url';
 import { getApiBaseUrl } from '@/lib/api-origin';
 
 const API_URL = getApiBaseUrl();
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
 
+// force-dynamic: usernames are user-generated; build-time API calls cause
+// ECONNREFUSED in CI. Metadata is generated at request time.
+export const dynamic = 'force-dynamic';
+
+async function fetchProfile(username: string) {
+  if (!API_URL) return null;
+  try {
+    const res = await fetch(`${API_URL}/users/${username}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function generateMetadata({ params }: { params: { username: string } }): Promise<Metadata> {
   try {
-    const res = await fetch(`${API_URL}/users/${params.username}`, { next: { revalidate: 3600 } });
-    if (!res.ok) return { title: 'Kullanıcı Bulunamadı' };
-    const profile = await res.json();
+    const profile = await fetchProfile(params.username);
+    if (!profile) return { title: 'Kullanıcı Bulunamadı' };
 
     const title = `@${profile.username}`;
     const description = profile.bio
@@ -45,4 +59,3 @@ export async function generateMetadata({ params }: { params: { username: string 
 export default function ProfileLayout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
-

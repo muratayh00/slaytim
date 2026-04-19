@@ -6,6 +6,10 @@ import { buildProfilePath, buildTopicPath } from '@/lib/url';
 const API_URL = getApiBaseUrl();
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
 
+// force-dynamic: topic IDs/slugs are user-generated; build-time API calls cause
+// ECONNREFUSED in CI. Metadata and JSON-LD are generated at request time.
+export const dynamic = 'force-dynamic';
+
 type RouteParams = { id?: string; slug?: string };
 
 function getRouteKey(params: RouteParams): string | null {
@@ -13,12 +17,17 @@ function getRouteKey(params: RouteParams): string | null {
 }
 
 async function fetchTopic(paramValue: string) {
-  const key = decodeURIComponent(paramValue);
-  const isNumeric = /^\d+$/.test(key);
-  const endpoint = isNumeric ? `/topics/${key}` : `/topics/slug/${encodeURIComponent(key)}`;
-  const res = await fetch(`${API_URL}${endpoint}`, { next: { revalidate: 3600 } });
-  if (!res.ok) return null;
-  return res.json();
+  if (!API_URL) return null;
+  try {
+    const key = decodeURIComponent(paramValue);
+    const isNumeric = /^\d+$/.test(key);
+    const endpoint = isNumeric ? `/topics/${key}` : `/topics/slug/${encodeURIComponent(key)}`;
+    const res = await fetch(`${API_URL}${endpoint}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
 }
 
 export async function generateMetadata({ params }: { params: RouteParams }): Promise<Metadata> {

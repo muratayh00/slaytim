@@ -9,6 +9,10 @@ const API_URL = getApiBaseUrl();
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
 const SERVER_BASE = getApiOrigin();
 
+// force-dynamic: slideo IDs are user-generated; build-time API calls cause
+// ECONNREFUSED in CI. Page and metadata are rendered at request time.
+export const dynamic = 'force-dynamic';
+
 type SlideoDetail = {
   id: number;
   title: string;
@@ -36,9 +40,9 @@ function resolveUrl(path: string | null | undefined): string | undefined {
 }
 
 async function fetchSlideo(id: number): Promise<SlideoDetail | null> {
-  if (!Number.isInteger(id) || id <= 0) return null;
+  if (!Number.isInteger(id) || id <= 0 || !API_URL) return null;
   try {
-    const res = await fetch(`${API_URL}/slideo/${id}`, { next: { revalidate: 300 } });
+    const res = await fetch(`${API_URL}/slideo/${id}`, { cache: 'no-store' });
     if (!res.ok) return null;
     return res.json();
   } catch {

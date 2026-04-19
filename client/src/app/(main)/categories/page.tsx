@@ -7,7 +7,9 @@ import { getApiBaseUrl } from '@/lib/api-origin';
 const API_URL = getApiBaseUrl();
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
 
-export const revalidate = 3600;
+// force-dynamic: categories change frequently and the API may not be reachable
+// at build time (ECONNREFUSED in CI). Render on first request instead.
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Tum Kategoriler | Slaytim',
@@ -23,8 +25,9 @@ export const metadata: Metadata = {
 };
 
 async function getCategories(): Promise<CategoryItem[]> {
+  if (!API_URL) return [];
   try {
-    const res = await fetch(`${API_URL}/categories`, { next: { revalidate } });
+    const res = await fetch(`${API_URL}/categories`, { cache: 'no-store' });
     if (!res.ok) return [];
     const data = await res.json();
     if (!Array.isArray(data)) return [];
