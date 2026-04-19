@@ -63,7 +63,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           modulepreload parses and compiles the ES module, not just downloads it.
         */}
         <link rel="modulepreload" href="/pdf.min.mjs" />
-        <link rel="preload" href="/pdf.worker.min.mjs" as="script" crossOrigin="anonymous" />
+        {/*
+          Worker files must be preloaded with as="worker" (not as="script")
+          so the browser's preload cache matches the fetch destination used
+          when PDF.js calls `new Worker(url)`.  Using as="script" causes a
+          "preloaded but not used" warning and the preload is wasted.
+        */}
+        <link rel="preload" href="/pdf.worker.min.mjs" as="worker" crossOrigin="anonymous" />
       </head>
       <body className={`${font.variable} font-sans`}>
         <Providers>

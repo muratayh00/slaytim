@@ -126,7 +126,7 @@ export default function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                prefetch={item.href === '/slideo' ? false : undefined}
+                prefetch={false}
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-semibold transition-colors group',
                   active ? 'bg-primary/8 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/70'
