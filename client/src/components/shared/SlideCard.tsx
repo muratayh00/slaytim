@@ -28,7 +28,7 @@ interface SlideCardProps {
 export default function SlideCard({ slide }: SlideCardProps) {
   const { user } = useAuthStore();
   const avatarColor = AVATAR_COLORS[slide.user.id % AVATAR_COLORS.length];
-  const fileExt = slide.fileUrl?.split('.').pop()?.toUpperCase() ?? 'PPTX';
+  const fileExt = slide.fileUrl?.split('.').pop()?.toUpperCase() || 'PPTX';
   const [thumbError, setThumbError] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
   const href = buildSlidePath(slide);

@@ -130,7 +130,7 @@ export default function AdUnit({
     );
   }
 
-  const resolvedFormat = format ?? FORMAT_FOR_SIZE[size];
+  const resolvedFormat = format || FORMAT_FOR_SIZE[size];
   const sizeClass = size === 'custom' ? className : SIZE_STYLES[size];
 
   return (

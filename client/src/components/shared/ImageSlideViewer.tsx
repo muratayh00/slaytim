@@ -119,9 +119,9 @@ export default function ImageSlideViewer({
 
   const totalPages     = pages.length;
   // Total expected pages (may be larger than pages.length while still generating)
-  const expectedTotal  = totalPagesProp ?? totalPages;
+  const expectedTotal  = totalPagesProp || totalPages;
   const isGenerating   = previewStatus === 'processing' && totalPages < expectedTotal;
-  const currentPageData = pages.find((p) => p.pageNumber === currentPage) ?? pages[0];
+  const currentPageData = pages.find((p) => p.pageNumber === currentPage) || pages[0];
 
   const goTo = useCallback(
     (pageNum: number) => {

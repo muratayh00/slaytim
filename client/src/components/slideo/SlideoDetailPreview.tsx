@@ -47,7 +47,7 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
 
   const previewPdfPath = `/api/slides/${slideId}/pdf`;
 
-  // â”€â”€ Auto-hide controls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Auto-hide controls ??????????????????????????????????????????????????????
   const bumpControls = useCallback(() => {
     setShowControls(true);
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
@@ -59,7 +59,7 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
     return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
   }, [bumpControls]);
 
-  // â”€â”€ Load PDF â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Load PDF ????????????????????????????????????????????????????????????????
   useEffect(() => {
     if (!canPreview) return;
     let cancelled = false;
@@ -73,7 +73,7 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
     return () => { cancelled = true; };
   }, [canPreview, previewPdfPath, pdfLoadAttempt]);
 
-  // â”€â”€ View tracking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? View tracking ???????????????????????????????????????????????????????????
   useEffect(() => {
     if (!canPreview) return;
     const key = `slideo:detail:view:${slideoId}`;
@@ -87,13 +87,13 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
     } catch {}
   }, [canPreview, slideoId]);
 
-  // â”€â”€ Reset on slideo change â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Reset on slideo change ??????????????????????????????????????????????????
   useEffect(() => {
     setIdx(0);
     setCanvasReady(false);
   }, [slideoId]);
 
-  // â”€â”€ Render page to canvas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Render page to canvas ???????????????????????????????????????????????????
   const renderCurrent = useCallback(() => {
     if (!pdfDoc || !canvasRef.current || !wrapRef.current || !canPreview) return;
     const pageNum = pageIndices[idx];
@@ -128,7 +128,7 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
     return () => window.removeEventListener('resize', onResize);
   }, [renderCurrent]);
 
-  // â”€â”€ Share â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Share ???????????????????????????????????????????????????????????????????
   const handleShare = async () => {
     const url = `${window.location.origin}${buildSlideoPath({ id: slideoId, title: String(slideoId) })}`;
     try { await navigator.clipboard.writeText(url); } catch {}
@@ -136,7 +136,7 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
     toast.success('Link kopyalandı');
   };
 
-  // â”€â”€ Derived â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Derived ?????????????????????????????????????????????????????????????????
   const total = pageIndices?.length ?? 0;
   const isLast = idx >= total - 1;
   const isFirst = idx === 0;
@@ -179,7 +179,7 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
           </div>
         ) : null}
 
-        {/* Canvas â€” always mounted, opacity-based visibility */}
+        {/* Canvas ? always mounted, opacity-based visibility */}
         <div
           className={cn(
             'transition-opacity duration-150',
@@ -265,7 +265,7 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
           )}
         </AnimatePresence>
 
-        {/* End screen â€” last page reached */}
+        {/* End screen ? last page reached */}
         <AnimatePresence>
           {isLast && canvasReady && showControls && (
             <motion.div

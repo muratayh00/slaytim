@@ -100,7 +100,7 @@ async function atomicIncrement(key, ttlSeconds = 0) {
     multi.incr(key);
     if (ttlSeconds > 0) multi.expire(key, ttlSeconds, 'NX'); // only set TTL on first creation
     const results = await multi.exec();
-    return results?.[0]?.[1] ?? 1;
+    return results?.[0]?.[1] ? 1;
   } catch (err) {
     logger.warn('[dedup] atomicIncrement failed', { key, error: err.message });
     return 1;

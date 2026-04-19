@@ -48,7 +48,7 @@ export default function TopicDetailPage() {
   const rawParam = String((params as Record<string, string>)?.id || (params as Record<string, string>)?.slug || '');
   const topicKey = decodeURIComponent(rawParam);
   const { id: parsedId, slug: parsedSlug } = splitIdSlug(topicKey);
-  const topicId = parsedId ?? Number(topicKey);
+  const topicId = parsedId || Number(topicKey) || 0;
   const isNumericTopicKey = Number.isInteger(topicId) && topicId > 0;
   const { user } = useAuthStore();
 
@@ -92,7 +92,7 @@ export default function TopicDetailPage() {
 
         if (cancelled) return;
 
-        const loadedTopic = topicRes?.data ?? null;
+        const loadedTopic = topicRes?.data || null;
         const resolvedTopicId = Number(loadedTopic?.id || 0);
         const slidesRes = resolvedTopicId
           ? await api.get(`/slides/topic/${resolvedTopicId}`)
@@ -292,7 +292,7 @@ export default function TopicDetailPage() {
                 {topicUser.avatarUrl ? (
                   <img src={resolveFileUrl(topicUser.avatarUrl)} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  String(topicUser.username || '??').slice(0, 2).toUpperCase()
+                  String(topicUser.username || '?').slice(0, 2).toUpperCase()
                 )}
               </div>
               <span className="text-sm font-semibold">{topicUser.username || 'Kullanici'}</span>
@@ -448,4 +448,3 @@ export default function TopicDetailPage() {
     </div>
   );
 }
-

@@ -52,7 +52,7 @@ function SlideoPageContent() {
       });
       const incoming = Array.isArray(data?.slideos) ? data.slideos : [];
       setSlideos((prev) => (replace ? incoming : [...prev, ...incoming]));
-      setHasMore(data.hasMore ?? false);
+      setHasMore(Boolean(data?.hasMore));
     } catch {
     } finally {
       setLoading(false);

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -18,51 +18,51 @@ import toast from 'react-hot-toast';
 import { buildCategoryPath, buildProfilePath, buildSlidePath, buildTopicPath } from '@/lib/url';
 import { resolveMediaUrl } from '@/lib/media';
 
-// â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? Constants ?????????????????????????????????????????????????????????????????
 
 const REASON_LABELS: Record<string, string> = {
-  spam: 'Spam', copyright: 'Telif HakkÄ±', inappropriate: 'Uygunsuz',
-  wrong_category: 'YanlÄ±ÅŸ Kategori', duplicate: 'Kopya',
+  spam: 'Spam', copyright: 'Telif Hakkı', inappropriate: 'Uygunsuz',
+  wrong_category: 'Yanlış Kategori', duplicate: 'Kopya',
 };
 
 const PRIORITY_CONFIG: Record<string, { label: string; cls: string }> = {
-  low:      { label: 'DÃ¼ÅŸÃ¼k',    cls: 'bg-slate-500/10 text-slate-500' },
+  low:      { label: 'Düşük',    cls: 'bg-slate-500/10 text-slate-500' },
   medium:   { label: 'Orta',     cls: 'bg-amber-500/10 text-amber-600' },
-  high:     { label: 'YÃ¼ksek',   cls: 'bg-orange-500/10 text-orange-600' },
+  high:     { label: 'Yüksek',   cls: 'bg-orange-500/10 text-orange-600' },
   critical: { label: 'Kritik',   cls: 'bg-red-500/10 text-red-600' },
 };
 
 const ROLE_CONFIG: Record<string, { label: string; cls: string }> = {
-  user:        { label: 'KullanÄ±cÄ±',  cls: 'bg-muted text-muted-foreground' },
-  moderator:   { label: 'ModeratÃ¶r',  cls: 'bg-blue-500/10 text-blue-600' },
+  user:        { label: 'Kullanıcı',  cls: 'bg-muted text-muted-foreground' },
+  moderator:   { label: 'Moderatör',  cls: 'bg-blue-500/10 text-blue-600' },
   support:     { label: 'Destek',     cls: 'bg-cyan-500/10 text-cyan-600' },
   analytics:   { label: 'Analitik',   cls: 'bg-violet-500/10 text-violet-600' },
   operations:  { label: 'Operasyon',  cls: 'bg-emerald-500/10 text-emerald-600' },
-  super_admin: { label: 'SÃ¼per Admin',cls: 'bg-primary/10 text-primary' },
+  super_admin: { label: 'Süper Admin',cls: 'bg-primary/10 text-primary' },
 };
 
 const ACTION_LABELS: Record<string, string> = {
-  ban_user: 'KullanÄ±cÄ± BanlandÄ±', unban_user: 'Ban KaldÄ±rÄ±ldÄ±',
-  mute_user: 'KullanÄ±cÄ± Susturuldu', unmute_user: 'Susturma KaldÄ±rÄ±ldÄ±',
-  warn_user: 'KullanÄ±cÄ± UyarÄ±ldÄ±',
-  hide_content: 'Ä°Ã§erik Gizlendi', restore_content: 'Ä°Ã§erik Geri YÃ¼klendi',
-  delete_content: 'Ä°Ã§erik Silindi', delete_slideo: 'Slideo Silindi',
-  update_role: 'Rol GÃ¼ncellendi', set_report_priority: 'Rapor Ã–nceliÄŸi AyarlandÄ±',
+  ban_user: 'Kullanıcı Banlandı', unban_user: 'Ban Kaldırıldı',
+  mute_user: 'Kullanıcı Susturuldu', unmute_user: 'Susturma Kaldırıldı',
+  warn_user: 'Kullanıcı Uyarıldı',
+  hide_content: 'İçerik Gizlendi', restore_content: 'İçerik Geri Yüklendi',
+  delete_content: 'İçerik Silindi', delete_slideo: 'Slideo Silindi',
+  update_role: 'Rol Güncellendi', set_report_priority: 'Rapor Önceliği Ayarlandı',
 };
 
 const ADMIN_TABS = [
-  { id: 'overview',  label: 'Genel BakÄ±ÅŸ',  icon: Activity },
+  { id: 'overview',  label: 'Genel Bakış',  icon: Activity },
   { id: 'analytics', label: 'Analitik',     icon: BarChart3 },
-  { id: 'conversion',label: 'DÃ¶nÃ¼ÅŸÃ¼m',      icon: RefreshCw },
+  { id: 'conversion',label: 'Dönüşüm',      icon: RefreshCw },
   { id: 'reports',   label: 'Raporlar',     icon: Flag },
-  { id: 'content',   label: 'Ä°Ã§erik',       icon: LayoutGrid },
-  { id: 'intel',     label: 'Ä°Ã§erik ZekasÄ±',icon: Star },
-  { id: 'users',     label: 'KullanÄ±cÄ±lar', icon: Users },
+  { id: 'content',   label: 'İçerik',       icon: LayoutGrid },
+  { id: 'intel',     label: 'İçerik Zekası',icon: Star },
+  { id: 'users',     label: 'Kullanıcılar', icon: Users },
   { id: 'slideos',   label: 'Slideo',       icon: Play },
   { id: 'audit',     label: 'Denetim Logu', icon: ClipboardList },
 ];
 
-// â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? Main Page ?????????????????????????????????????????????????????????????????
 
 export default function AdminPage() {
   const { user } = useAuthStore();
@@ -137,7 +137,7 @@ export default function AdminPage() {
   );
 }
 
-// â”€â”€ OVERVIEW TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? OVERVIEW TAB ??????????????????????????????????????????????????????????????
 
 function OverviewTab() {
   const [stats, setStats] = useState<any>(null);
@@ -260,17 +260,17 @@ function OverviewTab() {
       <Section title="Feed Experiment Dashboard">
         {!feedExperiment ? (
           <div className="p-4 rounded-2xl border border-border bg-card text-sm text-muted-foreground">
-            Feed A/B verisi bulunamadÄ±.
+            Feed A/B verisi bulunamadı.
           </div>
         ) : (
           <div className="space-y-3">
             <div className="p-4 rounded-2xl border border-border bg-card">
               <div className="mb-2">
                 <p className="text-sm font-bold">
-                  {feedExperiment?.experiment || 'feed_v2_ab'} â€¢ Son {feedExperiment?.days || 7} gÃ¼n
+                  {feedExperiment?.experiment || 'feed_v2_ab'} • Son {feedExperiment?.days || 7} gün
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Varyant bazlÄ± etkileÅŸim kÄ±yaslamasÄ±
+                  Varyant bazlı etkileşim kıyaslaması
                 </p>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -296,7 +296,7 @@ function OverviewTab() {
             </div>
 
             <div className="p-4 rounded-2xl border border-border bg-card">
-              <p className="text-xs font-bold text-muted-foreground mb-2">KÄ±yas Ã–zeti (B - A)</p>
+              <p className="text-xs font-bold text-muted-foreground mb-2">Kıyas Özeti (B - A)</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <MiniMetric
                   label="Open Delta"
@@ -341,7 +341,7 @@ function AnalyticsTab() {
       setFeedExperiment(feedRes?.data || null);
       setShadow(shadowRes?.data || null);
     } catch {
-      toast.error('Analitik verileri yÃ¼klenemedi');
+      toast.error('Analitik verileri yüklenemedi');
     } finally {
       setLoading(false);
     }
@@ -360,7 +360,7 @@ function AnalyticsTab() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-extrabold">Admin Analytics</h2>
-          <p className="text-sm text-muted-foreground">CanlÄ± platform metrikleri ve Ã¶neri sistemi telemetrisi</p>
+          <p className="text-sm text-muted-foreground">Canlı platform metrikleri ve öneri sistemi telemetrisi</p>
         </div>
         <button onClick={load} className="px-3 py-2 rounded-lg border border-border text-sm font-semibold hover:bg-muted">
           Yenile
@@ -369,7 +369,7 @@ function AnalyticsTab() {
 
       <Section title="Temel Metrikler (7g)">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <StatCard label="Yeni KullanÄ±cÄ±" value={stats?.users?.week || 0} color="emerald" />
+          <StatCard label="Yeni Kullanıcı" value={stats?.users?.week || 0} color="emerald" />
           <StatCard label="Yeni Konu" value={stats?.topics?.today || 0} color="primary" />
           <StatCard label="Yeni Slayt" value={stats?.slides?.today || 0} color="blue" />
           <StatCard label="Yeni Slideo" value={stats?.slideos?.today || 0} color="pink" />
@@ -380,7 +380,7 @@ function AnalyticsTab() {
 
       <Section title="Slideo Feed Deneyi">
         {!feedExperiment ? (
-          <EmptyState icon={Info} text="Feed deney verisi bulunamadÄ±" />
+          <EmptyState icon={Info} text="Feed deney verisi bulunamadı" />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <StatCard label="Variant A CTR (x100)" value={Math.round(Number(feedExperiment?.variants?.A?.openRate || 0) * 100)} color="slate" />
@@ -392,12 +392,12 @@ function AnalyticsTab() {
 
       <Section title="Recommendation Shadow Stats">
         {!shadow ? (
-          <EmptyState icon={BarChart3} text="Shadow deÄŸerlendirme verisi yok" />
+          <EmptyState icon={BarChart3} text="Shadow değerlendirme verisi yok" />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <StatCard label="Toplam KarÅŸÄ±laÅŸtÄ±rma" value={shadow?.totals?.comparisons || 0} color="primary" />
-            <StatCard label="Eski Sistem KazanÃ§" value={shadow?.totals?.baselineWins || 0} color="slate" />
-            <StatCard label="Yeni Sistem KazanÃ§" value={shadow?.totals?.candidateWins || 0} color="emerald" />
+            <StatCard label="Toplam Karşılaştırma" value={shadow?.totals?.comparisons || 0} color="primary" />
+            <StatCard label="Eski Sistem Kazanç" value={shadow?.totals?.baselineWins || 0} color="slate" />
+            <StatCard label="Yeni Sistem Kazanç" value={shadow?.totals?.candidateWins || 0} color="emerald" />
             <StatCard label="Tie" value={shadow?.totals?.ties || 0} color="amber" />
           </div>
         )}
@@ -432,7 +432,7 @@ function ConversionTab() {
       setTotalPages(Math.max(1, Number(data?.pages || 1)));
       setHealth(healthRes?.data || null);
     } catch {
-      toast.error('DÃ¶nÃ¼ÅŸÃ¼m kuyruÄŸu yÃ¼klenemedi');
+      toast.error('Dönüşüm kuyruğu yüklenemedi');
     } finally {
       setLoading(false);
     }
@@ -444,10 +444,10 @@ function ConversionTab() {
     setRetryingId(id);
     try {
       await api.post(`/admin/conversion-jobs/${id}/retry`);
-      toast.success('Ä°ÅŸ kuyruÄŸa tekrar alÄ±ndÄ±');
+      toast.success('İş kuyruğa tekrar alındı');
       load();
     } catch {
-      toast.error('Retry baÅŸarÄ±sÄ±z');
+      toast.error('Retry başarısız');
     } finally {
       setRetryingId(null);
     }
@@ -457,10 +457,10 @@ function ConversionTab() {
     setRetryingAll(true);
     try {
       const { data } = await api.post('/admin/conversion-jobs/retry-failed');
-      toast.success(`${Number(data?.requeued || 0)} failed iÅŸ yeniden kuyruÄŸa alÄ±ndÄ±`);
+      toast.success(`${Number(data?.requeued || 0)} failed iş yeniden kuyruğa alındı`);
       load();
     } catch {
-      toast.error('Toplu retry baÅŸarÄ±sÄ±z');
+      toast.error('Toplu retry başarısız');
     } finally {
       setRetryingAll(false);
     }
@@ -470,10 +470,10 @@ function ConversionTab() {
     setReclassifying(true);
     try {
       const { data } = await api.post('/admin/conversion-jobs/reclassify-invalid');
-      toast.success(`${Number(data?.reclassified || 0)} bozuk iÅŸ unsupported olarak iÅŸaretlendi`);
+      toast.success(`${Number(data?.reclassified || 0)} bozuk iş unsupported olarak işaretlendi`);
       load();
     } catch {
-      toast.error('Reclassify baÅŸarÄ±sÄ±z');
+      toast.error('Reclassify başarısız');
     } finally {
       setReclassifying(false);
     }
@@ -503,7 +503,7 @@ function ConversionTab() {
         </div>
       )}
 
-      <Section title="Kuyruk Ã–zeti">
+      <Section title="Kuyruk Özeti">
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <StatCard label="Pending" value={summary.pending} color="amber" />
           <StatCard label="Processing" value={summary.processing} color="blue" />
@@ -515,7 +515,7 @@ function ConversionTab() {
 
       <div className="flex flex-wrap gap-2 items-center">
         {[
-          { value: 'all', label: 'TÃ¼mÃ¼' },
+          { value: 'all', label: 'Tümü' },
           { value: 'pending', label: 'Pending' },
           { value: 'processing', label: 'Processing' },
           { value: 'failed', label: 'Failed' },
@@ -543,7 +543,7 @@ function ConversionTab() {
                 setPage(1);
               }
             }}
-            placeholder="Slayt/Konu/KullanÄ±cÄ± ara"
+            placeholder="Slayt/Konu/Kullanıcı ara"
             className="w-full px-4 py-2 rounded-xl border border-border bg-background text-sm"
           />
           <button
@@ -559,14 +559,14 @@ function ConversionTab() {
           disabled={retryingAll || summary.failed === 0}
           className="px-4 py-2 rounded-xl border border-red-500/30 bg-red-500/5 text-red-600 text-xs font-bold disabled:opacity-50"
         >
-          {retryingAll ? 'Ã‡alÄ±ÅŸÄ±yor...' : 'Failed Retry All'}
+          {retryingAll ? 'Çalışıyor...' : 'Failed Retry All'}
         </button>
         <button
           onClick={reclassifyInvalid}
           disabled={reclassifying || summary.failed === 0}
           className="px-4 py-2 rounded-xl border border-slate-500/30 bg-slate-500/5 text-slate-700 text-xs font-bold disabled:opacity-50"
         >
-          {reclassifying ? 'Ã‡alÄ±ÅŸÄ±yor...' : 'Reclassify Invalid'}
+          {reclassifying ? 'Çalışıyor...' : 'Reclassify Invalid'}
         </button>
         <button onClick={load} className="p-2 rounded-xl border border-border hover:bg-muted">
           <RefreshCw className="w-4 h-4" />
@@ -576,7 +576,7 @@ function ConversionTab() {
       {loading ? (
         <div className="space-y-2">{[...Array(6)].map((_, i) => <div key={i} className="skeleton h-16 rounded-xl" />)}</div>
       ) : items.length === 0 ? (
-        <EmptyState icon={RefreshCw} text="Kuyrukta iÅŸ bulunamadÄ±" />
+        <EmptyState icon={RefreshCw} text="Kuyrukta iş bulunamadı" />
       ) : (
         <div className="space-y-2">
           {items.map((job) => (
@@ -610,13 +610,13 @@ function ConversionTab() {
   );
 }
 
-// â”€â”€ REPORTS TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? REPORTS TAB ???????????????????????????????????????????????????????????????
 
 const STATUS_FILTERS = [
   { value: 'pending',  label: 'Bekleyenler' },
-  { value: 'reviewed', label: 'Ä°ncelenenler' },
-  { value: 'resolved', label: 'Ã‡Ã¶zÃ¼lenler' },
-  { value: 'all',      label: 'TÃ¼mÃ¼' },
+  { value: 'reviewed', label: 'İncelenenler' },
+  { value: 'resolved', label: 'Çözülenler' },
+  { value: 'all',      label: 'Tümü' },
 ];
 
 function ReportsTab() {
@@ -634,7 +634,7 @@ function ReportsTab() {
       const { data } = await api.get(`/reports?status=${s}&page=${p}`);
       setReports(data.reports);
       setTotalPages(data.pages);
-    } catch { toast.error('Raporlar yÃ¼klenemedi'); }
+    } catch { toast.error('Raporlar yüklenemedi'); }
     finally { setLoading(false); }
   }, [statusFilter, page]);
 
@@ -645,8 +645,8 @@ function ReportsTab() {
     try {
       await api.patch(`/reports/${id}/status`, { status, deleteContent });
       setReports((prev) => prev.map((r) => r.id === id ? { ...r, status } : r));
-      toast.success(deleteContent ? 'Ä°Ã§erik silindi ve rapor kapatÄ±ldÄ±' : 'Durum gÃ¼ncellendi');
-    } catch { toast.error('Ä°ÅŸlem baÅŸarÄ±sÄ±z'); }
+      toast.success(deleteContent ? 'İçerik silindi ve rapor kapatıldı' : 'Durum güncellendi');
+    } catch { toast.error('İşlem başarısız'); }
     finally { setActioningId(null); }
   };
 
@@ -654,15 +654,15 @@ function ReportsTab() {
     try {
       await api.patch(`/admin/reports/${id}/priority`, { priority });
       setReports((prev) => prev.map((r) => r.id === id ? { ...r, priority } : r));
-      toast.success('Ã–ncelik gÃ¼ncellendi');
-    } catch { toast.error('Ã–ncelik gÃ¼ncellenemedi'); }
+      toast.success('Öncelik güncellendi');
+    } catch { toast.error('Öncelik güncellenemedi'); }
   };
 
   const doWarn = async (userId: number, reason: string) => {
     try {
       await api.post(`/admin/users/${userId}/warn`, { reason });
-      toast.success('UyarÄ± gÃ¶nderildi');
-    } catch { toast.error('UyarÄ± gÃ¶nderilemedi'); }
+      toast.success('Uyarı gönderildi');
+    } catch { toast.error('Uyarı gönderilemedi'); }
     setWarnModal(null);
   };
 
@@ -698,7 +698,7 @@ function ReportsTab() {
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       {/* Status badge */}
                       <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${report.status === 'pending' ? 'bg-amber-500/10 text-amber-600' : report.status === 'reviewed' ? 'bg-blue-500/10 text-blue-600' : 'bg-emerald-500/10 text-emerald-600'}`}>
-                        {report.status === 'pending' ? 'Bekliyor' : report.status === 'reviewed' ? 'Ä°ncelendi' : 'Ã‡Ã¶zÃ¼ldÃ¼'}
+                        {report.status === 'pending' ? 'Bekliyor' : report.status === 'reviewed' ? 'İncelendi' : 'Çözüldü'}
                       </span>
                       {/* Priority selector */}
                       <select
@@ -723,21 +723,21 @@ function ReportsTab() {
                         href={`/${report.targetType === 'slide' ? 'slides' : 'topics'}/${report.targetId}`}
                         className="text-primary hover:underline font-semibold"
                       >
-                        Ä°Ã§eriÄŸi GÃ¶rÃ¼ntÃ¼le â†’
+                        İçeriği Görüntüle →
                       </Link>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
                     {report.status !== 'reviewed' && (
-                      <ActionBtn icon={Eye} label="Ä°ncele" variant="blue" loading={actioningId === report.id}
+                      <ActionBtn icon={Eye} label="İncele" variant="blue" loading={actioningId === report.id}
                         onClick={() => act(report.id, 'reviewed')} />
                     )}
                     {report.status !== 'resolved' && (
-                      <ActionBtn icon={CheckCircle} label="Ã‡Ã¶z" variant="green" loading={actioningId === report.id}
+                      <ActionBtn icon={CheckCircle} label="Çöz" variant="green" loading={actioningId === report.id}
                         onClick={() => act(report.id, 'resolved')} />
                     )}
-                    <ActionBtn icon={Trash2} label="Ä°Ã§eriÄŸi Sil" variant="red" loading={actioningId === report.id}
+                    <ActionBtn icon={Trash2} label="İçeriği Sil" variant="red" loading={actioningId === report.id}
                       onClick={() => act(report.id, 'resolved', true)} />
                     <ActionBtn icon={AlertTriangle} label="Uyar" variant="amber"
                       onClick={() => setWarnModal({ reportId: report.id, userId: report.user.id })} />
@@ -760,7 +760,7 @@ function ReportsTab() {
   );
 }
 
-// â”€â”€ CONTENT TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? CONTENT TAB ???????????????????????????????????????????????????????????????
 
 const CONTENT_TYPES = [
   { value: 'topics',   label: 'Konular',  icon: FileText },
@@ -784,7 +784,7 @@ function ContentTab() {
       const { data } = await api.get(`/admin/content?type=${type}&q=${q}&page=${page}`);
       setItems(data.items);
       setTotalPages(data.pages);
-    } catch { toast.error('Ä°Ã§erik yÃ¼klenemedi'); }
+    } catch { toast.error('İçerik yüklenemedi'); }
     finally { setLoading(false); }
   }, [type, q, page]);
 
@@ -796,7 +796,7 @@ function ContentTab() {
     try {
       await api.post(`/admin/content/${contentType}/${id}/hide`);
       setItems((prev) => prev.map((i) => i.id === id ? { ...i, isHidden: true } : i));
-      toast.success('Ä°Ã§erik gizlendi');
+      toast.success('İçerik gizlendi');
     } catch { toast.error('Gizlenemedi'); }
     finally { setActingId(null); }
   };
@@ -807,13 +807,13 @@ function ContentTab() {
     try {
       await api.post(`/admin/content/${contentType}/${id}/restore`);
       setItems((prev) => prev.map((i) => i.id === id ? { ...i, isHidden: false } : i));
-      toast.success('Ä°Ã§erik geri yÃ¼klendi');
-    } catch { toast.error('Geri yÃ¼klenemedi'); }
+      toast.success('İçerik geri yüklendi');
+    } catch { toast.error('Geri yüklenemedi'); }
     finally { setActingId(null); }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Bu iÃ§eriÄŸi kalÄ±cÄ± olarak silmek istediÄŸinizden emin misiniz?')) return;
+    if (!confirm('Bu içeriği kalıcı olarak silmek istediğinizden emin misiniz?')) return;
     const contentType = type === 'topics' ? 'topic' : type === 'slides' ? 'slide' : 'comment';
     setActingId(id);
     try {
@@ -853,14 +853,14 @@ function ContentTab() {
       {loading ? (
         <div className="space-y-2">{[...Array(8)].map((_, i) => <div key={i} className="skeleton h-16 rounded-xl" />)}</div>
       ) : items.length === 0 ? (
-        <EmptyState icon={LayoutGrid} text="Ä°Ã§erik bulunamadÄ±" />
+        <EmptyState icon={LayoutGrid} text="İçerik bulunamadı" />
       ) : (
         <div className="space-y-2">
           {items.map((item) => (
             <div key={item.id} className={`flex items-center justify-between gap-4 p-4 bg-card border rounded-xl flex-wrap transition-all ${item.isHidden ? 'border-orange-500/30 bg-orange-500/3 opacity-70' : 'border-border'}`}>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  {item.isHidden && <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 font-bold">GÄ°ZLÄ°</span>}
+                  {item.isHidden && <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 font-bold">GİZLİ</span>}
                   {type !== 'comments' ? (
                     <Link href={type === 'topics'
                       ? buildTopicPath({ id: item.id, slug: item.slug, title: item.title })
@@ -876,7 +876,7 @@ function ContentTab() {
                   <span>@{item.user.username}</span>
                   {item.category && <span className="flex items-center gap-1"><Tag className="w-3 h-3" />{item.category.name}</span>}
                   {item.topic && <Link href={buildTopicPath({ id: item.topic.id, slug: item.topic.slug, title: item.topic.title })} className="hover:text-primary line-clamp-1">{item.topic.title}</Link>}
-                  {item._count && <span>{item._count.slides} slayt Â· {item._count.comments} yorum</span>}
+                  {item._count && <span>{item._count.slides} slayt · {item._count.comments} yorum</span>}
                   <span>{formatDate(item.createdAt)}</span>
                 </div>
               </div>
@@ -892,7 +892,7 @@ function ContentTab() {
                   <button onClick={() => handleRestore(item.id)} disabled={actingId === item.id}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-emerald-600 text-xs font-bold hover:bg-emerald-500/10 transition-all disabled:opacity-50">
                     {actingId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
-                    Geri YÃ¼kle
+                    Geri Yükle
                   </button>
                 )}
                 <button onClick={() => handleDelete(item.id)} disabled={actingId === item.id}
@@ -911,7 +911,7 @@ function ContentTab() {
   );
 }
 
-// â”€â”€ CONTENT INTELLIGENCE TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? CONTENT INTELLIGENCE TAB ??????????????????????????????????????????????????
 
 const INTEL_TYPES = [
   { value: 'slides', label: 'Slaytlar' },
@@ -939,7 +939,7 @@ function ContentIntelTab() {
       const { data } = await api.get(`/admin/content-intel?type=${type}&sort=${sort}&page=${page}`);
       setItems(data.items);
       setTotalPages(data.pages);
-    } catch { toast.error('Ä°Ã§erik zekasÄ± yÃ¼klenemedi'); }
+    } catch { toast.error('İçerik zekası yüklenemedi'); }
     finally { setLoading(false); }
   }, [type, sort, page]);
 
@@ -978,7 +978,7 @@ function ContentIntelTab() {
       {loading ? (
         <div className="space-y-2">{[...Array(8)].map((_, i) => <div key={i} className="skeleton h-16 rounded-xl" />)}</div>
       ) : items.length === 0 ? (
-        <EmptyState icon={Star} text="Ä°Ã§erik bulunamadÄ±" />
+        <EmptyState icon={Star} text="İçerik bulunamadı" />
       ) : (
         <div className="space-y-2">
           {items.map((item, i) => (
@@ -995,7 +995,7 @@ function ContentIntelTab() {
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  {item.isHidden && <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 font-bold">GÄ°ZLÄ°</span>}
+                  {item.isHidden && <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 font-bold">GİZLİ</span>}
                   <Link href={`/${type === 'slides' ? 'slides' : 'topics'}/${item.id}`}
                     className="font-semibold text-sm hover:text-primary line-clamp-1">{item.title}</Link>
                 </div>
@@ -1035,11 +1035,11 @@ function ContentIntelTab() {
   );
 }
 
-// â”€â”€ USERS TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? USERS TAB ?????????????????????????????????????????????????????????????????
 
 const USER_FILTERS = [
-  { value: 'all',    label: 'TÃ¼mÃ¼' },
-  { value: 'banned', label: 'BanlÄ±lar' },
+  { value: 'all',    label: 'Tümü' },
+  { value: 'banned', label: 'Banlılar' },
   { value: 'muted',  label: 'Susturulanlar' },
   { value: 'admin',  label: 'Adminler' },
 ];
@@ -1062,7 +1062,7 @@ function UsersTab() {
       const { data } = await api.get(`/admin/users?q=${q}&filter=${filter}&page=${page}`);
       setUsers(data.users);
       setTotalPages(data.pages);
-    } catch { toast.error('KullanÄ±cÄ±lar yÃ¼klenemedi'); }
+    } catch { toast.error('Kullanıcılar yüklenemedi'); }
     finally { setLoading(false); }
   }, [q, filter, page]);
 
@@ -1073,27 +1073,27 @@ function UsersTab() {
     try {
       const { data } = await api.post(`/admin/users/${id}/mute`);
       setUsers((prev) => prev.map((u) => u.id === id ? { ...u, isMuted: data.isMuted } : u));
-      toast.success(data.isMuted ? 'Susturuldu' : 'Susturma kaldÄ±rÄ±ldÄ±');
-    } catch { toast.error('Ä°ÅŸlem baÅŸarÄ±sÄ±z'); }
+      toast.success(data.isMuted ? 'Susturuldu' : 'Susturma kaldırıldı');
+    } catch { toast.error('İşlem başarısız'); }
     finally { setActingId(null); }
   };
 
   const toggleBan = async (id: number) => {
-    if (!confirm('KullanÄ±cÄ±yÄ± banlamak/banÄ± kaldÄ±rmak istediÄŸinizden emin misiniz?')) return;
+    if (!confirm('Kullanıcıyı banlamak/banı kaldırmak istediğinizden emin misiniz?')) return;
     setActingId(id);
     try {
       const { data } = await api.post(`/admin/users/${id}/ban`);
       setUsers((prev) => prev.map((u) => u.id === id ? { ...u, isBanned: data.isBanned } : u));
-      toast.success(data.isBanned ? 'BanlandÄ±' : 'Ban kaldÄ±rÄ±ldÄ±');
-    } catch { toast.error('Ä°ÅŸlem baÅŸarÄ±sÄ±z'); }
+      toast.success(data.isBanned ? 'Banlandı' : 'Ban kaldırıldı');
+    } catch { toast.error('İşlem başarısız'); }
     finally { setActingId(null); }
   };
 
   const doWarn = async (userId: number, reason: string) => {
     try {
       await api.post(`/admin/users/${userId}/warn`, { reason });
-      toast.success('UyarÄ± gÃ¶nderildi');
-    } catch { toast.error('UyarÄ± gÃ¶nderilemedi'); }
+      toast.success('Uyarı gönderildi');
+    } catch { toast.error('Uyarı gönderilemedi'); }
     setWarnTarget(null);
   };
 
@@ -1101,8 +1101,8 @@ function UsersTab() {
     try {
       const { data } = await api.patch(`/admin/users/${userId}/role`, { role });
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: data.role, isAdmin: data.isAdmin } : u));
-      toast.success('Rol gÃ¼ncellendi');
-    } catch { toast.error('Rol gÃ¼ncellenemedi'); }
+      toast.success('Rol güncellendi');
+    } catch { toast.error('Rol güncellenemedi'); }
     setRoleTarget(null);
   };
 
@@ -1122,7 +1122,7 @@ function UsersTab() {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { setQ(searchInput); setPage(1); } }}
-            placeholder="KullanÄ±cÄ± adÄ± veya e-posta ara..."
+            placeholder="Kullanıcı adı veya e-posta ara..."
             className="flex-1 px-4 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
           <button onClick={() => { setQ(searchInput); setPage(1); }}
@@ -1135,7 +1135,7 @@ function UsersTab() {
       {loading ? (
         <div className="space-y-2">{[...Array(8)].map((_, i) => <div key={i} className="skeleton h-20 rounded-xl" />)}</div>
       ) : users.length === 0 ? (
-        <EmptyState icon={Users} text="KullanÄ±cÄ± bulunamadÄ±" />
+        <EmptyState icon={Users} text="Kullanıcı bulunamadı" />
       ) : (
         <div className="space-y-2">
           {users.map((u) => {
@@ -1153,14 +1153,14 @@ function UsersTab() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <Link href={buildProfilePath(u.username)} className="font-bold text-sm hover:text-primary">@{u.username}</Link>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${roleConf.cls}`}>{roleConf.label}</span>
-                      {u.isBanned && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 font-bold">BanlÄ±</span>}
-                      {u.isMuted && <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 font-bold">SusturulmuÅŸ</span>}
+                      {u.isBanned && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 font-bold">Banlı</span>}
+                      {u.isMuted && <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 font-bold">Susturulmuş</span>}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {u.email} Â· {u._count.topics} konu Â· {u._count.slides} slayt Â· {u._count.reports || 0} rapor Â· {formatDate(u.createdAt)}
+                      {u.email} · {u._count.topics} konu · {u._count.slides} slayt · {u._count.reports || 0} rapor · {formatDate(u.createdAt)}
                     </p>
                     {u.warnings?.length > 0 && (
-                      <p className="text-xs text-amber-600 mt-0.5">âš ï¸ {u.warnings.length} uyarÄ±: {u.warnings[0].reason}</p>
+                      <p className="text-xs text-amber-600 mt-0.5">⚠️ {u.warnings.length} uyarı: {u.warnings[0].reason}</p>
                     )}
                   </div>
                 </div>
@@ -1173,12 +1173,12 @@ function UsersTab() {
                     <button onClick={() => toggleMute(u.id)} disabled={actingId === u.id}
                       className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all disabled:opacity-50 ${u.isMuted ? 'border-orange-500/30 bg-orange-500/10 text-orange-600 hover:bg-orange-500/15' : 'border-border text-muted-foreground hover:border-orange-500/30 hover:text-orange-600 hover:bg-orange-500/5'}`}>
                       {actingId === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <VolumeX className="w-3.5 h-3.5" />}
-                      {u.isMuted ? 'SusturmayÄ± KaldÄ±r' : 'Sustur'}
+                      {u.isMuted ? 'Susturmayı Kaldır' : 'Sustur'}
                     </button>
                     <button onClick={() => toggleBan(u.id)} disabled={actingId === u.id}
                       className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all disabled:opacity-50 ${u.isBanned ? 'border-red-500/30 bg-red-500/10 text-red-600 hover:bg-red-500/15' : 'border-border text-muted-foreground hover:border-red-500/30 hover:text-red-600 hover:bg-red-500/5'}`}>
                       {actingId === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
-                      {u.isBanned ? 'BanÄ± KaldÄ±r' : 'Banla'}
+                      {u.isBanned ? 'Banı Kaldır' : 'Banla'}
                     </button>
                     <button onClick={() => setRoleTarget(u)}
                       className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-xs font-bold hover:bg-muted transition-all">
@@ -1204,19 +1204,19 @@ function UsersTab() {
   );
 }
 
-// â”€â”€ SLIDEO TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? SLIDEO TAB ????????????????????????????????????????????????????????????????
 
 const SLIDEO_SORTS = [
-  { value: 'views', label: 'GÃ¶rÃ¼ntÃ¼lenme' },
-  { value: 'likes', label: 'BeÄŸeni' },
-  { value: 'saves', label: 'KayÄ±t' },
+  { value: 'views', label: 'Görüntülenme' },
+  { value: 'likes', label: 'Beğeni' },
+  { value: 'saves', label: 'Kayıt' },
   { value: 'new', label: 'Yeni' },
   { value: 'risk', label: 'Risk' },
 ];
 
 const SLIDEO_STATUS = [
-  { value: 'all', label: 'TÃ¼mÃ¼' },
-  { value: 'visible', label: 'GÃ¶rÃ¼nÃ¼r' },
+  { value: 'all', label: 'Tümü' },
+  { value: 'visible', label: 'Görünür' },
   { value: 'hidden', label: 'Gizli' },
 ];
 
@@ -1240,14 +1240,14 @@ function SlideoTab() {
       setItems(data.items);
       setTotalPages(data.pages);
       setTotal(data.total);
-    } catch { toast.error('Slideo verileri yÃ¼klenemedi'); }
+    } catch { toast.error('Slideo verileri yüklenemedi'); }
     finally { setLoading(false); }
   }, [sort, q, status, page]);
 
   useEffect(() => { load(); }, [load]);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Bu Slideo'yu silmek istediÄŸinizden emin misiniz?")) return;
+    if (!confirm("Bu Slideo'yu silmek istediğinizden emin misiniz?")) return;
     setDeletingId(id);
     try {
       await api.delete(`/admin/slideos/${id}`);
@@ -1263,14 +1263,14 @@ function SlideoTab() {
       if (hidden) {
         await api.patch(`/admin/slideos/${id}/restore`);
         setItems((prev) => prev.map((i) => (i.id === id ? { ...i, isHidden: false, hiddenAt: null } : i)));
-        toast.success('Slideo yeniden gÃ¶rÃ¼nÃ¼r yapÄ±ldÄ±');
+        toast.success('Slideo yeniden görünür yapıldı');
       } else {
         await api.patch(`/admin/slideos/${id}/hide`);
         setItems((prev) => prev.map((i) => (i.id === id ? { ...i, isHidden: true, hiddenAt: new Date().toISOString() } : i)));
         toast.success('Slideo gizlendi');
       }
     } catch {
-      toast.error('Moderasyon iÅŸlemi baÅŸarÄ±sÄ±z');
+      toast.error('Moderasyon işlemi başarısız');
     } finally {
       setTogglingId(null);
     }
@@ -1299,7 +1299,7 @@ function SlideoTab() {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { setQ(searchInput); setPage(1); } }}
-            placeholder="Slideo baÅŸlÄ±ÄŸÄ± ara..."
+            placeholder="Slideo başlığı ara..."
             className="flex-1 px-4 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
           <button onClick={() => { setQ(searchInput); setPage(1); }}
@@ -1317,7 +1317,7 @@ function SlideoTab() {
       {loading ? (
         <div className="space-y-2">{[...Array(8)].map((_, i) => <div key={i} className="skeleton h-20 rounded-xl" />)}</div>
       ) : items.length === 0 ? (
-        <EmptyState icon={Play} text="Slideo bulunamadÄ±" />
+        <EmptyState icon={Play} text="Slideo bulunamadı" />
       ) : (
         <div className="space-y-2">
           {items.map((item, i) => (
@@ -1367,7 +1367,7 @@ function SlideoTab() {
                   <span className="px-2 py-1 rounded-full bg-violet-500/10 text-violet-600 font-bold">Spike</span>
                 )}
                 {item.riskSignals?.highReportRatio && (
-                  <span className="px-2 py-1 rounded-full bg-orange-500/10 text-orange-600 font-bold">YÃ¼ksek Rapor OranÄ±</span>
+                  <span className="px-2 py-1 rounded-full bg-orange-500/10 text-orange-600 font-bold">Yüksek Rapor Oranı</span>
                 )}
                 <button
                   onClick={() => toggleHidden(item.id, !!item.isHidden)}
@@ -1395,7 +1395,7 @@ function SlideoTab() {
   );
 }
 
-// â”€â”€ AUDIT LOG TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? AUDIT LOG TAB ?????????????????????????????????????????????????????????????
 
 function AuditTab() {
   const [logs, setLogs] = useState<any[]>([]);
@@ -1412,7 +1412,7 @@ function AuditTab() {
       setLogs(data.logs);
       setTotalPages(data.pages);
       setTotal(data.total);
-    } catch { toast.error('Denetim loglarÄ± yÃ¼klenemedi'); }
+    } catch { toast.error('Denetim logları yüklenemedi'); }
     finally { setLoading(false); }
   }, [page, filterAction]);
 
@@ -1441,14 +1441,14 @@ function AuditTab() {
           onChange={(e) => { setFilterAction(e.target.value); setPage(1); }}
           className="px-4 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
         >
-          <option value="">TÃ¼m Ä°ÅŸlemler</option>
+          <option value="">Tüm İşlemler</option>
           {ACTION_TYPES.filter(Boolean).map(a => (
             <option key={a} value={a}>{ACTION_LABELS[a] || a}</option>
           ))}
         </select>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <ClipboardList className="w-3.5 h-3.5" />
-          <span>{total} kayÄ±t</span>
+          <span>{total} kayıt</span>
         </div>
         <button onClick={load} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors">
           <RefreshCw className="w-4 h-4" />
@@ -1458,7 +1458,7 @@ function AuditTab() {
       {loading ? (
         <div className="space-y-2">{[...Array(10)].map((_, i) => <div key={i} className="skeleton h-14 rounded-xl" />)}</div>
       ) : logs.length === 0 ? (
-        <EmptyState icon={ClipboardList} text="Denetim logu bulunamadÄ±" />
+        <EmptyState icon={ClipboardList} text="Denetim logu bulunamadı" />
       ) : (
         <div className="space-y-2">
           {logs.map((log) => {
@@ -1482,7 +1482,7 @@ function AuditTab() {
                 {/* Target */}
                 {log.targetType && log.targetId && (
                   <span className="text-xs text-muted-foreground">
-                    â†’ {log.targetType} #{log.targetId}
+                    → {log.targetType} #{log.targetId}
                   </span>
                 )}
 
@@ -1508,7 +1508,7 @@ function AuditTab() {
   );
 }
 
-// â”€â”€ SHARED COMPONENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? SHARED COMPONENTS ?????????????????????????????????????????????????????????
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -1589,7 +1589,7 @@ function Pagination({ page, totalPages, onPage }: { page: number; totalPages: nu
     <div className="flex items-center justify-center gap-2 mt-6">
       <button onClick={() => onPage(Math.max(1, page - 1))} disabled={page === 1}
         className="flex items-center gap-1 px-4 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors disabled:opacity-40">
-        <ChevronLeft className="w-4 h-4" /> Ã–nceki
+        <ChevronLeft className="w-4 h-4" /> Önceki
       </button>
       <span className="text-sm text-muted-foreground font-medium">{page} / {totalPages}</span>
       <button onClick={() => onPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}
@@ -1609,20 +1609,20 @@ function WarnModal({ onConfirm, onClose }: { onConfirm: (reason: string) => void
       <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
         className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-2xl"
         onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-extrabold mb-1">KullanÄ±cÄ±yÄ± Uyar</h2>
-        <p className="text-sm text-muted-foreground mb-4">KullanÄ±cÄ±ya bildirim olarak gÃ¶nderilecek.</p>
+        <h2 className="text-lg font-extrabold mb-1">Kullanıcıyı Uyar</h2>
+        <p className="text-sm text-muted-foreground mb-4">Kullanıcıya bildirim olarak gönderilecek.</p>
         <textarea
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="UyarÄ± sebebi..."
+          placeholder="Uyarı sebebi..."
           rows={3}
           className="w-full px-4 py-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none mb-4"
         />
         <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors">Ä°ptal</button>
+          <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors">İptal</button>
           <button onClick={() => reason.trim() && onConfirm(reason.trim())} disabled={!reason.trim()}
             className="flex-1 px-4 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 transition-colors disabled:opacity-50">
-            UyarÄ± GÃ¶nder
+            Uyarı Gönder
           </button>
         </div>
       </motion.div>
@@ -1639,8 +1639,8 @@ function RoleModal({ user, onConfirm, onClose }: { user: any; onConfirm: (role: 
       <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
         className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-2xl"
         onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-extrabold mb-1">Rol GÃ¼ncelle</h2>
-        <p className="text-sm text-muted-foreground mb-4">@{user.username} iÃ§in rol seÃ§</p>
+        <h2 className="text-lg font-extrabold mb-1">Rol Güncelle</h2>
+        <p className="text-sm text-muted-foreground mb-4">@{user.username} için rol seç</p>
         <div className="grid grid-cols-2 gap-2 mb-4">
           {Object.entries(ROLE_CONFIG).map(([value, conf]) => (
             <button key={value} onClick={() => setRole(value)}
@@ -1650,7 +1650,7 @@ function RoleModal({ user, onConfirm, onClose }: { user: any; onConfirm: (role: 
           ))}
         </div>
         <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors">Ä°ptal</button>
+          <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors">İptal</button>
           <button onClick={() => onConfirm(role)}
             className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:opacity-90 transition-opacity">
             Kaydet

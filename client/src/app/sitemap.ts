@@ -70,7 +70,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   const categoriesData = await fetchJson<{ id: number; slug: string; name: string }[]>('/categories');
-  const categoryPages: MetadataRoute.Sitemap = (categoriesData ?? []).map((cat) => ({
+  const categoryPages: MetadataRoute.Sitemap = (categoriesData || []).map((cat) => ({
     url: `${BASE_URL}${buildCategoryPath(cat.slug)}`,
     lastModified: new Date(),
     changeFrequency: 'daily',
@@ -80,7 +80,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const topicsData = await fetchJson<{ topics: { id: number; slug?: string; title?: string; createdAt: string }[] }>(
     '/topics?sort=latest&limit=200&page=1',
   );
-  const topicPages: MetadataRoute.Sitemap = (topicsData?.topics ?? []).map((topic) => ({
+  const topicPages: MetadataRoute.Sitemap = (topicsData?.topics || []).map((topic) => ({
     url: `${BASE_URL}${buildTopicPath({ id: topic.id, slug: topic.slug, title: topic.title })}`,
     lastModified: toSafeDate(topic.createdAt),
     changeFrequency: 'weekly',
@@ -90,7 +90,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const slidesData = await fetchJson<{ id: number; slug?: string; title?: string; createdAt: string }[]>(
     '/slides/popular?limit=300',
   );
-  const slidePages: MetadataRoute.Sitemap = (slidesData ?? []).map((slide) => ({
+  const slidePages: MetadataRoute.Sitemap = (slidesData || []).map((slide) => ({
     url: `${BASE_URL}${buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title })}`,
     lastModified: toSafeDate(slide.createdAt),
     changeFrequency: 'monthly',
@@ -100,7 +100,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const slideoData = await fetchJson<{ slideos: { id: number; title?: string; createdAt: string }[] }>(
     '/slideo/feed?sort=new&limit=200&page=1',
   );
-  const slideoPages: MetadataRoute.Sitemap = (slideoData?.slideos ?? []).map((slideo) => ({
+  const slideoPages: MetadataRoute.Sitemap = (slideoData?.slideos || []).map((slideo) => ({
     url: `${BASE_URL}${buildSlideoPath({ id: slideo.id, title: slideo.title })}`,
     lastModified: toSafeDate(slideo.createdAt),
     changeFrequency: 'weekly',

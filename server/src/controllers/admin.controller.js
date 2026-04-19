@@ -23,7 +23,7 @@ const removeUploadIfExists = (urlPath) => {
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 };
 
-// â”€â”€ Audit Log Helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? Audit Log Helper ??????????????????????????????????????????????????????????
 const auditLog = async (adminId, action, targetType, targetId, meta, ip) => {
   try {
     await prisma.adminLog.create({
@@ -41,7 +41,7 @@ const auditLog = async (adminId, action, targetType, targetId, meta, ip) => {
   }
 };
 
-// â”€â”€ Overview Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? Overview Stats ????????????????????????????????????????????????????????????
 const getStats = async (req, res) => {
   if (!guard(req, res)) return;
   try {
@@ -106,7 +106,7 @@ const getStats = async (req, res) => {
   }
 };
 
-// â”€â”€ Content Management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? Content Management ????????????????????????????????????????????????????????
 const getContent = async (req, res) => {
   if (!guard(req, res)) return;
   const { type = 'topics', page = 1, showHidden = 'false' } = req.query;
@@ -235,7 +235,7 @@ const deleteContent = async (req, res) => {
   }
 };
 
-// â”€â”€ User Management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? User Management ???????????????????????????????????????????????????????????
 const getUsers = async (req, res) => {
   if (!guard(req, res)) return;
   const { q = '', page = 1, filter = 'all' } = req.query;
@@ -352,7 +352,7 @@ const updateRole = async (req, res) => {
   }
 };
 
-// â”€â”€ Reports Management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? Reports Management ????????????????????????????????????????????????????????
 const updateReportPriority = async (req, res) => {
   if (!guard(req, res)) return;
   const { id } = req.params;
@@ -376,7 +376,7 @@ const addReportNote = async (req, res) => {
   const note = String(req.body.note || '').slice(0, 2000).trim() || null;
   try {
     const report = await prisma.report.update({ where: { id: Number(id) }, data: { note } });
-    await auditLog(req.user.id, 'add_report_note', 'report', id, { noteLength: note?.length ?? 0 }, req.ip);
+    await auditLog(req.user.id, 'add_report_note', 'report', id, { noteLength: note?.length ? 0 }, req.ip);
     res.json(report);
   } catch (err) {
     logger.error('Admin: Failed to update report note', { error: err.message, stack: err.stack });
@@ -384,7 +384,7 @@ const addReportNote = async (req, res) => {
   }
 };
 
-// â”€â”€ Content Intelligence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? Content Intelligence ??????????????????????????????????????????????????????
 // Quality score: saves*5 + likes*1 + views*0.01 (slides)
 //                likes*1 + comments*3 + views*0.01 + slides*2 (topics)
 const getContentIntelligence = async (req, res) => {
@@ -655,7 +655,7 @@ const deleteSlideo = async (req, res) => {
   }
 };
 
-// â”€â”€ Audit Logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? Audit Logs ????????????????????????????????????????????????????????????????
 const getAuditLogs = async (req, res) => {
   if (!guard(req, res)) return;
   const { page = 1, action = '', adminId = '' } = req.query;

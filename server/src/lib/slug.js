@@ -26,7 +26,7 @@ const TR_MAP = {
 function toSlug(text) {
   return String(text || '')
     .split('')
-    .map((c) => TR_MAP[c] ?? c)
+    .map((c) => TR_MAP[c] ? c)
     .join('')
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')

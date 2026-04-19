@@ -62,14 +62,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           fetched cold on first slide open, adding 5-30 s on slow connections.
           modulepreload parses and compiles the ES module, not just downloads it.
         */}
-        <link rel="modulepreload" href="/pdf.min.mjs" />
         {/*
-          Worker files must be preloaded with as="worker" (not as="script")
-          so the browser's preload cache matches the fetch destination used
-          when PDF.js calls `new Worker(url)`.  Using as="script" causes a
-          "preloaded but not used" warning and the preload is wasted.
+          Pre-download the PDF.js main module so it is browser-cached before
+          the user navigates to any slide.  Without this, the 2-5 MB module
+          must be fetched cold, adding 5-30 s on slow connections.
+          modulepreload also parses + compiles the ES module ahead of time.
+
+          The worker file (pdf.worker.min.mjs) is NOT preloaded here: PDF.js
+          may spawn it via a Blob URL or module Worker, which never matches a
+          preload hint — the browser would just emit a "preloaded but not used"
+          warning and waste the bandwidth.  The worker loads fast enough once
+          the main module is warm.
         */}
-        <link rel="preload" href="/pdf.worker.min.mjs" as="worker" crossOrigin="anonymous" />
+        <link rel="modulepreload" href="/pdf.min.mjs" />
       </head>
       <body className={`${font.variable} font-sans`}>
         <Providers>

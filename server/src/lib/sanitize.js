@@ -23,7 +23,7 @@ function sanitizeText(str, maxLen) {
 
   let out = str
     .replace(/<[^>]*>/g, '')                                // remove HTML tags
-    .replace(/&[a-zA-Z#0-9]+;/g, (e) => HTML_ENTITIES[e] ?? '') // decode entities
+    .replace(/&[a-zA-Z#0-9]+;/g, (e) => HTML_ENTITIES[e] ? '') // decode entities
     .replace(/[\u0000-\u001F\u007F]/g, '')                  // strip control chars
     .trim();
 

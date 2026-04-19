@@ -83,9 +83,9 @@ export default function SlideoViewer({
   const [likesCount, setLikesCount] = useState(slideo.likesCount);
   const [savesCount, setSavesCount] = useState(slideo.savesCount);
 
-  // UI state â€” "ended" means last page reached
+  // UI state ? "ended" means last page reached
   const [isEnded, setIsEnded] = useState(false);
-  // "immersive" â€” user tapped center to hide overlays
+  // "immersive" ? user tapped center to hide overlays
   const [isImmersive, setIsImmersive] = useState(false);
   const [autoProgressPct, setAutoProgressPct] = useState(0);
   const immersiveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -108,7 +108,7 @@ export default function SlideoViewer({
 
   const previewPdfPath = `/api/slides/${slideo.slide.id}/pdf`;
 
-  // â”€â”€ Reset on slideo change â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Reset on slideo change ??????????????????????????????????????????????????
   useEffect(() => {
     setLiked(slideo.isLiked);
     setSaved(slideo.isSaved);
@@ -122,7 +122,7 @@ export default function SlideoViewer({
     completionTrackedRef.current = false;
   }, [slideo.id, slideo.isLiked, slideo.isSaved, slideo.likesCount, slideo.savesCount]);
 
-  // â”€â”€ Reset page / related when active changes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Reset page / related when active changes ????????????????????????????????
   useEffect(() => {
     if (!isActive) return;
     setCurrentIdx(0);
@@ -132,12 +132,12 @@ export default function SlideoViewer({
     setRelated(null);
   }, [isActive]);
 
-  // â”€â”€ Detect "ended" â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Detect "ended" ??????????????????????????????????????????????????????????
   useEffect(() => {
     setIsEnded(currentIdx === pages.length - 1 && canvasRendered);
   }, [currentIdx, pages.length, canvasRendered]);
 
-  // â”€â”€ Completion tracking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Completion tracking ?????????????????????????????????????????????????????
   useEffect(() => {
     if (!isActive || !user) return;
     if (currentIdx !== pages.length - 1) return;
@@ -146,7 +146,7 @@ export default function SlideoViewer({
     api.post(`/slideo/${slideo.id}/complete`, { variant: feedVariant, subjectKey: feedSubjectKey }).catch(() => {});
   }, [isActive, user, currentIdx, pages.length, slideo.id, feedVariant, feedSubjectKey]);
 
-  // â”€â”€ Related slideos fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Related slideos fetch ???????????????????????????????????????????????????
   useEffect(() => {
     if (isActive && currentIdx === pages.length - 1 && !relatedFetchedRef.current) {
       relatedFetchedRef.current = true;
@@ -154,7 +154,7 @@ export default function SlideoViewer({
     }
   }, [isActive, currentIdx, pages.length, slideo.id]);
 
-  // â”€â”€ Feed open event â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Feed open event ?????????????????????????????????????????????????????????
   useEffect(() => {
     if (!isActive || !feedSubjectKey) return;
     api.post('/slideo/feed/evaluate', {
@@ -162,7 +162,7 @@ export default function SlideoViewer({
     }).catch(() => {});
   }, [isActive, slideo.id, feedSubjectKey]);
 
-  // â”€â”€ PDF load â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? PDF load ????????????????????????????????????????????????????????????????
   useEffect(() => {
     if (!isActive || slideo.slide.conversionStatus !== 'done') return;
     if (pdfDoc) return;
@@ -176,7 +176,7 @@ export default function SlideoViewer({
     return () => { cancelled = true; };
   }, [isActive, slideo.slide.conversionStatus, slideo.id, previewPdfPath, pdfDoc, pdfLoadAttempt]);
 
-  // â”€â”€ View tracking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? View tracking ???????????????????????????????????????????????????????????
   useEffect(() => {
     if (!isActive || slideo.slide.conversionStatus !== 'done') return;
     const viewKey = `slideo:view:${slideo.id}`;
@@ -202,14 +202,14 @@ export default function SlideoViewer({
     }
   }, [isActive, slideo.id, slideo.slide.conversionStatus]);
 
-  // â”€â”€ Render page to canvas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Render page to canvas ???????????????????????????????????????????????????
   useEffect(() => {
     if (!pdfDoc || !canvasRef.current || !isActive) return;
     const pageNum = pages[currentIdx];
     if (!pageNum) return;
     const seq = ++renderSeqRef.current;
     const container = containerRef.current;
-    const measuredWidth = container?.clientWidth ?? 0;
+    const measuredWidth = container?.clientWidth || 0;
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 0;
     const w = Math.min(1200, Math.max(360, measuredWidth || viewportWidth || 800));
     let cancelled = false;
@@ -232,7 +232,7 @@ export default function SlideoViewer({
     return () => { cancelled = true; };
   }, [pdfDoc, currentIdx, isActive, slideo.id, pages]);
 
-  // â”€â”€ Page navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Page navigation ?????????????????????????????????????????????????????????
   const goToPage = useCallback((idx: number) => {
     if (idx < 0 || idx >= pages.length) return;
     setCurrentIdx(idx);
@@ -247,7 +247,7 @@ export default function SlideoViewer({
     if (currentIdxRef.current > 0) goToPage(currentIdxRef.current - 1);
   }, [goToPage]);
 
-  // â€”â€” Auto advance pages (Reels/TikTok-like pacing) â€”â€”
+  // ? Auto advance pages (Reels/TikTok-like pacing) ?
   useEffect(() => {
     if (!isActive) return;
     if (pdfLoading || pdfError || !canvasRendered) return;
@@ -286,7 +286,7 @@ export default function SlideoViewer({
     return () => clearTimeout(timer);
   }, [isActive, pdfLoading, pdfError, canvasRendered, currentIdx, pages.length, onNext]);
 
-  // â”€â”€ Immersive toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Immersive toggle ????????????????????????????????????????????????????????
   const showUI = useCallback(() => {
     setIsImmersive(false);
     if (immersiveTimerRef.current) clearTimeout(immersiveTimerRef.current);
@@ -301,7 +301,7 @@ export default function SlideoViewer({
     if (immersiveTimerRef.current) clearTimeout(immersiveTimerRef.current);
   }, []);
 
-  // â”€â”€ Like / Save / Share â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Like / Save / Share ?????????????????????????????????????????????????????
     const handleLike = useCallback(async () => {
     if (!user) return toast.error('Beğenmek için giriş yap');
     try {
@@ -334,7 +334,7 @@ export default function SlideoViewer({
     toast.success('Link kopyalandı');
   }, [slideo.id, slideo.title, user, feedVariant, feedSubjectKey]);
 
-  // â”€â”€ Keyboard shortcuts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Keyboard shortcuts ??????????????????????????????????????????????????????
   useEffect(() => {
     if (!isActive) return;
     const handler = (e: KeyboardEvent) => {
@@ -351,7 +351,7 @@ export default function SlideoViewer({
     return () => window.removeEventListener('keydown', handler);
   }, [isActive, goPageNext, goPagePrev, onNext, onPrev, handleLike, showUI, toggleImmersive]);
 
-  // â”€â”€ Touch / pointer gestures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Touch / pointer gestures ????????????????????????????????????????????????
   const onPtrDown = useCallback((e: React.PointerEvent) => {
     ptrStartYRef.current = e.clientY;
     ptrStartXRef.current = e.clientX;
@@ -361,13 +361,13 @@ export default function SlideoViewer({
     const dy = ptrStartYRef.current - e.clientY;
     const dx = ptrStartXRef.current - e.clientX;
 
-    // Vertical swipe â†’ change slideo
+    // Vertical swipe ? change slideo
     if (Math.abs(dy) > 70 && Math.abs(dy) > Math.abs(dx) * 1.2) {
       if (dy > 0) onNext(); else onPrev();
       return;
     }
 
-    // Horizontal swipe â†’ change page within slideo
+    // Horizontal swipe ? change page within slideo
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.2) {
       if (dx > 0) goPageNext(); else goPagePrev();
       showUI();
@@ -386,7 +386,7 @@ export default function SlideoViewer({
     const inCenter = x >= rect.width * 0.25 && x <= rect.width * 0.75;
 
     if (isDoubleTap && inCenter) {
-      // Double tap center â†’ like
+      // Double tap center ? like
       setHeartAnim({ id: now, x, y });
       setTimeout(() => setHeartAnim(null), 900);
       if (!liked) handleLike();
@@ -397,7 +397,7 @@ export default function SlideoViewer({
     lastTapTimeRef.current = now;
     lastTapPosRef.current = { x, y };
 
-    // Single tap left/right zones â†’ page nav
+    // Single tap left/right zones ? page nav
     if (x <= rect.width * 0.3) {
       goPagePrev(); showUI(); return;
     }
@@ -405,7 +405,7 @@ export default function SlideoViewer({
       goPageNext(); showUI(); return;
     }
 
-    // Tap center â†’ toggle immersive
+    // Tap center ? toggle immersive
     if (inCenter) toggleImmersive();
   }, [onNext, onPrev, goPageNext, goPagePrev, liked, handleLike, showUI, toggleImmersive]);
 
@@ -416,7 +416,7 @@ export default function SlideoViewer({
     setPdfLoadAttempt((v) => v + 1);
   }, []);
 
-  // â”€â”€ Derived â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Derived ?????????????????????????????????????????????????????????????????
   const noPdf = slideo.slide.conversionStatus !== 'done';
   const continueHref = slideo.slide.topic
     ? buildTopicPath({
@@ -427,7 +427,7 @@ export default function SlideoViewer({
     : '/slideo';
   const avatarColor = AVATAR_COLORS[slideo.user.id % AVATAR_COLORS.length];
 
-  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Render ??????????????????????????????????????????????????????????????????
   return (
     <div
       ref={containerRef}
@@ -438,7 +438,7 @@ export default function SlideoViewer({
       onPointerDown={onPtrDown}
       onPointerUp={onPtrUp}
     >
-      {/* â”€â”€ Canvas / loading layer â”€â”€ */}
+      {/* ?? Canvas / loading layer ?? */}
       <div className="absolute inset-0 flex items-center justify-center bg-black">
         {noPdf ? (
           <div className="flex flex-col items-center gap-3 text-white/30">
@@ -474,7 +474,7 @@ export default function SlideoViewer({
         )}
       </div>
 
-      {/* â”€â”€ Heart double-tap animation â”€â”€ */}
+      {/* ?? Heart double-tap animation ?? */}
       <AnimatePresence>
         {heartAnim && (
           <motion.div
@@ -491,14 +491,14 @@ export default function SlideoViewer({
         )}
       </AnimatePresence>
 
-      {/* â”€â”€ UI overlays â€” hidden in immersive mode â”€â”€ */}
+      {/* ?? UI overlays ? hidden in immersive mode ?? */}
       <div
         className={cn(
           'absolute inset-0 pointer-events-none transition-opacity duration-200',
           isImmersive ? 'opacity-0' : 'opacity-100',
         )}
       >
-        {/* Progress bar â€” top */}
+        {/* Progress bar ? top */}
         <div
           className="absolute top-0 inset-x-0 flex gap-[3px] px-3 pt-2.5 pointer-events-auto"
           onPointerDown={(e) => e.stopPropagation()}
@@ -617,7 +617,7 @@ export default function SlideoViewer({
         </div>
       </div>
 
-      {/* â”€â”€ End-of-slideo overlay â”€â”€ */}
+      {/* ?? End-of-slideo overlay ?? */}
       <AnimatePresence>
         {false && isEnded && !isImmersive && (
           <motion.div
@@ -656,7 +656,7 @@ export default function SlideoViewer({
                   Aynı konudan
                 </p>
                 <div className="flex gap-2.5 overFlow-x-auto scrollbar-none pb-1">
-                  {(related?.sameTopic ?? []).map((r) => (
+                  {(related?.sameTopic || []).map((r) => (
                     <MiniSlideoCard key={r.id} slideo={r} />
                   ))}
                   <Link
@@ -677,7 +677,7 @@ export default function SlideoViewer({
   );
 }
 
-// â”€â”€ Mini card for related slideos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? Mini card for related slideos ????????????????????????????????????????????
 function MiniSlideoCard({ slideo: s }: { slideo: SlideoItem }) {
   const avatarColor = AVATAR_COLORS[s.user.id % AVATAR_COLORS.length];
   return (

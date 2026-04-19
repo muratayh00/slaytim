@@ -104,7 +104,7 @@ function ConversionBanner({
 }
 
 
-// â”€â”€ Collection modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? Collection modal ??????????????????????????????????????????????????????????
 
 function AddToCollectionModal({
   slideId,
@@ -252,7 +252,7 @@ function AddToCollectionModal({
   );
 }
 
-// â”€â”€ Embed modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? Embed modal ???????????????????????????????????????????????????????????????
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
 
@@ -420,7 +420,7 @@ function DeleteSlideModal({
   );
 }
 
-// â”€â”€ Related section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? Related section ???????????????????????????????????????????????????????????
 
 function RelatedSection({ slides, title }: { slides: any[]; title: string }) {
   if (!slides || slides.length === 0) return null;
@@ -434,13 +434,13 @@ function RelatedSection({ slides, title }: { slides: any[]; title: string }) {
   );
 }
 
-// â”€â”€ Main page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? Main page ?????????????????????????????????????????????????????????????????
 
 export default function SlideDetailPage() {
   const params = useParams();
   const rawParam = String((params as Record<string, string>)?.id || (params as Record<string, string>)?.slug || '');
   const { id: parsedId, slug: parsedSlug } = splitIdSlug(rawParam);
-  const id = parsedId ?? Number(rawParam);
+  const id = parsedId || Number(rawParam) || 0;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -898,7 +898,7 @@ export default function SlideDetailPage() {
 
     // If ImageSlideViewer is active, capture from the <img> element of the current page
     if (previewMeta?.previewMode === 'images' && previewMeta.pages.length > 0) {
-      const pageData = previewMeta.pages.find((p) => p.pageNumber === currentPage) ?? previewMeta.pages[0];
+      const pageData = previewMeta.pages.find((p) => p.pageNumber === currentPage) || previewMeta.pages[0];
       try {
         const img = new window.Image();
         img.crossOrigin = 'anonymous';
@@ -1012,7 +1012,7 @@ export default function SlideDetailPage() {
   const bgGradient = BG_GRADIENTS[slide.id % BG_GRADIENTS.length];
   const avatarGradient = AVATAR_COLORS[slide.user.id % AVATAR_COLORS.length];
   const hasPdf = slide.conversionStatus === 'done' && slide.pdfUrl;
-  const fileExt = slide.fileUrl?.split('.').pop()?.toUpperCase() ?? 'PPTX';
+  const fileExt = slide.fileUrl?.split('.').pop()?.toUpperCase() || 'PPTX';
   const canDeleteSlide = Boolean(user && (isSlideOwner || user.isAdmin));
 
   return (

@@ -34,7 +34,7 @@ const { putBuffer, resolveStorageReadUrl, isRemoteEnabled } = require('./storage
 const logger    = require('../lib/logger');
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const PREVIEW_ENABLED     = String(process.env.PREVIEW_ENABLED    ?? 'true').toLowerCase() !== 'false';
+const PREVIEW_ENABLED     = String(process.env.PREVIEW_ENABLED    ? 'true').toLowerCase() !== 'false';
 const MAX_PAGES           = Math.max(1,   Number(process.env.PREVIEW_MAX_PAGES       || 60));
 const MAX_PDF_SIZE_MB     = Math.max(1,   Number(process.env.PREVIEW_MAX_PDF_SIZE_MB || 80));
 const PREVIEW_WIDTH       = Math.max(400, Number(process.env.PREVIEW_WIDTH           || 1280));

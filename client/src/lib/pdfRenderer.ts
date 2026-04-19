@@ -53,7 +53,7 @@ export function resolveFileUrl(path: string | null | undefined): string {
   // ensures credentials are sent to the correct host.
   // slaytim.com and api.slaytim.com share the same eTLD+1, so SameSite=Lax
   // cookies are forwarded correctly on cross-subdomain fetch calls.
-  return resolveMediaUrl(cleaned) ?? cleaned;
+  return resolveMediaUrl(cleaned) || cleaned;
 }
 
 /**
@@ -93,7 +93,7 @@ export async function loadPdfDocument(pdfPath: string) {
     console.error('[PDF] getDocument() failed:', err);
     // UnexpectedResponseException carries the HTTP status
     if (err?.name === 'UnexpectedResponseException') {
-      throw new Error(`PDF fetch failed: ${err.status ?? 'unknown'}`);
+      throw new Error(`PDF fetch failed: ${err.status || 'unknown'}`);
     }
     throw err;
   }

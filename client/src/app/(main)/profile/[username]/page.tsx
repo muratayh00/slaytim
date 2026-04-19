@@ -36,7 +36,7 @@ type ProfilePageProps = {
 
 export default function ProfilePage({ forcedUsername }: ProfilePageProps) {
   const params = useParams();
-  const rawUsername = forcedUsername ?? String((params as { username?: string })?.username || '');
+  const rawUsername = forcedUsername || String((params as { username?: string })?.username || '');
   const username = decodeURIComponent(rawUsername).replace(/^@+/, '').trim();
   const { user: me } = useAuthStore();
   const [profile, setProfile] = useState<any>(null);
@@ -540,4 +540,3 @@ function Empty({ message }: { message: string }) {
     </div>
   );
 }
-

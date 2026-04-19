@@ -53,7 +53,7 @@ export default function CollectionDetailPage() {
     return <div className="p-8 text-center text-muted-foreground">Koleksiyon bulunamadı.</div>;
   }
 
-  const slides = col.slides?.map((cs: any) => cs.slide) ?? [];
+  const slides = col.slides?.map((cs: any) => cs.slide) || [];
   const avatarColor = AVATAR_COLORS[col.user.id % AVATAR_COLORS.length];
   const isOwner = user?.id === col.userId;
 

@@ -141,7 +141,7 @@ export default function SlideViewer({
   const fullscreenRef = useRef(fullscreen);
   useEffect(() => { fullscreenRef.current = fullscreen; }, [fullscreen]);
 
-  // â”€â”€ Load PDF â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Load PDF ???????????????????????????????????????????????????????????????
   useEffect(() => {
     setDoc(null);
     setLoadError(null);
@@ -155,7 +155,7 @@ export default function SlideViewer({
     const loadWithRetry = async () => {
       // Always route through the Next.js proxy to stay same-origin.
       // Direct pdfUrl (e.g. http://localhost:5001/uploads/...) is cross-origin
-      // and blocked by browser CORS/CORP â€” use /api/slides/:id/pdf instead.
+      // and blocked by browser CORS/CORP — use /api/slides/:id/pdf instead.
       const apiPath = `/api/slides/${slideId}/pdf`;
       try {
         return await loadPdfDocument(apiPath);
@@ -223,7 +223,7 @@ export default function SlideViewer({
     return () => clearInterval(id);
   }, [autoStepMs, doc, numPages]);
 
-  // â”€â”€ Render current page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Render current page ????????????????????????????????????????????????????
   const renderPage = useCallback(async (pageNum: number) => {
     if (!doc || !canvasRef.current) return;
     const seq = ++renderSeqRef.current;
@@ -231,7 +231,7 @@ export default function SlideViewer({
     setRendering(true);
     try {
       const isFs = fullscreenRef.current;
-      const containerW = canvasRef.current.parentElement?.clientWidth ?? 800;
+      const containerW = canvasRef.current.parentElement?.clientWidth || 800;
       // Keep the first visual fast by limiting non-fullscreen render size.
       // This cuts render pixel count materially on large displays.
       const w = isFs
@@ -276,7 +276,7 @@ export default function SlideViewer({
     }
   }, [fullscreen]); // eslint-disable-line
 
-  // â”€â”€ Generate thumbnails progressively â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Generate thumbnails progressively ?????????????????????????????????????
   useEffect(() => {
     if (!doc || numPages === 0) return;
     // Don't start thumbnail rendering until first canvas page is visible.
@@ -286,7 +286,7 @@ export default function SlideViewer({
     let cancelled = false;
     const before = 1;
     // Grid mode prefetches up to 10 visible thumbnails; normal mode only fetches
-    // the next 3 pages â€” enough to avoid loading spinners on fast swipes.
+    // the next 3 pages — enough to avoid loading spinners on fast swipes.
     const after = showGrid ? 10 : 3;
     const yieldMs = showGrid ? 20 : 12; // yield so main thread stays responsive
     const from = Math.max(1, currentPage - before);
@@ -302,7 +302,7 @@ export default function SlideViewer({
         if (cancelled) break;
         try {
           const canvas = document.createElement('canvas');
-          // Thumbnail'ler iÃ§in DPR = 1 (kÃ¼Ã§Ã¼k boyut, ekstra piksel anlamsÄ±z)
+          // Thumbnail'ler için DPR = 1 (küçük boyut, ekstra piksel anlamsız)
           await renderPageToCanvas(doc, i, canvas, THUMB_W, 1);
           const url = canvas.toDataURL('image/jpeg', 0.75);
           if (!cancelled) {
@@ -315,10 +315,10 @@ export default function SlideViewer({
           }
           setThumbMem(slideId, i, url);
           setThumbIdb(slideId, i, url).catch(() => {});
-          // Ana iÅŸ parÃ§acÄ±ÄŸÄ±na yield et; grid modda daha uzun bekleme â†’ daha akÄ±cÄ± scroll
+          // Ana iş parçacığına yield et; grid modda daha uzun bekleme ? daha akıcı scroll
           await new Promise(r => setTimeout(r, yieldMs));
         } catch {
-          // Tek sayfa thumbnail hatalarÄ±nÄ± yoksay.
+          // Tek sayfa thumbnail hatalarını yoksay.
         }
       }
     })();
@@ -329,14 +329,14 @@ export default function SlideViewer({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc, numPages, currentPage, showGrid, thumbnails, slideId, firstRenderDone]);
 
-  // â”€â”€ Scroll active thumbnail into view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Scroll active thumbnail into view ?????????????????????????????????????
   useEffect(() => {
     if (!thumbStripRef.current) return;
     const el = thumbStripRef.current.children[currentPage - 1] as HTMLElement | undefined;
     el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
   }, [currentPage]);
 
-  // â”€â”€ Keyboard navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Keyboard navigation ????????????????????????????????????????????????????
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
@@ -372,7 +372,7 @@ export default function SlideViewer({
     return () => window.removeEventListener('keydown', onKey);
   }, [numPages]);
 
-  // â”€â”€ Touch swipe â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Touch swipe ????????????????????????????????????????????????????????????
   const onTouchStart = (e: React.TouchEvent) => {
     touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   };
@@ -387,7 +387,7 @@ export default function SlideViewer({
     touchStartRef.current = null;
   };
 
-  // â”€â”€ Fullscreen API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Fullscreen API ?????????????????????????????????????????????????????????
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) {
@@ -403,7 +403,7 @@ export default function SlideViewer({
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
 
-  // â”€â”€ Loading state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Loading state ??????????????????????????????????????????????????????????
   if (loadError) {
     return (
       <div className={`flex items-center justify-center bg-muted rounded-2xl ${className}`} style={{ minHeight: '60vh' }}>
@@ -422,7 +422,7 @@ export default function SlideViewer({
     );
   }
 
-  // â”€â”€ Cover-aware loading state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ?? Cover-aware loading state ?????????????????????????????????????????????
   // While the PDF document is being fetched/parsed, show the slide thumbnail
   // so users see real content instantly instead of a blank spinner.
   if (!doc) {
@@ -492,7 +492,7 @@ export default function SlideViewer({
   return (
     <div ref={containerRef} className={`${className} ${fullscreen ? 'bg-black' : ''}`}>
 
-      {/* â”€â”€ Grid overview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ?? Grid overview ???????????????????????????????????????????????????? */}
       <AnimatePresence>
         {showGrid && (
           <motion.div
@@ -540,7 +540,7 @@ export default function SlideViewer({
         )}
       </AnimatePresence>
 
-      {/* â”€â”€ Main viewer area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ?? Main viewer area ????????????????????????????????????????????????? */}
       <div
         className={`relative rounded-2xl overflow-hidden bg-zinc-900 select-none ${
           fullscreen ? 'rounded-none flex flex-col justify-center' : ''
@@ -663,7 +663,7 @@ export default function SlideViewer({
         </div>
       </div>
 
-      {/* â”€â”€ Thumbnail strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ?? Thumbnail strip ?????????????????????????????????????????????????? */}
       {!fullscreen && thumbnails.length > 0 && (
         <div
           ref={thumbStripRef}
@@ -691,7 +691,7 @@ export default function SlideViewer({
         </div>
       )}
 
-      {/* â”€â”€ Controls bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ?? Controls bar ???????????????????????????????????????????????????? */}
       {!fullscreen && (
         <div className="flex items-center justify-between mt-1.5 px-0.5">
           <button
@@ -732,7 +732,7 @@ export default function SlideViewer({
         </div>
       )}
 
-      {/* â”€â”€ Keyboard hint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ?? Keyboard hint ??????????????????????????????????????????????????? */}
       {!fullscreen && numPages > 1 && (
         <p className="text-[10px] text-muted-foreground/40 text-center mt-2">
           ← → tuşları · kaydır · G: genel görünüm · F11: tam ekran

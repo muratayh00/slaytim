@@ -44,7 +44,7 @@ export function observeAdViewability(
         timer = setTimeout(() => {
           if (!fired) {
             fired = true;
-            const elapsed = Date.now() - (enterTime ?? Date.now());
+            const elapsed = Date.now() - (enterTime || Date.now());
             onViewed(slotId, elapsed);
           }
         }, VIEWABILITY_MIN_MS);

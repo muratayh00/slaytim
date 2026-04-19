@@ -40,7 +40,7 @@ function clearTopicCaches() {
   ttlCache.clear('topic-trending');
 }
 
-// â”€â”€ Algorithm 1: Hot/Trending Score â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? Algorithm 1: Hot/Trending Score ??????????????????????????????????????????
 // hot_score = (likes + slides*4 + views*0.05) / (age_hours + 2)^1.5
 // Saves count 3x more than likes; new slides added to a topic boost velocity.
 function calcHotScore(topic, ageHours) {
@@ -48,7 +48,7 @@ function calcHotScore(topic, ageHours) {
   return score / Math.pow(ageHours + 2, 1.5);
 }
 
-// â”€â”€ Algorithm 2: Personalized feed score â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? Algorithm 2: Personalized feed score ?????????????????????????????????????
 // personal_score = creator_affinity + category_affinity + freshness_boost
 function calcPersonalScore(topic, followedUserIds, followedCategoryIds, visitedTopicIds, now) {
   let score = 0;
@@ -65,7 +65,7 @@ function calcPersonalScore(topic, followedUserIds, followedCategoryIds, visitedT
   return score;
 }
 
-// â”€â”€ Algorithm 8: Search ranking score â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?? Algorithm 8: Search ranking score ????????????????????????????????????????
 // search_score = text_relevance_bonus + quality_score
 function calcSearchScore(item, q) {
   const lower = q.toLowerCase();

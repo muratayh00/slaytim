@@ -9,7 +9,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
 type RouteParams = { id?: string; slug?: string };
 
 function getRouteKey(params: RouteParams): string | null {
-  return params.id ?? params.slug ?? null;
+  return params.id || params.slug || null;
 }
 
 async function fetchTopic(paramValue: string) {
