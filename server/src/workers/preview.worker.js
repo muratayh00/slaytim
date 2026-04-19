@@ -37,7 +37,7 @@ if (!REDIS_ENABLED) {
   process.exit(0);
 }
 
-const PREVIEW_ENABLED = String(process.env.PREVIEW_ENABLED ? 'true').toLowerCase() !== 'false';
+const PREVIEW_ENABLED = String(process.env.PREVIEW_ENABLED ?? 'true').toLowerCase() !== 'false';
 if (!PREVIEW_ENABLED) {
   console.log('[preview-worker] PREVIEW_ENABLED=false. Worker not started.');
   process.exit(0);

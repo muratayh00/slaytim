@@ -60,5 +60,34 @@ export const analytics = {
     source: 'viewer' | 'detail';
     attempt: number;
   }) => track('slideo_view_track_retry_success', params),
+
+  /**
+   * Fires when the first visual (image or PDF page) is rendered for a slide.
+   * Used to measure Time-to-First-Visual (TTFV) performance.
+   * @param mode  'images' = WebP preview rendered | 'pdf' = PDF.js rendered
+   * @param ttMs  Milliseconds from navigation start to first visual
+   */
+  previewFirstVisual: (params: {
+    slide_id: number;
+    mode: 'images' | 'pdf';
+    tt_ms: number;
+  }) => {
+    track('preview_first_visual', params);
+    // Also fire to backend for server-side aggregation
+    if (typeof window !== 'undefined') {
+      const body = JSON.stringify(params);
+      // Use sendBeacon so it doesn't block navigation
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/analytics/preview-metric', new Blob([body], { type: 'application/json' }));
+      } else {
+        fetch('/api/analytics/preview-metric', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body,
+          keepalive: true,
+        }).catch(() => { /* fire and forget */ });
+      }
+    }
+  },
 };
 

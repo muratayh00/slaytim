@@ -8,7 +8,8 @@ import {
   LayoutGrid, Search, ChevronLeft, ChevronRight, Eye, MessageSquare,
   FileText, Tag, Play, Heart, Bookmark, EyeOff, RotateCcw,
   TrendingUp, ClipboardList, Star, Info, Zap, Activity,
-  UserCheck, ArrowUpRight, CheckCheck, XCircle,
+  UserCheck, ArrowUpRight, CheckCheck, XCircle, Layers, Image as ImageIcon,
+  HardDrive, Clock, AlertCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import api from '@/lib/api';
@@ -51,15 +52,16 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 const ADMIN_TABS = [
-  { id: 'overview',  label: 'Genel Bakış',  icon: Activity },
-  { id: 'analytics', label: 'Analitik',     icon: BarChart3 },
-  { id: 'conversion',label: 'Dönüşüm',      icon: RefreshCw },
-  { id: 'reports',   label: 'Raporlar',     icon: Flag },
-  { id: 'content',   label: 'İçerik',       icon: LayoutGrid },
-  { id: 'intel',     label: 'İçerik Zekası',icon: Star },
-  { id: 'users',     label: 'Kullanıcılar', icon: Users },
-  { id: 'slideos',   label: 'Slideo',       icon: Play },
-  { id: 'audit',     label: 'Denetim Logu', icon: ClipboardList },
+  { id: 'overview',    label: 'Genel Bakış',   icon: Activity },
+  { id: 'analytics',  label: 'Analitik',       icon: BarChart3 },
+  { id: 'conversion', label: 'Dönüşüm',        icon: RefreshCw },
+  { id: 'preview',    label: 'Preview Ops',    icon: Layers },
+  { id: 'reports',    label: 'Raporlar',       icon: Flag },
+  { id: 'content',    label: 'İçerik',         icon: LayoutGrid },
+  { id: 'intel',      label: 'İçerik Zekası',  icon: Star },
+  { id: 'users',      label: 'Kullanıcılar',   icon: Users },
+  { id: 'slideos',    label: 'Slideo',          icon: Play },
+  { id: 'audit',      label: 'Denetim Logu',   icon: ClipboardList },
 ];
 
 // ?? Main Page ?????????????????????????????????????????????????????????????????
@@ -122,15 +124,16 @@ export default function AdminPage() {
 
       <AnimatePresence mode="wait">
         <motion.div key={activeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-          {activeTab === 'overview' && <OverviewTab />}
-          {activeTab === 'analytics' && <AnalyticsTab />}
-          {activeTab === 'conversion' && <ConversionTab />}
-          {activeTab === 'reports'  && <ReportsTab />}
-          {activeTab === 'content'  && <ContentTab />}
-          {activeTab === 'intel'    && <ContentIntelTab />}
-          {activeTab === 'users'    && <UsersTab />}
-          {activeTab === 'slideos'  && <SlideoTab />}
-          {activeTab === 'audit'    && <AuditTab />}
+          {activeTab === 'overview'    && <OverviewTab />}
+          {activeTab === 'analytics'   && <AnalyticsTab />}
+          {activeTab === 'conversion'  && <ConversionTab />}
+          {activeTab === 'preview'     && <PreviewOpsTab />}
+          {activeTab === 'reports'     && <ReportsTab />}
+          {activeTab === 'content'     && <ContentTab />}
+          {activeTab === 'intel'       && <ContentIntelTab />}
+          {activeTab === 'users'       && <UsersTab />}
+          {activeTab === 'slideos'     && <SlideoTab />}
+          {activeTab === 'audit'       && <AuditTab />}
         </motion.div>
       </AnimatePresence>
     </div>
@@ -1658,5 +1661,296 @@ function RoleModal({ user, onConfirm, onClose }: { user: any; onConfirm: (role: 
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+// ── PREVIEW OPS TAB ───────────────────────────────────────────────────────────
+
+function ActionButton({ icon: Icon, label, onClick, isLoading, className = '', disabled = false }: {
+  icon: any; label: string; onClick: () => void; isLoading?: boolean; className?: string; disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={isLoading || disabled}
+      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-xs font-bold transition-all disabled:opacity-50 hover:opacity-90 ${className}`}
+    >
+      {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Icon className="w-3.5 h-3.5" />}
+      {label}
+    </button>
+  );
+}
+
+const PREVIEW_STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
+  none:       { label: 'Bekliyor',    cls: 'bg-slate-500/10 text-slate-500' },
+  processing: { label: 'İşleniyor',  cls: 'bg-blue-500/10 text-blue-600' },
+  ready:      { label: 'Hazır',      cls: 'bg-emerald-500/10 text-emerald-600' },
+  failed:     { label: 'Başarısız',  cls: 'bg-red-500/10 text-red-600' },
+};
+
+function PreviewOpsTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/admin/preview-ops');
+      setData(res.data);
+    } catch {
+      toast.error('Preview ops verisi yüklenemedi');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const doAction = async (action: string, extra?: Record<string, unknown>) => {
+    setActionLoading(action);
+    try {
+      const res = await api.post('/admin/preview-ops/retry', { action, ...extra });
+      toast.success(`${res.data.queued} slide kuyruğa alındı`);
+      await load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'İşlem başarısız');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        {[...Array(3)].map((_, i) => <div key={i} className="skeleton h-32 rounded-2xl" />)}
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl text-center">
+        <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-2" />
+        <p className="text-sm text-red-600 font-semibold">Veri yüklenemedi</p>
+      </div>
+    );
+  }
+
+  const dist = data.distribution || {};
+  const totalSlides = Object.values(dist).reduce((s: number, v: any) => s + v, 0);
+  const readyCount = dist.ready || 0;
+  const readyPct = totalSlides > 0 ? Math.round((readyCount / totalSlides) * 100) : 0;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-extrabold">Preview Operasyonları</h2>
+          <p className="text-sm text-muted-foreground">WebP preview üretim durumu ve toplu yönetim</p>
+        </div>
+        <ActionButton label="Yenile" icon={RefreshCw} onClick={load} isLoading={loading} />
+      </div>
+
+      {/* Status Distribution */}
+      <Section title="Preview Durum Dağılımı">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          {Object.entries(PREVIEW_STATUS_CONFIG).map(([status, conf]) => (
+            <div key={status} className="p-4 bg-card border border-border rounded-xl">
+              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${conf.cls}`}>{conf.label}</span>
+              <p className="text-2xl font-black mt-2">{(dist[status] || 0).toLocaleString()}</p>
+            </div>
+          ))}
+        </div>
+        {/* Progress bar */}
+        <div className="p-4 bg-muted/40 rounded-xl">
+          <div className="flex justify-between text-xs font-semibold mb-2">
+            <span>Preview Coverage</span>
+            <span className="text-emerald-600">{readyPct}% hazır ({readyCount.toLocaleString()} / {totalSlides.toLocaleString()})</span>
+          </div>
+          <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden">
+            <div className="h-full bg-emerald-500 rounded-full transition-all duration-700" style={{ width: `${readyPct}%` }} />
+          </div>
+        </div>
+      </Section>
+
+      {/* Asset Stats */}
+      <Section title="Preview Asset İstatistikleri">
+        <div className="grid grid-cols-3 gap-3">
+          <div className="p-4 bg-card border border-border rounded-xl text-center">
+            <ImageIcon className="w-5 h-5 mx-auto text-primary mb-1" />
+            <p className="text-xl font-black">{(data.assets?.total || 0).toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground">Toplam Asset</p>
+          </div>
+          <div className="p-4 bg-card border border-border rounded-xl text-center">
+            <HardDrive className="w-5 h-5 mx-auto text-blue-500 mb-1" />
+            <p className="text-xl font-black">{data.assets?.totalSizeMB || 0} MB</p>
+            <p className="text-xs text-muted-foreground">Toplam Boyut</p>
+          </div>
+          <div className="p-4 bg-card border border-border rounded-xl text-center">
+            <BarChart3 className="w-5 h-5 mx-auto text-violet-500 mb-1" />
+            <p className="text-xl font-black">{data.assets?.avgSizeKB || 0} KB</p>
+            <p className="text-xs text-muted-foreground">Ort. Asset Boyutu</p>
+          </div>
+        </div>
+      </Section>
+
+      {/* Actions */}
+      <Section title="Toplu İşlemler">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="p-4 bg-card border border-border rounded-xl">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                <Layers className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-sm">Top-100 Backfill</p>
+                <p className="text-xs text-muted-foreground mb-3">En çok görüntülenen 100 eksik slide'ı kuyruğa al</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  <span className="font-semibold text-amber-600">{(data.missingCount || 0).toLocaleString()}</span> slide preview bekliyor
+                </p>
+                <ActionButton
+                  label="Top-100 Kuyruğa Al"
+                  icon={Zap}
+                  onClick={() => doAction('backfill_top', { limit: 100 })}
+                  isLoading={actionLoading === 'backfill_top'}
+                  className="bg-emerald-500 text-white hover:bg-emerald-600"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-card border border-border rounded-xl">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                <RotateCcw className="w-4 h-4 text-orange-600" />
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-sm">Failed → Retry</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Başarısız <span className="font-semibold text-red-600">{(dist.failed || 0).toLocaleString()}</span> slide'ı yeniden kuyruğa al
+                </p>
+                <ActionButton
+                  label="Failed Sıfırla & Retry"
+                  icon={RefreshCw}
+                  onClick={() => doAction('retry_failed')}
+                  isLoading={actionLoading === 'retry_failed'}
+                  className="bg-orange-500 text-white hover:bg-orange-600"
+                  disabled={!dist.failed}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-card border border-border rounded-xl">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                <Clock className="w-4 h-4 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-sm">Takılı İşlemleri Sıfırla</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  30+ dakikadır processing'de bekleyen <span className="font-semibold text-blue-600">{(data.stuckSlides?.length || 0)}</span> slide
+                </p>
+                <ActionButton
+                  label="Stuck → Retry"
+                  icon={AlertCircle}
+                  onClick={() => doAction('retry_stuck')}
+                  isLoading={actionLoading === 'retry_stuck'}
+                  className="bg-blue-500 text-white hover:bg-blue-600"
+                  disabled={!data.stuckSlides?.length}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-card border border-border rounded-xl">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                <Zap className="w-4 h-4 text-violet-600" />
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-sm">Tümünü Backfill</p>
+                <p className="text-xs text-muted-foreground mb-3">500 adede kadar eksik preview'ı kuyruğa al</p>
+                <ActionButton
+                  label="500 Slide Kuyruğa Al"
+                  icon={Layers}
+                  onClick={() => doAction('backfill_top', { limit: 500 })}
+                  isLoading={actionLoading === 'backfill_top'}
+                  className="bg-violet-500 text-white hover:bg-violet-600"
+                  disabled={!data.missingCount}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      {/* Stuck Slides */}
+      {data.stuckSlides && data.stuckSlides.length > 0 && (
+        <Section title={`Takılı Slide'lar (${data.stuckSlides.length})`}>
+          <div className="space-y-2">
+            {data.stuckSlides.map((s: any) => (
+              <div key={s.id} className="flex items-center gap-3 p-3 bg-blue-500/5 border border-blue-500/15 rounded-xl">
+                <Clock className="w-4 h-4 text-blue-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">{s.title || `Slide #${s.id}`}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Güncelleme: {formatDate(s.updatedAt)} · {s.viewsCount.toLocaleString()} görüntülenme
+                  </p>
+                </div>
+                <ActionButton
+                  label="Retry"
+                  icon={RotateCcw}
+                  onClick={() => doAction('retry_single', { slideId: s.id })}
+                  isLoading={actionLoading === 'retry_single'}
+                  className="text-xs"
+                />
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Failed Slides */}
+      {data.failedSlides && data.failedSlides.length > 0 && (
+        <Section title={`Başarısız Slide'lar (${data.failedSlides.length}${data.failedSlides.length === 20 ? '+' : ''})`}>
+          <div className="space-y-2">
+            {data.failedSlides.map((s: any) => (
+              <div key={s.id} className="flex items-center gap-3 p-3 bg-red-500/5 border border-red-500/15 rounded-xl">
+                <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">{s.title || `Slide #${s.id}`}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {s.viewsCount.toLocaleString()} görüntülenme · {formatDate(s.updatedAt)}
+                  </p>
+                </div>
+                <ActionButton
+                  label="Retry"
+                  icon={RotateCcw}
+                  onClick={() => doAction('retry_single', { slideId: s.id })}
+                  isLoading={actionLoading === 'retry_single'}
+                  className="text-xs"
+                />
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Ops Guide */}
+      <Section title="CLI Komutları">
+        <div className="bg-muted/50 rounded-xl p-4 font-mono text-xs space-y-1 text-muted-foreground">
+          <p className="text-foreground font-bold mb-2"># Preview yönetim komutları:</p>
+          <p>npm run preview:backfill:top    <span className="text-slate-400"># top-100 kuyruğa al</span></p>
+          <p>npm run preview:backfill        <span className="text-slate-400"># tüm eksikleri kuyruğa al (500 limit)</span></p>
+          <p>npm run preview:backfill:dry    <span className="text-slate-400"># dry-run — sadece listele</span></p>
+          <p>npm run preview:report          <span className="text-slate-400"># DB raporu</span></p>
+          <p>npm run pm2:health             <span className="text-slate-400"># PM2 süreç sağlık kontrolü</span></p>
+          <p>npm run backup:check           <span className="text-slate-400"># orphan + backup durumu</span></p>
+        </div>
+      </Section>
+    </div>
   );
 }

@@ -20,7 +20,7 @@ const toInt = (v, fallback = 0) => {
 
 const safeJson = (value, fallback) => {
   try {
-    return JSON.stringify(value ? fallback);
+    return JSON.stringify(value ?? fallback);
   } catch {
     return JSON.stringify(fallback);
   }
@@ -74,7 +74,7 @@ const ingestBatch = async (req, res) => {
         sessionId: String(item?.sessionId || '').trim().slice(0, 128),
         sequence: Math.max(0, toInt(item?.sequence, 0)),
         eventType: String(item?.eventType || '').trim().toLowerCase(),
-        payload: item?.payload ? {},
+        payload: item?.payload ?? {},
       }))
       .filter((item) => item.eventId && item.sessionId && EVENT_TYPES.has(item.eventType))
       .slice(0, 500);

@@ -10,6 +10,7 @@ const {
   getSlideoStats, hideSlideo, restoreSlideo, deleteSlideo,
   getAuditLogs,
   getConversionJobs, retryConversionJob, retryFailedConversions, reclassifyInvalidConversions, getConversionHealth,
+  getPreviewOps, retryPreview,
 } = require('../controllers/admin.controller');
 
 const router = Router();
@@ -54,5 +55,9 @@ router.post('/conversion-jobs/reclassify-invalid', reclassifyInvalidConversions)
 
 // Audit Logs
 router.get('/audit', getAuditLogs);
+
+// Preview Ops
+router.get('/preview-ops', getPreviewOps);
+router.post('/preview-ops/retry', retryPreview);
 
 module.exports = router;

@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { invalidateHotFeedCache } = require('../services/slideo-feed-cache.service');
 const { hasAdminAccess } = require('../lib/rbac');
-const { enqueueSlideConversion, getConversionQueueState } = require('../services/conversion.service');
+const { enqueueSlideConversion, getConversionQueueState, dispatchPreviewGeneration } = require('../services/conversion.service');
 const {
   retryRecoverableFailedConversions,
   reclassifyInvalidFailedConversions,
@@ -376,7 +376,7 @@ const addReportNote = async (req, res) => {
   const note = String(req.body.note || '').slice(0, 2000).trim() || null;
   try {
     const report = await prisma.report.update({ where: { id: Number(id) }, data: { note } });
-    await auditLog(req.user.id, 'add_report_note', 'report', id, { noteLength: note?.length ? 0 }, req.ip);
+    await auditLog(req.user.id, 'add_report_note', 'report', id, { noteLength: note?.length || 0 }, req.ip);
     res.json(report);
   } catch (err) {
     logger.error('Admin: Failed to update report note', { error: err.message, stack: err.stack });
@@ -852,6 +852,175 @@ const getConversionHealth = async (req, res) => {
   }
 };
 
+// ── Preview Ops ───────────────────────────────────────────────────────────────
+const getPreviewOps = async (req, res) => {
+  if (!guard(req, res)) return;
+  try {
+    const stuckThreshold = new Date(Date.now() - 30 * 60 * 1000);
+
+    const [statusCounts, assetStats, stuckSlides, failedSlides, missingSlides] = await Promise.all([
+      // Status distribution
+      prisma.slide.groupBy({
+        by: ['previewStatus'],
+        where: { conversionStatus: 'done', deletedAt: null },
+        _count: { _all: true },
+      }),
+      // Asset stats
+      prisma.slidePreviewAsset.aggregate({
+        _count: { _all: true },
+        _sum: { fileSizeBytes: true },
+        _avg: { fileSizeBytes: true },
+      }),
+      // Stuck processing (30+ min)
+      prisma.slide.findMany({
+        where: {
+          previewStatus: 'processing',
+          updatedAt: { lt: stuckThreshold },
+          deletedAt: null,
+        },
+        select: { id: true, title: true, updatedAt: true, viewsCount: true },
+        orderBy: { updatedAt: 'asc' },
+        take: 20,
+      }),
+      // Failed slides
+      prisma.slide.findMany({
+        where: { previewStatus: 'failed', deletedAt: null },
+        select: { id: true, title: true, viewsCount: true, updatedAt: true },
+        orderBy: { viewsCount: 'desc' },
+        take: 20,
+      }),
+      // Missing (done but no preview)
+      prisma.slide.count({
+        where: {
+          conversionStatus: 'done',
+          previewStatus: { in: ['none', 'failed'] },
+          deletedAt: null,
+        },
+      }),
+    ]);
+
+    const distribution = {};
+    for (const row of statusCounts) {
+      distribution[row.previewStatus] = row._count._all;
+    }
+
+    res.json({
+      distribution,
+      assets: {
+        total: assetStats._count._all || 0,
+        totalSizeMB: Math.round((assetStats._sum?.fileSizeBytes || 0) / 1024 / 1024),
+        avgSizeKB: Math.round((assetStats._avg?.fileSizeBytes || 0) / 1024),
+      },
+      stuckSlides,
+      failedSlides,
+      missingCount: missingSlides,
+      checkedAt: new Date(),
+    });
+  } catch (err) {
+    logger.error('Admin: Failed to fetch preview ops', { error: err.message });
+    res.status(500).json({ error: 'Failed to fetch preview ops' });
+  }
+};
+
+const retryPreview = async (req, res) => {
+  if (!guard(req, res)) return;
+  const { action, slideId, limit: limitParam } = req.body;
+  const VALID_ACTIONS = ['retry_failed', 'retry_stuck', 'retry_single', 'backfill_top'];
+  if (!VALID_ACTIONS.includes(action)) {
+    return res.status(400).json({ error: 'Invalid action' });
+  }
+
+  try {
+    const stuckThreshold = new Date(Date.now() - 30 * 60 * 1000);
+    const limit = Math.min(500, Math.max(1, Number(limitParam || 100)));
+
+    if (action === 'retry_single') {
+      if (!slideId) return res.status(400).json({ error: 'slideId required' });
+      const slide = await prisma.slide.findUnique({
+        where: { id: Number(slideId) },
+        select: { id: true, pdfUrl: true, conversionStatus: true },
+      });
+      if (!slide) return res.status(404).json({ error: 'Slide not found' });
+      if (slide.conversionStatus !== 'done') return res.status(400).json({ error: 'Slide not converted yet' });
+
+      await prisma.slide.update({
+        where: { id: slide.id },
+        data: { previewStatus: 'none' },
+      });
+      if (slide.pdfUrl) {
+        void dispatchPreviewGeneration(slide.id, slide.pdfUrl);
+      }
+      await auditLog(req.user.id, 'preview_retry_single', 'slide', slideId, { action }, req.ip);
+      return res.json({ success: true, queued: 1 });
+    }
+
+    if (action === 'retry_failed') {
+      const failed = await prisma.slide.findMany({
+        where: { previewStatus: 'failed', conversionStatus: 'done', deletedAt: null },
+        select: { id: true, pdfUrl: true },
+        orderBy: { viewsCount: 'desc' },
+        take: limit,
+      });
+      await prisma.slide.updateMany({
+        where: { id: { in: failed.map(s => s.id) } },
+        data: { previewStatus: 'none' },
+      });
+      for (const s of failed) {
+        if (s.pdfUrl) void dispatchPreviewGeneration(s.id, s.pdfUrl);
+      }
+      await auditLog(req.user.id, 'preview_retry_failed', 'slide', null, { count: failed.length }, req.ip);
+      return res.json({ success: true, queued: failed.length });
+    }
+
+    if (action === 'retry_stuck') {
+      const stuck = await prisma.slide.findMany({
+        where: {
+          previewStatus: 'processing',
+          updatedAt: { lt: stuckThreshold },
+          deletedAt: null,
+        },
+        select: { id: true, pdfUrl: true },
+        take: limit,
+      });
+      await prisma.slide.updateMany({
+        where: { id: { in: stuck.map(s => s.id) } },
+        data: { previewStatus: 'none' },
+      });
+      for (const s of stuck) {
+        if (s.pdfUrl) void dispatchPreviewGeneration(s.id, s.pdfUrl);
+      }
+      await auditLog(req.user.id, 'preview_retry_stuck', 'slide', null, { count: stuck.length }, req.ip);
+      return res.json({ success: true, queued: stuck.length });
+    }
+
+    if (action === 'backfill_top') {
+      const missing = await prisma.slide.findMany({
+        where: {
+          conversionStatus: 'done',
+          previewStatus: { in: ['none', 'failed'] },
+          pdfUrl: { not: null },
+          deletedAt: null,
+        },
+        select: { id: true, pdfUrl: true },
+        orderBy: { viewsCount: 'desc' },
+        take: limit,
+      });
+      await prisma.slide.updateMany({
+        where: { id: { in: missing.map(s => s.id) } },
+        data: { previewStatus: 'none' },
+      });
+      for (const s of missing) {
+        if (s.pdfUrl) void dispatchPreviewGeneration(s.id, s.pdfUrl);
+      }
+      await auditLog(req.user.id, 'preview_backfill_top', 'slide', null, { count: missing.length, limit }, req.ip);
+      return res.json({ success: true, queued: missing.length });
+    }
+  } catch (err) {
+    logger.error('Admin: Failed to retry preview', { error: err.message });
+    res.status(500).json({ error: 'Failed to retry preview' });
+  }
+};
+
 module.exports = {
   getStats,
   getContent, hideContent, restoreContent, deleteContent,
@@ -861,5 +1030,5 @@ module.exports = {
   getSlideoStats, hideSlideo, restoreSlideo, deleteSlideo,
   getAuditLogs,
   getConversionJobs, retryConversionJob, retryFailedConversions, reclassifyInvalidConversions, getConversionHealth,
+  getPreviewOps, retryPreview,
 };
-

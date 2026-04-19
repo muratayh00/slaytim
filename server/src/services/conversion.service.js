@@ -913,4 +913,5 @@ module.exports = {
   hasLibreOffice,
   hasPowerPoint,
   getLibreOfficeBinary,
+  dispatchPreviewGeneration,
 };

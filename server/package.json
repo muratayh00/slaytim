@@ -38,7 +38,18 @@
     "staging:proof": "node scripts/staging-proof.mjs"
     ,
     "conversion:recover-failed": "node scripts/recover-failed-conversions.js",
-    "conversion:reclassify-invalid": "node scripts/reclassify-invalid-conversions.js"
+    "conversion:reclassify-invalid": "node scripts/reclassify-invalid-conversions.js",
+    "preview:backfill": "node scripts/backfill-preview-assets.js",
+    "preview:backfill:dry": "node scripts/backfill-preview-assets.js --dry-run",
+    "preview:backfill:top": "BACKFILL_LIMIT=100 node scripts/backfill-preview-assets.js",
+    "preview:report": "bash scripts/preview-backfill-report.sh",
+    "preview:monitor": "node scripts/monitor-preview-worker.js",
+    "pm2:health": "bash scripts/pm2-health-check.sh",
+    "backup:check": "bash scripts/backup-check.sh",
+    "smoke:prod": "node scripts/smoke-test-prod.mjs",
+    "seo:check": "node scripts/seo-check.mjs",
+    "ops:weekly": "bash scripts/weekly-ops.sh",
+    "security:check": "bash scripts/security-check.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.883.0",

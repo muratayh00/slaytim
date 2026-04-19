@@ -187,7 +187,10 @@ app.use('/uploads', (req, res, next) => {
   res.removeHeader('X-Frame-Options');
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   const reqPath = String(req.path || '').toLowerCase();
-  if (reqPath.startsWith('/thumbnails/')) {
+  if (reqPath.startsWith('/previews/')) {
+    // WebP preview images are content-addressed (slideId/pageN.webp) — safe to cache forever
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  } else if (reqPath.startsWith('/thumbnails/')) {
     res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
   } else if (reqPath.startsWith('/pdfs/')) {
     res.setHeader('Cache-Control', 'public, max-age=600, stale-while-revalidate=3600');

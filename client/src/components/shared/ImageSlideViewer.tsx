@@ -21,6 +21,7 @@ import {
   ChevronLeft, ChevronRight, Grid3x3, Maximize2, Minimize2, X, Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { analytics } from '@/lib/analytics';
 
 export interface SlidePreviewPage {
   pageNumber: number;
@@ -39,6 +40,10 @@ interface ImageSlideViewerProps {
   coverUrl?: string;
   onPageChange?: (page: number) => void;
   className?: string;
+  /** Slide ID used for TTFV analytics */
+  slideId?: number;
+  /** Navigation start timestamp (performance.now() or Date.now()) for TTFV measurement */
+  navStartMs?: number;
 }
 
 // ── Skeleton ─────────────────────────────────────────────────────────────────
@@ -110,12 +115,23 @@ export default function ImageSlideViewer({
   title,
   onPageChange,
   className,
+  slideId,
+  navStartMs,
 }: ImageSlideViewerProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [showGrid, setShowGrid] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number | null>(null);
+  const firstVisualFired = useRef(false);
+
+  // TTFV: fire once when first page image is loaded
+  const handleFirstPageLoad = useCallback(() => {
+    if (firstVisualFired.current || !slideId) return;
+    firstVisualFired.current = true;
+    const ttMs = navStartMs ? Date.now() - navStartMs : 0;
+    analytics.previewFirstVisual({ slide_id: slideId, mode: 'images', tt_ms: ttMs });
+  }, [slideId, navStartMs]);
 
   const totalPages     = pages.length;
   // Total expected pages (may be larger than pages.length while still generating)
@@ -258,6 +274,7 @@ export default function ImageSlideViewer({
               key={currentPageData.pageNumber}
               page={currentPageData}
               eager={currentPageData.pageNumber === 1}
+              onLoad={currentPageData.pageNumber === 1 ? handleFirstPageLoad : undefined}
             />
           </div>
         ) : (
