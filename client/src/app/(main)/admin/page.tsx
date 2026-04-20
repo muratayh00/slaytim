@@ -9,7 +9,7 @@ import {
   FileText, Tag, Play, Heart, Bookmark, EyeOff, RotateCcw,
   TrendingUp, ClipboardList, Star, Info, Zap, Activity,
   UserCheck, ArrowUpRight, CheckCheck, XCircle, Layers, Image as ImageIcon,
-  HardDrive, Clock, AlertCircle,
+  HardDrive, Clock, AlertCircle, Pencil, ChevronDown, ChevronUp, StickyNote,
 } from 'lucide-react';
 import Link from 'next/link';
 import api from '@/lib/api';
@@ -417,6 +417,7 @@ function ConversionTab() {
   const [retryingId, setRetryingId] = useState<number | null>(null);
   const [retryingAll, setRetryingAll] = useState(false);
   const [reclassifying, setReclassifying] = useState(false);
+  const [retryLimit, setRetryLimit] = useState(50);
   const [status, setStatus] = useState('all');
   const [q, setQ] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -459,7 +460,7 @@ function ConversionTab() {
   const retryAllFailed = async () => {
     setRetryingAll(true);
     try {
-      const { data } = await api.post('/admin/conversion-jobs/retry-failed');
+      const { data } = await api.post('/admin/conversion-jobs/retry-failed', { limit: retryLimit });
       toast.success(`${Number(data?.requeued || 0)} failed iş yeniden kuyruğa alındı`);
       load();
     } catch {
@@ -557,16 +558,27 @@ function ConversionTab() {
           </button>
         </div>
 
-        <button
-          onClick={retryAllFailed}
-          disabled={retryingAll || summary.failed === 0}
-          className="px-4 py-2 rounded-xl border border-red-500/30 bg-red-500/5 text-red-600 text-xs font-bold disabled:opacity-50"
-        >
-          {retryingAll ? 'Çalışıyor...' : 'Failed Retry All'}
-        </button>
+        <div className="flex items-center gap-1">
+          <input
+            type="number"
+            min={1}
+            max={500}
+            value={retryLimit}
+            onChange={(e) => setRetryLimit(Math.max(1, Math.min(500, Number(e.target.value))))}
+            className="w-16 px-2 py-2 text-xs rounded-l-xl border border-red-500/30 bg-background focus:outline-none focus:ring-1 focus:ring-red-500/30 text-center"
+            title="Retry limiti"
+          />
+          <button
+            onClick={retryAllFailed}
+            disabled={retryingAll || summary.failed === 0}
+            className="px-4 py-2 rounded-r-xl border border-l-0 border-red-500/30 bg-red-500/5 text-red-600 text-xs font-bold disabled:opacity-50"
+          >
+            {retryingAll ? 'Çalışıyor...' : 'Failed Retry All'}
+          </button>
+        </div>
         <button
           onClick={reclassifyInvalid}
-          disabled={reclassifying || summary.failed === 0}
+          disabled={reclassifying || summary.unsupported === 0}
           className="px-4 py-2 rounded-xl border border-slate-500/30 bg-slate-500/5 text-slate-700 text-xs font-bold disabled:opacity-50"
         >
           {reclassifying ? 'Çalışıyor...' : 'Reclassify Invalid'}
@@ -630,6 +642,10 @@ function ReportsTab() {
   const [totalPages, setTotalPages] = useState(1);
   const [actioningId, setActioningId] = useState<number | null>(null);
   const [warnModal, setWarnModal] = useState<{ reportId: number; userId: number } | null>(null);
+  // Note editing
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+  const [noteText, setNoteText] = useState('');
+  const [noteSaving, setNoteSaving] = useState(false);
 
   const load = useCallback(async (s = statusFilter, p = page) => {
     setLoading(true);
@@ -667,6 +683,22 @@ function ReportsTab() {
       toast.success('Uyarı gönderildi');
     } catch { toast.error('Uyarı gönderilemedi'); }
     setWarnModal(null);
+  };
+
+  const startEditNote = (report: any) => {
+    setEditingNoteId(report.id);
+    setNoteText(report.note || '');
+  };
+
+  const saveNote = async (id: number) => {
+    setNoteSaving(true);
+    try {
+      await api.patch(`/admin/reports/${id}/note`, { note: noteText.trim() });
+      setReports((prev) => prev.map((r) => r.id === id ? { ...r, note: noteText.trim() } : r));
+      toast.success('Not kaydedildi');
+      setEditingNoteId(null);
+    } catch { toast.error('Not kaydedilemedi'); }
+    finally { setNoteSaving(false); }
   };
 
   return (
@@ -729,6 +761,55 @@ function ReportsTab() {
                         İçeriği Görüntüle →
                       </Link>
                     </div>
+
+                    {/* ── Moderator note ── */}
+                    {editingNoteId === report.id ? (
+                      <div className="mt-3">
+                        <textarea
+                          value={noteText}
+                          onChange={(e) => setNoteText(e.target.value)}
+                          rows={3}
+                          maxLength={2000}
+                          placeholder="Moderasyon notu gir..."
+                          className="w-full text-sm px-3 py-2 rounded-xl border border-primary/30 bg-primary/5 focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+                          autoFocus
+                        />
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <button
+                            onClick={() => saveNote(report.id)}
+                            disabled={noteSaving}
+                            className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold disabled:opacity-60 inline-flex items-center gap-1"
+                          >
+                            {noteSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                            Kaydet
+                          </button>
+                          <button onClick={() => setEditingNoteId(null)} className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold hover:bg-muted">
+                            İptal
+                          </button>
+                          <span className="text-[10px] text-muted-foreground ml-auto">{noteText.length}/2000</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-2 flex items-start gap-2">
+                        {report.note ? (
+                          <div className="flex-1 bg-amber-500/8 border border-amber-500/20 rounded-xl px-3 py-2">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <StickyNote className="w-3 h-3 text-amber-600" />
+                              <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wide">Moderasyon Notu</span>
+                            </div>
+                            <p className="text-xs text-foreground leading-relaxed">{report.note}</p>
+                          </div>
+                        ) : null}
+                        <button
+                          onClick={() => startEditNote(report)}
+                          className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors mt-0.5"
+                          title={report.note ? 'Notu düzenle' : 'Not ekle'}
+                        >
+                          <Pencil className="w-3 h-3" />
+                          {report.note ? 'Düzenle' : 'Not ekle'}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -1058,6 +1139,7 @@ function UsersTab() {
   const [actingId, setActingId] = useState<number | null>(null);
   const [warnTarget, setWarnTarget] = useState<number | null>(null);
   const [roleTarget, setRoleTarget] = useState<any | null>(null);
+  const [expandedWarnings, setExpandedWarnings] = useState<Set<number>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1163,7 +1245,31 @@ function UsersTab() {
                       {u.email} · {u._count.topics} konu · {u._count.slides} slayt · {u._count.reports || 0} rapor · {formatDate(u.createdAt)}
                     </p>
                     {u.warnings?.length > 0 && (
-                      <p className="text-xs text-amber-600 mt-0.5">⚠️ {u.warnings.length} uyarı: {u.warnings[0].reason}</p>
+                      <div className="mt-0.5">
+                        <button
+                          onClick={() => setExpandedWarnings((prev) => {
+                            const next = new Set(prev);
+                            next.has(u.id) ? next.delete(u.id) : next.add(u.id);
+                            return next;
+                          })}
+                          className="flex items-center gap-1 text-xs text-amber-600 font-semibold hover:text-amber-700"
+                        >
+                          ⚠️ {u.warnings.length} uyarı
+                          {expandedWarnings.has(u.id)
+                            ? <ChevronUp className="w-3 h-3" />
+                            : <ChevronDown className="w-3 h-3" />}
+                        </button>
+                        {expandedWarnings.has(u.id) && (
+                          <div className="mt-1 space-y-1 pl-2 border-l-2 border-amber-300">
+                            {u.warnings.map((w: any, i: number) => (
+                              <div key={i} className="flex items-start gap-2">
+                                <span className="text-[10px] text-muted-foreground whitespace-nowrap">{formatDate(w.createdAt)}</span>
+                                <span className="text-xs text-amber-700">{w.reason}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1371,6 +1477,12 @@ function SlideoTab() {
                 )}
                 {item.riskSignals?.highReportRatio && (
                   <span className="px-2 py-1 rounded-full bg-orange-500/10 text-orange-600 font-bold">Yüksek Rapor Oranı</span>
+                )}
+                {item.riskSignals?.hasPendingReports && (
+                  <span className="px-2 py-1 rounded-full bg-red-500/10 text-red-600 font-bold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
+                    {item.pendingReports ?? 0} Bekleyen Rapor
+                  </span>
                 )}
                 <button
                   onClick={() => toggleHidden(item.id, !!item.isHidden)}

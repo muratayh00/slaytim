@@ -68,13 +68,13 @@ const {
 } = require('../queues/preview.queue');
 const {
   generatePageAsset,
+  generatePageAssetsRange,
   getPdfPageCount,
   resolveLocalPdf,
 } = require('../services/preview-generator.service');
 const prisma  = require('../lib/prisma');
 const logger  = require('../lib/logger');
 
-const PREVIEW_PAGE_CONCURRENCY = Math.max(1, Number(process.env.PREVIEW_PAGE_CONCURRENCY || 2));
 const WORKER_CONCURRENCY       = Math.max(1, Number(process.env.PREVIEW_WORKER_CONCURRENCY || 2));
 const LOCK_DURATION_MS         = Math.max(30000, Number(process.env.PREVIEW_LOCK_DURATION_MS || 180000));
 const MAX_PAGES                = Math.max(1, Number(process.env.PREVIEW_MAX_PAGES || 60));
@@ -158,23 +158,17 @@ async function handleRemainingPages(job) {
   try {
     ({ localPath: localPdfPath, isTempFile } = await resolveLocalPdf(pdfUrl));
 
-    // Pages 2..total (page 1 is already done by the first-page job)
-    const pageNumbers = Array.from({ length: Math.max(0, total - 1) }, (_, i) => i + 2);
-
-    for (let i = 0; i < pageNumbers.length; i += PREVIEW_PAGE_CONCURRENCY) {
-      const batch = pageNumbers.slice(i, i + PREVIEW_PAGE_CONCURRENCY);
-      await Promise.all(
-        batch.map(async (pageNumber) => {
-          try {
-            await generatePageAsset(id, localPdfPath, pageNumber);
-          } catch (err) {
-            // Partial failure is acceptable — log and continue with other pages
-            logger.error('[preview-worker] Page generation failed (non-fatal)', {
-              slideId: id, pageNumber, error: err?.message,
-            });
-          }
-        })
-      );
+    // ── BATCH: one pdftoppm call for ALL remaining pages ──────────────────────
+    // This is the key optimization vs the old per-page loop:
+    //   Old: (total-1) separate pdftoppm spawns, each re-reading the PDF
+    //   New: 1 pdftoppm spawn reads PDF once, renders all pages; then parallel
+    //        sharp encode + storage upload + DB upsert for every page at once.
+    //
+    // For a 30-page PDF (pages 2..30):
+    //   Old: 29 × ~2s per spawn = ~58 seconds
+    //   New: ~5s pdftoppm + ~2s parallel sharp/upload = ~7 seconds
+    if (total > 1) {
+      await generatePageAssetsRange(id, localPdfPath, 2, total);
     }
 
     const assetCount = await prisma.slidePreviewAsset.count({ where: { slideId: id } });

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Search, Plus, LogOut, Menu, X, Moon, Sun, Layers, Compass,
-  User, Presentation, Folder, ChevronDown, Play, Users, Shield,
+  User, Presentation, Folder, ChevronDown, Play, Users, Shield, Settings,
 } from 'lucide-react';
 import NotificationBell from '@/components/shared/NotificationBell';
 import { useState, useEffect, useRef } from 'react';
@@ -192,6 +192,10 @@ export default function Navbar() {
                           <Users className="w-4 h-4 text-muted-foreground" />
                           Odalar
                         </Link>
+                        <Link href="/settings" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-muted transition-colors">
+                          <Settings className="w-4 h-4 text-muted-foreground" />
+                          Ayarlar
+                        </Link>
                         {(user as any).isAdmin && (
                           <Link href="/admin" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-muted transition-colors">
                             <Shield className="w-4 h-4 text-muted-foreground" />
@@ -268,6 +272,7 @@ export default function Navbar() {
               <Link href={buildTopicCreatePath()} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-white text-sm font-bold"><Plus className="w-4 h-4" />Konu Aç</Link>
               <Link href={buildProfilePath(user.username)} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors"><User className="w-4 h-4 text-muted-foreground" />Profilim</Link>
               <Link href="/collections" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors"><Folder className="w-4 h-4 text-muted-foreground" />Koleksiyonlarım</Link>
+              <Link href="/settings" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors"><Settings className="w-4 h-4 text-muted-foreground" />Ayarlar</Link>
               <Link href="/rooms" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors"><Users className="w-4 h-4 text-muted-foreground" />Odalar</Link>
               {(user as any).isAdmin && (
                 <Link href="/admin" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors"><Shield className="w-4 h-4 text-muted-foreground" />Admin Paneli</Link>

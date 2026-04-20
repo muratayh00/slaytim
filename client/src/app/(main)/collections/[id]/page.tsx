@@ -11,7 +11,7 @@ import { formatDate } from '@/lib/utils';
 import SlideCard from '@/components/shared/SlideCard';
 import { resolveFileUrl } from '@/lib/pdfRenderer';
 import toast from 'react-hot-toast';
-import { buildProfilePath } from '@/lib/url';
+import { buildCollectionPath, buildProfilePath } from '@/lib/url';
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } };
 const fadeUp = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.3 } } };
@@ -142,7 +142,7 @@ export default function CollectionDetailPage() {
               )}
               {isOwner && (
                 <Link
-                  href={`/collections/${col.id}/edit`}
+                  href={`${buildCollectionPath(col)}/edit`}
                   className="px-3.5 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
                 >
                   Düzenle

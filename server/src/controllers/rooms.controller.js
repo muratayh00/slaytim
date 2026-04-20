@@ -7,6 +7,7 @@ const {
   registerRoomSseClient,
   unregisterRoomSseClient,
   pushRoomMessage,
+  getRoomPresence,
 } = require('../services/room-chat-stream.service');
 
 const roomSelect = {
@@ -19,6 +20,21 @@ const roomSelect = {
   updatedAt: true,
   owner: { select: { id: true, username: true, avatarUrl: true } },
   _count: { select: { members: true } },
+};
+
+/**
+ * Resolves a room by either numeric ID or slug string.
+ * Returns { id } (numeric) or null if not found.
+ */
+const resolveRoom = async (idOrSlug) => {
+  const trimmed = String(idOrSlug || '').trim();
+  if (!trimmed) return null;
+
+  const numericId = Number(trimmed);
+  if (Number.isInteger(numericId) && numericId > 0) {
+    return prisma.room.findUnique({ where: { id: numericId }, select: { id: true } });
+  }
+  return prisma.room.findUnique({ where: { slug: trimmed }, select: { id: true } });
 };
 
 const normalizeRoomPassword = (value) => {
@@ -73,7 +89,9 @@ const getMine = async (req, res) => {
 
 const getOne = async (req, res) => {
   try {
-    const id = Number(req.params.id);
+    const resolved = await resolveRoom(req.params.id);
+    if (!resolved) return res.status(404).json({ error: 'Room not found' });
+    const id = resolved.id;
     const room = await prisma.room.findUnique({
       where: { id },
       select: {
@@ -157,7 +175,9 @@ const create = async (req, res) => {
 
 const update = async (req, res) => {
   try {
-    const id = Number(req.params.id);
+    const resolved = await resolveRoom(req.params.id);
+    if (!resolved) return res.status(404).json({ error: 'Room not found' });
+    const id = resolved.id;
     const room = await prisma.room.findUnique({ where: { id } });
     if (!room) return res.status(404).json({ error: 'Room not found' });
     if (room.ownerId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
@@ -194,7 +214,9 @@ const update = async (req, res) => {
 
 const join = async (req, res) => {
   try {
-    const roomId = Number(req.params.id);
+    const resolved = await resolveRoom(req.params.id);
+    if (!resolved) return res.status(404).json({ error: 'Room not found' });
+    const roomId = resolved.id;
     const room = await prisma.room.findUnique({ where: { id: roomId } });
     if (!room) return res.status(404).json({ error: 'Room not found' });
     if (!room.isPublic) {
@@ -233,7 +255,7 @@ const accessByName = async (req, res) => {
           { slug: normalizedSlug },
         ],
       },
-      select: { id: true, accessPasswordHash: true },
+      select: { id: true, slug: true, accessPasswordHash: true },
     });
 
     if (!room || !room.accessPasswordHash) {
@@ -249,7 +271,7 @@ const accessByName = async (req, res) => {
       update: {},
     });
 
-    res.json({ joined: true, roomId: room.id });
+    res.json({ joined: true, roomId: room.id, slug: room.slug });
   } catch (err) {
     logger.error('Odaya giris basarisiz', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Odaya giris basarisiz' });
@@ -258,7 +280,9 @@ const accessByName = async (req, res) => {
 
 const leave = async (req, res) => {
   try {
-    const roomId = Number(req.params.id);
+    const resolved = await resolveRoom(req.params.id);
+    if (!resolved) return res.status(404).json({ error: 'Room not found' });
+    const roomId = resolved.id;
     const room = await prisma.room.findUnique({ where: { id: roomId } });
     if (!room) return res.status(404).json({ error: 'Room not found' });
     if (room.ownerId === req.user.id) {
@@ -295,10 +319,9 @@ const ensureRoomMember = async (roomId, userId) => {
 
 const getMessages = async (req, res) => {
   try {
-    const roomId = Number(req.params.id);
-    if (!Number.isInteger(roomId) || roomId <= 0) {
-      return res.status(400).json({ error: 'Invalid room id' });
-    }
+    const resolved = await resolveRoom(req.params.id);
+    if (!resolved) return res.status(404).json({ error: 'Room not found' });
+    const roomId = resolved.id;
     const { error } = await ensureRoomMember(roomId, req.user.id);
     if (error) return res.status(error.code).json({ error: error.message });
 
@@ -327,10 +350,9 @@ const getMessages = async (req, res) => {
 
 const createMessage = async (req, res) => {
   try {
-    const roomId = Number(req.params.id);
-    if (!Number.isInteger(roomId) || roomId <= 0) {
-      return res.status(400).json({ error: 'Invalid room id' });
-    }
+    const resolved = await resolveRoom(req.params.id);
+    if (!resolved) return res.status(404).json({ error: 'Room not found' });
+    const roomId = resolved.id;
     const { error } = await ensureRoomMember(roomId, req.user.id);
     if (error) return res.status(error.code).json({ error: error.message });
 
@@ -358,10 +380,9 @@ const createMessage = async (req, res) => {
 
 const streamMessages = async (req, res) => {
   try {
-    const roomId = Number(req.params.id);
-    if (!Number.isInteger(roomId) || roomId <= 0) {
-      return res.status(400).json({ error: 'Invalid room id' });
-    }
+    const resolved = await resolveRoom(req.params.id);
+    if (!resolved) return res.status(404).json({ error: 'Room not found' });
+    const roomId = resolved.id;
     const { error } = await ensureRoomMember(roomId, req.user.id);
     if (error) return res.status(error.code).json({ error: error.message });
 
@@ -370,9 +391,11 @@ const streamMessages = async (req, res) => {
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
-    res.write(`event: ready\ndata: ${JSON.stringify({ roomId, ok: true })}\n\n`);
 
-    registerRoomSseClient(roomId, res);
+    const { onlineCount, onlineUsers } = getRoomPresence(roomId);
+    res.write(`event: ready\ndata: ${JSON.stringify({ roomId, ok: true, onlineCount, onlineUsers })}\n\n`);
+
+    registerRoomSseClient(roomId, res, req.user.id, req.user.username);
     const heartbeat = setInterval(() => {
       if (res.writableEnded) return;
       res.write(`event: ping\ndata: ${Date.now()}\n\n`);
@@ -380,7 +403,7 @@ const streamMessages = async (req, res) => {
 
     req.on('close', () => {
       clearInterval(heartbeat);
-      unregisterRoomSseClient(roomId, res);
+      unregisterRoomSseClient(roomId, res, req.user.id);
     });
   } catch (err) {
     logger.error('Failed to open room stream', { error: err.message, stack: err.stack });

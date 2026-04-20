@@ -6,12 +6,14 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+import { buildCollectionPath } from '@/lib/url';
 
 export default function EditCollectionPage() {
   const { id } = useParams();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [colSlug, setColSlug] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', description: '', isPublic: true });
 
   useEffect(() => {
@@ -22,6 +24,8 @@ export default function EditCollectionPage() {
           description: data?.description || '',
           isPublic: Boolean(data?.isPublic),
         });
+        // Store slug for navigation (may be backfilled 'col-{id}' for old collections)
+        setColSlug(data?.slug || null);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -31,13 +35,15 @@ export default function EditCollectionPage() {
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      await api.patch(`/collections/${id}`, {
+      const { data } = await api.patch(`/collections/${id}`, {
         name: form.name.trim(),
         description: form.description.trim() || null,
         isPublic: form.isPublic,
       });
       toast.success('Koleksiyon güncellendi');
-      router.push(`/collections/${id}`);
+      // Navigate to slug-based URL (backend returns updated slug after name change)
+      const newSlug = data?.slug;
+      router.push(newSlug ? buildCollectionPath({ id: Number(id), slug: newSlug }) : `/collections/${id}`);
     } catch {
       toast.error('Güncelleme başarısız');
     } finally {
@@ -49,7 +55,7 @@ export default function EditCollectionPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
-      <Link href={`/collections/${id}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-5">
+      <Link href={colSlug ? buildCollectionPath({ id: Number(id), slug: colSlug }) : `/collections/${id}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-5">
         <ArrowLeft className="w-4 h-4" />
         Koleksiyona Don
       </Link>

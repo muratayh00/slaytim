@@ -326,4 +326,42 @@ const getMyRecentTopics = async (req, res) => {
   }
 };
 
-module.exports = { getProfile, getProfileDetails, updateProfile, getUserTopics, getUserSlideos, searchUsers, deleteAccount, getMyRecentTopics };
+// GET /api/users/me/notification-prefs
+const getNotificationPrefs = async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { notifyOnLike: true, notifyOnComment: true, notifyOnFollow: true },
+    });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json(user);
+  } catch (err) {
+    logger.error('Failed to fetch notification prefs', { error: err.message });
+    res.status(500).json({ error: 'Failed to fetch notification prefs' });
+  }
+};
+
+// PATCH /api/users/me/notification-prefs
+const updateNotificationPrefs = async (req, res) => {
+  try {
+    const allowed = ['notifyOnLike', 'notifyOnComment', 'notifyOnFollow'];
+    const data = {};
+    for (const key of allowed) {
+      if (typeof req.body[key] === 'boolean') data[key] = req.body[key];
+    }
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'No valid fields provided' });
+    }
+    const updated = await prisma.user.update({
+      where: { id: req.user.id },
+      data,
+      select: { notifyOnLike: true, notifyOnComment: true, notifyOnFollow: true },
+    });
+    res.json(updated);
+  } catch (err) {
+    logger.error('Failed to update notification prefs', { error: err.message });
+    res.status(500).json({ error: 'Failed to update notification prefs' });
+  }
+};
+
+module.exports = { getProfile, getProfileDetails, updateProfile, getUserTopics, getUserSlideos, searchUsers, deleteAccount, getMyRecentTopics, getNotificationPrefs, updateNotificationPrefs };

@@ -34,7 +34,7 @@ const PREVIEW_QUEUE_NAME = String(process.env.PREVIEW_QUEUE_NAME || 'preview-gen
 // Per-job retry budgets
 const FIRST_PAGE_ATTEMPTS = Math.max(1, Number(process.env.PREVIEW_FIRST_PAGE_ATTEMPTS || 3));
 const REMAINING_ATTEMPTS  = Math.max(1, Number(process.env.PREVIEW_REMAINING_ATTEMPTS  || 2));
-const PREVIEW_BACKOFF_MS  = Math.max(1000, Number(process.env.PREVIEW_BACKOFF_MS || 3000));
+const PREVIEW_BACKOFF_MS  = Math.max(500, Number(process.env.PREVIEW_BACKOFF_MS || 1000));
 
 // ── Lazy Redis connection ────────────────────────────────────────────────────
 let _connection = null;

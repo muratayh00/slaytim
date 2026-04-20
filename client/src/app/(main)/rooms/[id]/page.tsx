@@ -7,7 +7,7 @@ import { ArrowLeft, Users, Crown, Lock, Globe, Share2, Plus, Send, Loader2, Mess
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import toast from 'react-hot-toast';
-import { buildTopicCreatePath, buildTopicPath } from '@/lib/url';
+import { buildRoomPath, buildTopicCreatePath, buildTopicPath } from '@/lib/url';
 import { getApiOrigin } from '@/lib/api-origin';
 
 type RoomMessage = {
@@ -32,7 +32,9 @@ const formatMessageTime = (value: string | null | undefined) => {
 
 export default function RoomDetailPage() {
   const { id } = useParams();
-  const roomId = Number(id);
+  // URL segment can be a slug (e.g. "benim-odam") or a legacy numeric ID.
+  // Backend resolves both. We keep it as a string for API calls.
+  const roomSlug = String(id || '').trim();
   const { user } = useAuthStore();
 
   const [room, setRoom] = useState<any>(null);
@@ -43,14 +45,21 @@ export default function RoomDetailPage() {
 
   const [messages, setMessages] = useState<RoomMessage[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [olderLoading, setOlderLoading] = useState(false);
+  const [nextBeforeId, setNextBeforeId] = useState<number | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   const [messageText, setMessageText] = useState('');
   const [messageBusy, setMessageBusy] = useState(false);
   const [streamMode, setStreamMode] = useState<'off' | 'sse' | 'poll'>('off');
+  const [onlineCount, setOnlineCount] = useState(0);
 
   const listEndRef = useRef<HTMLDivElement | null>(null);
   const streamRef = useRef<EventSource | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptRef = useRef(0);
+
+  // Numeric ID from loaded room data (used for topic creation path)
+  const numericRoomId: number | null = room?.id ? Number(room.id) : null;
 
   const isMember = useMemo(() => {
     if (!user || !room?.members) return Boolean(room?.viewerIsMember);
@@ -73,19 +82,42 @@ export default function RoomDetailPage() {
   }, []);
 
   const loadMessages = useCallback(async () => {
-    if (!Number.isInteger(roomId) || roomId <= 0 || !user || !isMember) return;
+    if (!roomSlug || !user || !isMember) return;
     setMessagesLoading(true);
     try {
-      const { data } = await api.get(`/rooms/${roomId}/messages?limit=60`);
+      const { data } = await api.get(`/rooms/${roomSlug}/messages?limit=60`);
       const rows = Array.isArray(data?.messages) ? data.messages : [];
       setMessages(rows);
+      setNextBeforeId(data?.nextBeforeId ?? null);
+      setHasMore(Boolean(data?.hasMore));
       if (rows.length > 0) scrollToBottom();
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Mesajlar yüklenemedi');
     } finally {
       setMessagesLoading(false);
     }
-  }, [roomId, user, isMember, scrollToBottom]);
+  }, [roomSlug, user, isMember, scrollToBottom]);
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!roomSlug || !nextBeforeId || olderLoading) return;
+    setOlderLoading(true);
+    try {
+      const { data } = await api.get(`/rooms/${roomSlug}/messages?limit=40&beforeId=${nextBeforeId}`);
+      const rows = Array.isArray(data?.messages) ? data.messages : [];
+      setMessages((prev) => {
+        const map = new Map<number, RoomMessage>();
+        for (const m of rows) map.set(m.id, m);
+        for (const m of prev) map.set(m.id, m);
+        return [...map.values()].sort((a, b) => a.id - b.id);
+      });
+      setNextBeforeId(data?.nextBeforeId ?? null);
+      setHasMore(Boolean(data?.hasMore));
+    } catch {
+      toast.error('Eski mesajlar yüklenemedi');
+    } finally {
+      setOlderLoading(false);
+    }
+  }, [roomSlug, nextBeforeId, olderLoading]);
 
   const closeRealtime = useCallback(() => {
     if (streamRef.current) {
@@ -100,20 +132,31 @@ export default function RoomDetailPage() {
   }, []);
 
   const connectRealtime = useCallback(() => {
-    if (!user || !isMember || !Number.isInteger(roomId) || roomId <= 0) return;
+    if (!user || !isMember || !roomSlug) return;
 
     if (streamRef.current) {
       try { streamRef.current.close(); } catch {}
       streamRef.current = null;
     }
 
-    const url = `${API_ORIGIN}/api/rooms/${roomId}/messages/stream`;
+    const url = `${API_ORIGIN}/api/rooms/${roomSlug}/messages/stream`;
     const stream = new EventSource(url, { withCredentials: true });
     streamRef.current = stream;
 
-    stream.addEventListener('ready', () => {
+    stream.addEventListener('ready', (ev: MessageEvent) => {
       reconnectAttemptRef.current = 0;
       setStreamMode('sse');
+      try {
+        const payload = JSON.parse(ev.data || '{}');
+        if (typeof payload?.onlineCount === 'number') setOnlineCount(payload.onlineCount);
+      } catch {}
+    });
+
+    stream.addEventListener('presence', (ev: MessageEvent) => {
+      try {
+        const payload = JSON.parse(ev.data || '{}');
+        if (typeof payload?.onlineCount === 'number') setOnlineCount(payload.onlineCount);
+      } catch {}
     });
 
     stream.addEventListener('room_message', (ev: MessageEvent) => {
@@ -140,17 +183,18 @@ export default function RoomDetailPage() {
         connectRealtime();
       }, waitMs);
     };
-  }, [isMember, mergeMessages, roomId, scrollToBottom, user]);
+  }, [isMember, mergeMessages, roomSlug, scrollToBottom, user]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/rooms/${roomId}`);
+      const { data } = await api.get(`/rooms/${roomSlug}`);
       setRoom(data);
 
+      const resolvedId = data?.id;
       if (data?.isPublic || data?.viewerIsMember || (Array.isArray(data?.members) && data.members.length > 0)) {
         try {
-          const topicsRes = await api.get(`/topics?roomId=${roomId}&sort=latest&page=1&limit=30`);
+          const topicsRes = await api.get(`/topics?roomId=${resolvedId}&sort=latest&page=1&limit=30`);
           setTopics(Array.isArray(topicsRes?.data?.topics) ? topicsRes.data.topics : []);
         } catch {
           setTopics([]);
@@ -164,16 +208,16 @@ export default function RoomDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [roomId]);
+  }, [roomSlug]);
 
   useEffect(() => {
-    if (!Number.isInteger(roomId) || roomId <= 0) {
+    if (!roomSlug) {
       setLoading(false);
       setRoom(null);
       return;
     }
     load();
-  }, [load, roomId, user]);
+  }, [load, roomSlug, user]);
 
   useEffect(() => {
     if (!isMember) {
@@ -195,9 +239,9 @@ export default function RoomDetailPage() {
     try {
       if (!room?.isPublic) {
         if (!password.trim()) return toast.error('Bu oda şifre korumalı');
-        await api.post(`/rooms/${roomId}/join`, { password });
+        await api.post(`/rooms/${roomSlug}/join`, { password });
       } else {
-        await api.post(`/rooms/${roomId}/follow`);
+        await api.post(`/rooms/${roomSlug}/follow`);
       }
       await load();
       setPassword('');
@@ -213,7 +257,7 @@ export default function RoomDetailPage() {
     if (!user) return;
     if (isOwner) return toast.error('Kurucu odadan ayrılamaz');
     try {
-      await api.post(`/rooms/${roomId}/unfollow`);
+      await api.post(`/rooms/${roomSlug}/unfollow`);
       await load();
       toast.success('Odadan ayrıldın');
     } catch {
@@ -222,7 +266,8 @@ export default function RoomDetailPage() {
   };
 
   const shareRoom = async () => {
-    const url = `${window.location.origin}/rooms/${roomId}`;
+    const slug = room?.slug || roomSlug;
+    const url = `${window.location.origin}${buildRoomPath({ slug })}`;
     try {
       await navigator.clipboard.writeText(url);
       toast.success('Oda linki kopyalandı');
@@ -237,7 +282,7 @@ export default function RoomDetailPage() {
     if (!text) return;
     setMessageBusy(true);
     try {
-      const { data } = await api.post(`/rooms/${roomId}/messages`, { content: text });
+      const { data } = await api.post(`/rooms/${roomSlug}/messages`, { content: text });
       if (data?.message?.id) {
         mergeMessages([data.message]);
         setMessageText('');
@@ -306,7 +351,7 @@ export default function RoomDetailPage() {
             <Share2 className="w-4 h-4" /> Odayı Paylaş
           </button>
           {isMember && (
-            <Link href={buildTopicCreatePath(String(roomId))} className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold inline-flex items-center gap-2">
+            <Link href={buildTopicCreatePath(numericRoomId ?? undefined)} className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold inline-flex items-center gap-2">
               <Plus className="w-4 h-4" /> Bu Odada Konu Aç
             </Link>
           )}
@@ -374,9 +419,18 @@ export default function RoomDetailPage() {
                   <MessageCircle className="w-4 h-4 text-primary" />
                   Oda Sohbeti
                 </h2>
-                <span className="text-[11px] text-muted-foreground">
-                  {streamMode === 'sse' ? 'Canlı' : streamMode === 'poll' ? 'Yeniden bağlanıyor' : 'Kapalı'}
-                </span>
+                <div className="flex items-center gap-2">
+                  {/* Online presence indicator */}
+                  {streamMode === 'sse' && onlineCount > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      {onlineCount} çevrimiçi
+                    </span>
+                  )}
+                  <span className="text-[11px] text-muted-foreground">
+                    {streamMode === 'sse' ? 'Canlı' : streamMode === 'poll' ? 'Bağlanıyor...' : 'Kapalı'}
+                  </span>
+                </div>
               </div>
 
               {!isMember ? (
@@ -386,6 +440,19 @@ export default function RoomDetailPage() {
               ) : (
                 <>
                   <div className="flex-1 overflow-y-auto rounded-xl border border-border/70 bg-muted/20 p-3 space-y-2">
+                    {/* Load older messages */}
+                    {hasMore && !messagesLoading && (
+                      <div className="flex justify-center pb-1">
+                        <button
+                          onClick={loadOlderMessages}
+                          disabled={olderLoading}
+                          className="text-[11px] text-primary hover:underline disabled:opacity-50 inline-flex items-center gap-1"
+                        >
+                          {olderLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                          {olderLoading ? 'Yükleniyor...' : 'Daha eski mesajları göster'}
+                        </button>
+                      </div>
+                    )}
                     {messagesLoading ? (
                       <div className="h-full flex items-center justify-center text-muted-foreground">
                         <Loader2 className="w-4 h-4 animate-spin" />

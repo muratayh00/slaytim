@@ -202,8 +202,8 @@ export default function TopicDetailPage() {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="h-56 skeleton rounded-2xl mb-6" />
+      <div className="max-w-5xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
+        <div className="h-48 sm:h-56 skeleton rounded-2xl mb-6" />
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => <SlideCardSkeleton key={i} />)}
         </div>
@@ -220,87 +220,104 @@ export default function TopicDetailPage() {
   const avatarGradient = AVATAR_COLORS[(Number(topicUser.id) || 0) % AVATAR_COLORS.length];
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
-      <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors group">
+    <div className="max-w-5xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
+      <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-5 transition-colors group">
         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
         Ana Sayfa
       </Link>
 
-      <div className="bg-card border border-border rounded-2xl overflow-hidden mb-8 shadow-card">
+      <div className="bg-card border border-border rounded-2xl overflow-hidden mb-6 sm:mb-8 shadow-card">
         <div className="h-1.5 w-full bg-gradient-to-r from-primary via-violet-500 to-indigo-400" />
 
-        <div className="p-6 sm:p-8">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-3 flex-wrap">
-                <Link
-                  href={topicCategory.slug ? buildCategoryPath(topicCategory.slug) : '/kategori'}
-                  className="text-xs px-3 py-1 rounded-full bg-primary/10 text-primary font-bold flex items-center gap-1.5 hover:bg-primary/20 transition-colors"
-                >
-                  <Tag className="w-3 h-3" />
-                  {topicCategory.name || 'Kategori'}
-                </Link>
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  {topic.createdAt ? formatDate(topic.createdAt) : '-'}
-                </span>
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold mb-2 leading-tight tracking-tight">{topic.title || 'Konu'}</h1>
-              {topic.description && (
-                <p className="text-muted-foreground leading-relaxed text-[15px]">{topic.description}</p>
-              )}
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {user && (
-                <button
-                  onClick={handleSubscribe}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border font-bold text-sm transition-all ${
-                    subscribed
-                      ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/15'
-                      : 'border-border hover:bg-muted hover:border-primary/30'
-                  }`}
-                >
-                  {subscribed ? 'Abone' : 'Yeni Yüklemeleri Takip Et'}
-                </button>
-              )}
+        <div className="p-4 sm:p-6 lg:p-8">
+          {/* ── Badges row ── */}
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <Link
+              href={topicCategory.slug ? buildCategoryPath(topicCategory.slug) : '/kategori'}
+              className="text-xs px-3 py-1 rounded-full bg-primary/10 text-primary font-bold flex items-center gap-1.5 hover:bg-primary/20 transition-colors"
+            >
+              <Tag className="w-3 h-3" />
+              {topicCategory.name || 'Kategori'}
+            </Link>
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              {topic.createdAt ? formatDate(topic.createdAt) : '-'}
+            </span>
+          </div>
+
+          {/* ── Title + description ── */}
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold mb-2 leading-tight tracking-tight">
+            {topic.title || 'Konu'}
+          </h1>
+          {topic.description && (
+            <p className="text-muted-foreground leading-relaxed text-sm sm:text-[15px] mb-4">
+              {topic.description}
+            </p>
+          )}
+
+          {/* ── Action buttons ── */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {user && (
               <button
-                onClick={handleLike}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border font-bold text-sm transition-all ${
-                  liked
-                    ? 'bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/15'
+                onClick={handleSubscribe}
+                className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl border font-bold text-xs sm:text-sm transition-all ${
+                  subscribed
+                    ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/15'
                     : 'border-border hover:bg-muted hover:border-primary/30'
                 }`}
               >
-                <Heart className={`w-4 h-4 ${liked ? 'fill-current' : ''}`} />
-                {Number(topic.likesCount || 0)}
+                {subscribed ? (
+                  'Abone'
+                ) : (
+                  <>
+                    <span className="hidden sm:inline">Yeni Yüklemeleri Takip Et</span>
+                    <span className="sm:hidden">Takip Et</span>
+                  </>
+                )}
               </button>
-              {user && (
-                <button
-                  onClick={() => setShowReport(true)}
-                  className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-red-500 hover:border-red-500/30 hover:bg-red-500/5 transition-all"
-                  title="Raporla"
-                >
-                  <Flag className="w-4 h-4" />
-                </button>
-              )}
-            </div>
+            )}
+            <button
+              onClick={handleLike}
+              className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl border font-bold text-xs sm:text-sm transition-all ${
+                liked
+                  ? 'bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/15'
+                  : 'border-border hover:bg-muted hover:border-primary/30'
+              }`}
+            >
+              <Heart className={`w-4 h-4 ${liked ? 'fill-current' : ''}`} />
+              {Number(topic.likesCount || 0)}
+            </button>
+            {user && (
+              <button
+                onClick={() => setShowReport(true)}
+                className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-red-500 hover:border-red-500/30 hover:bg-red-500/5 transition-all"
+                title="Raporla"
+              >
+                <Flag className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
-          <div className="flex items-center gap-4 mt-6 pt-5 border-t border-border/60 flex-wrap">
-            <Link href={topicUser.username ? buildProfilePath(topicUser.username) : '/'} className="flex items-center gap-2.5 hover:text-primary transition-colors group">
-              <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-xs font-bold text-white ring-2 ring-white/20 shadow-sm overflow-hidden`}>
+          {/* ── Author + stats ── */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mt-5 pt-4 border-t border-border/60">
+            <Link
+              href={topicUser.username ? buildProfilePath(topicUser.username) : '/'}
+              className="flex items-center gap-2.5 hover:text-primary transition-colors group min-w-0"
+            >
+              <div className={`w-8 h-8 shrink-0 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-xs font-bold text-white ring-2 ring-white/20 shadow-sm overflow-hidden`}>
                 {topicUser.avatarUrl ? (
                   <img src={resolveFileUrl(topicUser.avatarUrl)} alt="" className="w-full h-full object-cover" />
                 ) : (
                   String(topicUser.username || '?').slice(0, 2).toUpperCase()
                 )}
               </div>
-              <span className="text-sm font-semibold">{topicUser.username || 'Kullanici'}</span>
+              <span className="text-sm font-semibold truncate">{topicUser.username || 'Kullanici'}</span>
             </Link>
-            <div className="flex items-center gap-3 ml-auto flex-wrap">
+            <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
               <span className="text-xs text-muted-foreground flex items-center gap-1.5 bg-muted px-2.5 py-1 rounded-lg">
                 <Eye className="w-3.5 h-3.5" />
-                {Number(topic.viewsCount || 0).toLocaleString()} goruntulenme
+                {Number(topic.viewsCount || 0).toLocaleString()}
+                <span className="hidden sm:inline"> görüntülenme</span>
               </span>
               <span className="text-xs text-muted-foreground flex items-center gap-1.5 bg-muted px-2.5 py-1 rounded-lg">
                 <LayoutGrid className="w-3.5 h-3.5" />
@@ -311,10 +328,11 @@ export default function TopicDetailPage() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+      {/* ── Slides header ── */}
+      <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between mb-4 sm:mb-5 gap-3">
         <h2 className="font-extrabold text-lg tracking-tight">Slaytlar</h2>
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center gap-1 bg-muted rounded-xl p-1">
+        <div className="flex items-center gap-2 w-full xs:w-auto">
+          <div className="flex items-center gap-1 bg-muted rounded-xl p-1 flex-1 xs:flex-none">
             {[
               { value: 'latest', label: 'Yeni' },
               { value: 'popular', label: 'Popüler' },
@@ -323,7 +341,7 @@ export default function TopicDetailPage() {
               <button
                 key={s.value}
                 onClick={() => loadSlides(s.value)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`flex-1 xs:flex-none px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   sort === s.value ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
@@ -335,10 +353,11 @@ export default function TopicDetailPage() {
           {user && (
             <button
               onClick={() => setShowUpload(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-all shadow-button hover:shadow-button-hover hover:-translate-y-0.5"
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-primary text-white text-xs sm:text-sm font-bold hover:bg-primary/90 transition-all shadow-button hover:shadow-button-hover hover:-translate-y-0.5 shrink-0"
             >
               <Upload className="w-4 h-4" />
-              Slayt Yukle
+              <span className="hidden sm:inline">Slayt Yükle</span>
+              <span className="sm:hidden">Yükle</span>
             </button>
           )}
         </div>

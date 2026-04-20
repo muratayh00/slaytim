@@ -73,6 +73,16 @@ export function buildTagPath(slug: string): string {
   return `/etiket/${encodeURIComponent(slugifyTr(slug || ''))}`;
 }
 
+export function buildCollectionPath(col: { id: number; slug?: string | null; name?: string | null }): string {
+  const slug = (col.slug || slugifyTr(col.name || '') || String(col.id)).trim();
+  return `/collections/${slug}`;
+}
+
+export function buildRoomPath(room: { slug?: string | null; name?: string | null; id?: number | null }): string {
+  const slug = (room.slug || slugifyTr(room.name || '') || String(room.id || '')).trim();
+  return `/rooms/${slug}`;
+}
+
 export function buildTopicCreatePath(roomId?: number | string): string {
   const normalized = typeof roomId === 'string' ? Number(roomId) : roomId;
   if (Number.isInteger(normalized) && Number(normalized) > 0) {

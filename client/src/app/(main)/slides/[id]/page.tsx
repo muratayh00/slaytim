@@ -785,10 +785,19 @@ export default function SlideDetailPage() {
     if (previewMeta.previewStatus !== 'processing' && previewMeta.previewStatus !== 'none') return;
     if (slide?.conversionStatus !== 'done') return;
 
+    // Adaptive polling: 1s for the first 20s, then 2s for next 40s, then stop.
+    // Total max wait: 20 × 1s + 20 × 2s = 60s.
     let pollCount = 0;
-    const MAX_PREVIEW_POLLS = 36; // 36 × 5 s = 3 minutes
-    const timer = setInterval(async () => {
-      if (++pollCount > MAX_PREVIEW_POLLS) { clearInterval(timer); return; }
+    const FAST_POLLS  = 20;  // first 20 polls at 1s = 20 seconds
+    const SLOW_POLLS  = 20;  // next 20 polls at 2s  = 40 seconds
+    const MAX_POLLS   = FAST_POLLS + SLOW_POLLS;
+    let currentInterval = 1000;
+    let timer: ReturnType<typeof setInterval>;
+
+    const doPoll = async () => {
+      pollCount++;
+      if (pollCount > MAX_POLLS) { clearInterval(timer); return; }
+
       try {
         const { data } = await api.get(`/slides/${id}/preview-meta`);
         const newMode   = data.previewMode === 'images' ? 'images' : 'pdf';
@@ -798,10 +807,21 @@ export default function SlideDetailPage() {
 
         setPreviewMeta({ previewMode: newMode, previewStatus: newStatus, pages: newPages, pageCount: newCount });
 
-        // Stop polling once generation is complete or permanently failed
-        if (newStatus === 'ready' || newStatus === 'failed') clearInterval(timer);
+        if (newStatus === 'ready' || newStatus === 'failed') {
+          clearInterval(timer);
+          return;
+        }
       } catch { /* silent — keep polling */ }
-    }, 5000);
+
+      // Switch to slower interval after fast phase
+      if (pollCount === FAST_POLLS && currentInterval === 1000) {
+        clearInterval(timer);
+        currentInterval = 2000;
+        timer = setInterval(doPoll, currentInterval);
+      }
+    };
+
+    timer = setInterval(doPoll, currentInterval);
     return () => clearInterval(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, previewMeta?.previewStatus, slide?.conversionStatus]);

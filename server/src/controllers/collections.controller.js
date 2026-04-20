@@ -1,6 +1,22 @@
 const prisma = require('../lib/prisma');
 const logger = require('../lib/logger');
 const { normalizeMediaUrls } = require('../lib/media-normalize');
+const { toSlug, uniqueSlug } = require('../lib/slug');
+
+/**
+ * Resolves a collection by numeric ID or slug string.
+ * Returns { id } or null if not found.
+ */
+const resolveCollection = async (idOrSlug) => {
+  const trimmed = String(idOrSlug || '').trim();
+  if (!trimmed) return null;
+
+  const numericId = Number(trimmed);
+  if (Number.isInteger(numericId) && numericId > 0) {
+    return prisma.collection.findUnique({ where: { id: numericId }, select: { id: true } });
+  }
+  return prisma.collection.findUnique({ where: { slug: trimmed }, select: { id: true } });
+};
 
 const slideSelect = {
   id: true, title: true, description: true, fileUrl: true,
@@ -49,11 +65,13 @@ const getByUser = async (req, res) => {
   }
 };
 
-// GET /collections/:id — single collection with slides
+// GET /collections/:id — single collection with slides (id or slug)
 const getOne = async (req, res) => {
   try {
+    const resolved = await resolveCollection(req.params.id);
+    if (!resolved) return res.status(404).json({ error: 'Collection not found' });
     const col = await prisma.collection.findUnique({
-      where: { id: Number(req.params.id) },
+      where: { id: resolved.id },
       include: {
         user: { select: { id: true, username: true, avatarUrl: true } },
         slides: { orderBy: { addedAt: 'desc' }, include: { slide: { select: slideSelect } } },
@@ -89,9 +107,11 @@ const create = async (req, res) => {
       return res.status(400).json({ error: 'Description must be a string' });
     }
 
+    const slug = await uniqueSlug(prisma.collection, toSlug(name.trim()));
     const col = await prisma.collection.create({
       data: {
         name: name.trim(),
+        slug,
         description: typeof description === 'string' ? description.trim() : null,
         isPublic: Boolean(isPublic),
         userId: req.user.id,
@@ -108,7 +128,9 @@ const create = async (req, res) => {
 // PATCH /collections/:id
 const update = async (req, res) => {
   try {
-    const col = await prisma.collection.findUnique({ where: { id: Number(req.params.id) } });
+    const resolved = await resolveCollection(req.params.id);
+    if (!resolved) return res.status(404).json({ error: 'Not found' });
+    const col = await prisma.collection.findUnique({ where: { id: resolved.id } });
     if (!col) return res.status(404).json({ error: 'Not found' });
     if (col.userId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
 
@@ -121,7 +143,11 @@ const update = async (req, res) => {
     }
 
     const nextData = {};
-    if (name !== undefined) nextData.name = name.trim();
+    if (name !== undefined) {
+      nextData.name = name.trim();
+      // Re-generate slug when name changes (unique, skip current row's own slug)
+      nextData.slug = await uniqueSlug(prisma.collection, toSlug(name.trim()), col.id);
+    }
     if (description !== undefined) nextData.description = description === null ? null : description.trim();
     if (isPublic !== undefined) nextData.isPublic = Boolean(isPublic);
 
@@ -140,7 +166,9 @@ const update = async (req, res) => {
 // DELETE /collections/:id
 const remove = async (req, res) => {
   try {
-    const col = await prisma.collection.findUnique({ where: { id: Number(req.params.id) } });
+    const resolved = await resolveCollection(req.params.id);
+    if (!resolved) return res.status(404).json({ error: 'Not found' });
+    const col = await prisma.collection.findUnique({ where: { id: resolved.id } });
     if (!col) return res.status(404).json({ error: 'Not found' });
     if (col.userId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
 
@@ -155,7 +183,9 @@ const remove = async (req, res) => {
 // POST /collections/:id/slides/:slideId — add slide
 const addSlide = async (req, res) => {
   try {
-    const col = await prisma.collection.findUnique({ where: { id: Number(req.params.id) } });
+    const resolved = await resolveCollection(req.params.id);
+    if (!resolved) return res.status(404).json({ error: 'Collection not found' });
+    const col = await prisma.collection.findUnique({ where: { id: resolved.id } });
     if (!col) return res.status(404).json({ error: 'Collection not found' });
     if (col.userId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
 
@@ -190,10 +220,9 @@ const addSlide = async (req, res) => {
 // POST /collections/:id/follow -> toggle
 const toggleFollow = async (req, res) => {
   try {
-    const collectionId = Number(req.params.id);
-    if (!Number.isInteger(collectionId) || collectionId <= 0) {
-      return res.status(400).json({ error: 'Invalid collection id' });
-    }
+    const resolved = await resolveCollection(req.params.id);
+    if (!resolved) return res.status(404).json({ error: 'Collection not found' });
+    const collectionId = resolved.id;
 
     const collection = await prisma.collection.findUnique({ where: { id: collectionId } });
     if (!collection) return res.status(404).json({ error: 'Collection not found' });

@@ -107,7 +107,7 @@ export default async function SlideoDetailPage({
     <main className="mx-auto w-full max-w-3xl px-4 py-10">
       <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Slideo ?nizleme
+          Slideo Önizleme
         </p>
         <h1 className="mb-3 text-2xl font-extrabold leading-tight sm:text-3xl">{slideo.title}</h1>
 
@@ -117,9 +117,9 @@ export default async function SlideoDetailPage({
 
         <div className="mb-6 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span className="rounded-full border border-border px-2.5 py-1">{pageCount} sayfa</span>
-          <span className="rounded-full border border-border px-2.5 py-1">{slideo.likesCount} begeni</span>
+          <span className="rounded-full border border-border px-2.5 py-1">{slideo.likesCount} beğeni</span>
           <span className="rounded-full border border-border px-2.5 py-1">{slideo.savesCount} kaydetme</span>
-          <span className="rounded-full border border-border px-2.5 py-1">{slideo.viewsCount} goruntuleme</span>
+          <span className="rounded-full border border-border px-2.5 py-1">{slideo.viewsCount} görüntülenme</span>
           <span className="rounded-full border border-border px-2.5 py-1">@{slideo.user.username}</span>
         </div>
 
@@ -138,7 +138,7 @@ export default async function SlideoDetailPage({
             prefetch={false}
             className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:opacity-90"
           >
-            Slideo akista ac
+            Slideo akışında aç
           </Link>
           <a
             href={buildSlidePath({ id: slideo.slide.id, title: slideo.slide.title })}

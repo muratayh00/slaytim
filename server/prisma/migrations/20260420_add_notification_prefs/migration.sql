@@ -1,0 +1,4 @@
+-- Add notification preference columns to users table
+ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_on_like    BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_on_comment BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_on_follow  BOOLEAN NOT NULL DEFAULT TRUE;

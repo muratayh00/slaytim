@@ -10,6 +10,7 @@ import { useAuthStore } from '@/store/auth';
 import toast from 'react-hot-toast';
 import { formatDate } from '@/lib/utils';
 import { resolveFileUrl } from '@/lib/pdfRenderer';
+import { buildCollectionPath } from '@/lib/url';
 
 const fadeUp = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.3 } } };
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } };
@@ -27,7 +28,7 @@ function CollectionCard({ col, onDelete }: { col: any; onDelete: (id: number) =>
   return (
     <motion.div variants={fadeUp}>
       <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-card hover:border-border/80 hover:shadow-card-hover transition-all group">
-        <Link href={`/collections/${col.id}`}>
+        <Link href={buildCollectionPath(col)}>
           <div className="aspect-video bg-muted relative overflow-hidden">
             {cover ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -45,14 +46,14 @@ function CollectionCard({ col, onDelete }: { col: any; onDelete: (id: number) =>
         </Link>
 
         <div className="p-4">
-          <Link href={`/collections/${col.id}`}>
+          <Link href={buildCollectionPath(col)}>
             <h3 className="font-bold text-[14px] leading-snug group-hover:text-primary transition-colors mb-1">{col.name}</h3>
           </Link>
           {col.description && <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{col.description}</p>}
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">{slideCount} slayt · {formatDate(col.createdAt)}</span>
             <div className="flex items-center gap-1">
-              <Link href={`/collections/${col.id}/edit`} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+              <Link href={`${buildCollectionPath(col)}/edit`} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
                 <Pencil className="w-3.5 h-3.5" />
               </Link>
               <button
@@ -261,7 +262,7 @@ export default function CollectionsPage() {
         <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {followedCollections.map((col) => (
             <motion.div key={col.id} variants={fadeUp}>
-              <Link href={`/collections/${col.id}`} className="block bg-card border border-border rounded-2xl p-4 hover:border-border/80 transition-all">
+              <Link href={buildCollectionPath(col)} className="block bg-card border border-border rounded-2xl p-4 hover:border-border/80 transition-all">
                 <h3 className="font-bold text-[14px]">{col.name}</h3>
                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{col.description || 'Açıklama yok'}</p>
                 <p className="text-xs text-muted-foreground mt-2">

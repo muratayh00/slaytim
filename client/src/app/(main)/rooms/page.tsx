@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Users, Plus, Lock, Globe, Loader2 } from 'lucide-react';
+import { Users, Plus, Lock, Globe, Loader2, Search } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import toast from 'react-hot-toast';
+import { buildRoomPath } from '@/lib/url';
 
 type Room = {
   id: number;
@@ -29,8 +30,21 @@ export default function RoomsPage() {
   const [form, setForm] = useState({ name: '', description: '', isPublic: true, accessPassword: '' });
   const [privateAccess, setPrivateAccess] = useState({ name: '', password: '' });
   const [privateAccessBusy, setPrivateAccessBusy] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const myRoomIds = useMemo(() => new Set(myRooms.map((r) => r.id)), [myRooms]);
+
+  // Client-side filter — backend also supports ?q= for server-side search
+  const filteredRooms = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return rooms;
+    return rooms.filter(
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        (r.description || '').toLowerCase().includes(q) ||
+        (r.owner?.username || '').toLowerCase().includes(q),
+    );
+  }, [rooms, searchQuery]);
 
   const navigateSafely = useCallback((path: string) => {
     try {
@@ -85,7 +99,7 @@ export default function RoomsPage() {
       setCreateOpen(false);
       toast.success('Oda olusturuldu');
       if (data?.id) {
-        navigateSafely(`/rooms/${data.id}`);
+        navigateSafely(buildRoomPath(data));
         return;
       }
       await load();
@@ -96,10 +110,10 @@ export default function RoomsPage() {
     }
   };
 
-  const followRoom = async (roomId: number) => {
+  const followRoom = async (roomId: number, slug?: string) => {
     if (!user) return toast.error('Takip icin giris yapmalisin');
     try {
-      await api.post(`/rooms/${roomId}/follow`);
+      await api.post(`/rooms/${slug || roomId}/follow`);
       await load();
       toast.success('Odayi takip etmeye basladin');
     } catch {
@@ -121,7 +135,8 @@ export default function RoomsPage() {
       toast.success('Kapali odaya giris yapildi');
       setPrivateAccess({ name: '', password: '' });
       await load();
-      if (data?.roomId) window.location.href = `/rooms/${data.roomId}`;
+      if (data?.slug) window.location.href = buildRoomPath({ slug: data.slug });
+      else if (data?.roomId) window.location.href = `/rooms/${data.roomId}`;
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Kapali odaya giris basarisiz');
     } finally {
@@ -131,20 +146,32 @@ export default function RoomsPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Odalar</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Herkese acik odalari kesfet, kapali odalara sifre ile gir</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Herkese açık odaları keşfet, kapalı odalara şifre ile gir</p>
         </div>
-        {user && (
-          <button
-            onClick={() => setCreateOpen((s) => !s)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Oda Ac
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Search box */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Oda ara..."
+              className="pl-9 pr-3 py-2 text-sm rounded-xl border border-border bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/25 w-48 sm:w-56"
+            />
+          </div>
+          {user && (
+            <button
+              onClick={() => setCreateOpen((s) => !s)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              Oda Aç
+            </button>
+          )}
+        </div>
       </div>
 
       {createOpen && user && (
@@ -225,9 +252,19 @@ export default function RoomsPage() {
           <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
           Yukleniyor...
         </div>
+      ) : filteredRooms.length === 0 ? (
+        <div className="text-center py-16 border-2 border-dashed border-border rounded-2xl text-muted-foreground">
+          <Search className="w-10 h-10 mx-auto mb-3 opacity-20" />
+          <p className="font-bold">{searchQuery ? `"${searchQuery}" için oda bulunamadı` : 'Henüz hiç oda yok'}</p>
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="mt-2 text-sm text-primary hover:underline">
+              Aramayı temizle
+            </button>
+          )}
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {rooms.map((room) => {
+          {filteredRooms.map((room) => {
             const joined = myRoomIds.has(room.id);
             return (
               <div key={room.id} className="border border-border rounded-2xl p-4 bg-card">
@@ -250,14 +287,14 @@ export default function RoomsPage() {
                 </div>
                 <div className="mt-4 flex items-center gap-2">
                   <Link
-                    href={`/rooms/${room.id}`}
+                    href={buildRoomPath(room)}
                     className="px-3 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
                   >
                     Odayi Ac
                   </Link>
                   {!joined && user && room.isPublic && (
                     <button
-                      onClick={() => followRoom(room.id)}
+                      onClick={() => followRoom(room.id, room.slug)}
                       className="px-3 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90"
                     >
                       Takip Et

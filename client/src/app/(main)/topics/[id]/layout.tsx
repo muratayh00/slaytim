@@ -1,7 +1,7 @@
-﻿import type { Metadata } from 'next';
+import type { Metadata } from 'next';
 import Script from 'next/script';
 import { getApiBaseUrl } from '@/lib/api-origin';
-import { buildProfilePath, buildTopicPath } from '@/lib/url';
+import { buildProfilePath, buildTopicPath, splitIdSlug } from '@/lib/url';
 
 const API_URL = getApiBaseUrl();
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
@@ -20,8 +20,16 @@ async function fetchTopic(paramValue: string) {
   if (!API_URL) return null;
   try {
     const key = decodeURIComponent(paramValue);
-    const isNumeric = /^\d+$/.test(key);
-    const endpoint = isNumeric ? `/topics/${key}` : `/topics/slug/${encodeURIComponent(key)}`;
+
+    // Params may arrive as "123-konu-basligi" (id + slug combined).
+    // splitIdSlug extracts the numeric id so we can hit /topics/:id directly.
+    const { id: numericId } = splitIdSlug(key);
+    const endpoint = numericId
+      ? `/topics/${numericId}`
+      : /^\d+$/.test(key)
+        ? `/topics/${key}`
+        : `/topics/slug/${encodeURIComponent(key)}`;
+
     const res = await fetch(`${API_URL}${endpoint}`, { cache: 'no-store' });
     if (!res.ok) return null;
     return res.json();
@@ -33,15 +41,15 @@ async function fetchTopic(paramValue: string) {
 export async function generateMetadata({ params }: { params: RouteParams }): Promise<Metadata> {
   try {
     const key = getRouteKey(params);
-    if (!key) return { title: 'Konu Bulunamadi' };
+    if (!key) return { title: 'Konu Bulunamadı' };
 
     const topic = await fetchTopic(key);
-    if (!topic) return { title: 'Konu Bulunamadi' };
+    if (!topic) return { title: 'Konu Bulunamadı' };
 
     const title = topic.title as string;
     const description = topic.description
       ? (topic.description as string).slice(0, 155)
-      : `${topic._count?.slides || 0} slayt iceren "${title}" konusunu kesfet.`;
+      : `${topic._count?.slides || 0} slayt içeren "${title}" konusunu keşfet.`;
     const url = `${BASE_URL}${buildTopicPath({ id: topic.id, slug: topic.slug, title: topic.title })}`;
 
     return {
@@ -81,11 +89,11 @@ export default async function TopicLayout({
           '@context': 'https://schema.org',
           '@type': 'Article',
           headline: topic.title,
-          description: topic.description || `${topic._count?.slides || 0} slayt iceren konu.`,
+          description: topic.description || `${topic._count?.slides || 0} slayt içeren konu.`,
           url,
           author: {
             '@type': 'Person',
-            name: topic.user?.username || 'Slaytim Kullanicisi',
+            name: topic.user?.username || 'Slaytim Kullanıcısı',
             url: topic.user?.username ? `${BASE_URL}${buildProfilePath(topic.user.username)}` : BASE_URL,
           },
           publisher: { '@type': 'Organization', name: 'Slaytim', url: BASE_URL },
@@ -111,4 +119,3 @@ export default async function TopicLayout({
     </>
   );
 }
-
