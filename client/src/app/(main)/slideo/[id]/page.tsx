@@ -129,6 +129,8 @@ export default async function SlideoDetailPage({
           <SlideoDetailPreview
             slideoId={slideo.id}
             slideId={slideo.slide.id}
+            title={slideo.title}
+            slideTitle={slideo.slide.title}
             pageIndices={slideo.pageIndices}
             conversionStatus={slideo.slide.conversionStatus}
           />

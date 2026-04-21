@@ -62,7 +62,12 @@ export default function SlideoViewer({
   const { user } = useAuthStore();
   const pages = slideo.pageIndices;
 
-  // PDF state
+  // Image mode (fast path — pre-generated WebP assets)
+  const [slideImages, setSlideImages] = useState<{ pageNumber: number; url: string }[]>([]);
+  const [imageMode, setImageMode] = useState(false);
+  const [currentImgLoaded, setCurrentImgLoaded] = useState(false);
+
+  // PDF state (slow path fallback)
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState(false);
@@ -119,8 +124,14 @@ export default function SlideoViewer({
     setPdfLoading(false);
     setPdfLoadAttempt(0);
     setCanvasRendered(false);
+    setSlideImages([]);
+    setImageMode(false);
+    setCurrentImgLoaded(false);
     completionTrackedRef.current = false;
   }, [slideo.id, slideo.isLiked, slideo.isSaved, slideo.likesCount, slideo.savesCount]);
+
+  // Reset img loaded state on page change
+  useEffect(() => { setCurrentImgLoaded(false); }, [currentIdx]);
 
   // ?? Reset page / related when active changes ????????????????????????????????
   useEffect(() => {
@@ -133,9 +144,10 @@ export default function SlideoViewer({
   }, [isActive]);
 
   // ?? Detect "ended" ??????????????????????????????????????????????????????????
+  const pageReady = imageMode ? currentImgLoaded : canvasRendered;
   useEffect(() => {
-    setIsEnded(currentIdx === pages.length - 1 && canvasRendered);
-  }, [currentIdx, pages.length, canvasRendered]);
+    setIsEnded(currentIdx === pages.length - 1 && pageReady);
+  }, [currentIdx, pages.length, pageReady]);
 
   // ?? Completion tracking ?????????????????????????????????????????????????????
   useEffect(() => {
@@ -162,9 +174,24 @@ export default function SlideoViewer({
     }).catch(() => {});
   }, [isActive, slideo.id, feedSubjectKey]);
 
-  // ?? PDF load ????????????????????????????????????????????????????????????????
+  // ?? Try image mode when active (fast path) ??????????????????????????????????????????
   useEffect(() => {
     if (!isActive || slideo.slide.conversionStatus !== 'done') return;
+    if (imageMode || slideImages.length > 0) return; // already loaded
+    api.get(`/slides/${slideo.slide.id}/preview-meta`)
+      .then(({ data }) => {
+        if (data?.previewMode === 'images' && Array.isArray(data.pages) && data.pages.length > 0) {
+          setSlideImages(data.pages);
+          setImageMode(true);
+        }
+      })
+      .catch(() => { /* fall through to PDF.js */ });
+  }, [isActive, slideo.slide.conversionStatus, slideo.slide.id, imageMode, slideImages.length]);
+
+  // ?? PDF load (only when image mode unavailable) ?????????????????????????????
+  useEffect(() => {
+    if (!isActive || slideo.slide.conversionStatus !== 'done') return;
+    if (imageMode) return; // image mode active, skip PDF
     if (pdfDoc) return;
     let cancelled = false;
     setPdfLoading(true);
@@ -174,7 +201,7 @@ export default function SlideoViewer({
       .catch((err) => { console.error('[SlideoViewer] PDF load failed:', previewPdfPath, err); if (!cancelled) setPdfError(true); })
       .finally(() => { if (!cancelled) setPdfLoading(false); });
     return () => { cancelled = true; };
-  }, [isActive, slideo.slide.conversionStatus, slideo.id, previewPdfPath, pdfDoc, pdfLoadAttempt]);
+  }, [isActive, slideo.slide.conversionStatus, slideo.id, imageMode, previewPdfPath, pdfDoc, pdfLoadAttempt]);
 
   // ?? View tracking ???????????????????????????????????????????????????????????
   useEffect(() => {
@@ -202,9 +229,9 @@ export default function SlideoViewer({
     }
   }, [isActive, slideo.id, slideo.slide.conversionStatus]);
 
-  // ?? Render page to canvas ???????????????????????????????????????????????????
+  // ?? Render page to canvas (PDF.js mode only) ??????????????????????????????????????
   useEffect(() => {
-    if (!pdfDoc || !canvasRef.current || !isActive) return;
+    if (imageMode || !pdfDoc || !canvasRef.current || !isActive) return;
     const pageNum = pages[currentIdx];
     if (!pageNum) return;
     const seq = ++renderSeqRef.current;
@@ -230,7 +257,7 @@ export default function SlideoViewer({
         }
       });
     return () => { cancelled = true; };
-  }, [pdfDoc, currentIdx, isActive, slideo.id, pages]);
+  }, [imageMode, pdfDoc, currentIdx, isActive, slideo.id, pages]);
 
   // ?? Page navigation ?????????????????????????????????????????????????????????
   const goToPage = useCallback((idx: number) => {
@@ -250,7 +277,8 @@ export default function SlideoViewer({
   // ? Auto advance pages (Reels/TikTok-like pacing) ?
   useEffect(() => {
     if (!isActive) return;
-    if (pdfLoading || pdfError || !canvasRendered) return;
+    if (!imageMode && (pdfLoading || pdfError || !canvasRendered)) return;
+    if (imageMode && !currentImgLoaded) return;
     if (isImmersive) return;
     if (currentIdx >= pages.length - 1) return;
 
@@ -270,7 +298,7 @@ export default function SlideoViewer({
       clearTimeout(timer);
       clearInterval(progressTimer);
     };
-  }, [isActive, pdfLoading, pdfError, canvasRendered, isImmersive, currentIdx, pages.length]);
+  }, [isActive, imageMode, currentImgLoaded, pdfLoading, pdfError, canvasRendered, isImmersive, currentIdx, pages.length]);
 
   useEffect(() => {
     if (currentIdx >= pages.length - 1) setAutoProgressPct(100);
@@ -278,13 +306,14 @@ export default function SlideoViewer({
 
   useEffect(() => {
     if (!isActive) return;
-    if (pdfLoading || pdfError || !canvasRendered) return;
+    if (!imageMode && (pdfLoading || pdfError || !canvasRendered)) return;
+    if (imageMode && !currentImgLoaded) return;
     if (currentIdx !== pages.length - 1) return;
     const timer = setTimeout(() => {
       onNext();
     }, AUTO_NEXT_SLIDEO_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [isActive, pdfLoading, pdfError, canvasRendered, currentIdx, pages.length, onNext]);
+  }, [isActive, imageMode, currentImgLoaded, pdfLoading, pdfError, canvasRendered, currentIdx, pages.length, onNext]);
 
   // ?? Immersive toggle ????????????????????????????????????????????????????????
   const showUI = useCallback(() => {
@@ -445,6 +474,36 @@ export default function SlideoViewer({
             <Loader2 className="w-10 h-10 animate-spin" />
             <p className="text-sm">PDF hazırlanıyor...</p>
           </div>
+        ) : imageMode ? (
+          /* Image mode (fast path) */
+          (() => {
+            const currentPageNum = pages[currentIdx];
+            const currentImg = slideImages.find((p) => p.pageNumber === currentPageNum);
+            return currentImg ? (
+              <>
+                {!currentImgLoaded && (
+                  <div className="flex flex-col items-center gap-3 text-white/40">
+                    <Loader2 className="w-10 h-10 animate-spin" />
+                  </div>
+                )}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  key={currentPageNum}
+                  src={currentImg.url}
+                  alt={`Sayfa ${currentIdx + 1}`}
+                  onLoad={() => setCurrentImgLoaded(true)}
+                  className={cn(
+                    'max-w-full max-h-full object-contain transition-opacity duration-100',
+                    currentImgLoaded ? 'opacity-100' : 'opacity-0',
+                  )}
+                />
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-3 text-white/40">
+                <Loader2 className="w-10 h-10 animate-spin" />
+              </div>
+            );
+          })()
         ) : pdfLoading ? (
           <div className="flex flex-col items-center gap-3 text-white/40">
             <Loader2 className="w-10 h-10 animate-spin" />

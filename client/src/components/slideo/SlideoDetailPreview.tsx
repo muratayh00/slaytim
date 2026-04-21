@@ -14,16 +14,26 @@ import { buildSlidePath, buildSlideoPath } from '@/lib/url';
 
 const VIEW_DEDUP_MS = 30_000;
 
+interface PageImage { pageNumber: number; url: string }
+
 interface Props {
   slideoId: number;
   slideId: number;
+  slideTitle: string;
+  title: string;
   pageIndices: number[];
   conversionStatus?: string;
 }
 
-export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, conversionStatus }: Props) {
+export default function SlideoDetailPreview({ slideoId, slideId, slideTitle, title, pageIndices, conversionStatus }: Props) {
   const { user } = useAuthStore();
 
+  // Image mode (fast path)
+  const [slideImages, setSlideImages] = useState<PageImage[]>([]);
+  const [imageMode, setImageMode] = useState(false);
+  const [currentImgLoaded, setCurrentImgLoaded] = useState(false);
+
+  // PDF.js fallback (slow path)
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState(false);
@@ -59,9 +69,31 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
     return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
   }, [bumpControls]);
 
-  // ?? Load PDF ????????????????????????????????????????????????????????????????
+  // ?? Try image mode first (fast path) ??????????????????????????????????????????????
   useEffect(() => {
     if (!canPreview) return;
+    api.get(`/slides/${slideId}/preview-meta`)
+      .then(({ data }) => {
+        if (data?.previewMode === 'images' && Array.isArray(data.pages) && data.pages.length > 0) {
+          const needed = new Set(pageIndices);
+          const imgs = data.pages.filter((p: PageImage) => needed.has(p.pageNumber));
+          if (imgs.length > 0) {
+            setSlideImages(imgs);
+            setImageMode(true);
+          }
+        }
+      })
+      .catch(() => { /* fall through to PDF.js */ });
+  }, [canPreview, slideId, pageIndices]);
+
+  // Reset img loaded state on page change
+  useEffect(() => {
+    setCurrentImgLoaded(false);
+  }, [idx]);
+
+  // ?? Load PDF (only when no images available) ??????????????????????????????????????????
+  useEffect(() => {
+    if (!canPreview || imageMode) return;
     let cancelled = false;
     setPdfLoading(true);
     setPdfError(false);
@@ -71,7 +103,7 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
       .catch((err) => { console.error('[SlideoDetailPreview] PDF load failed:', previewPdfPath, err); if (!cancelled) setPdfError(true); })
       .finally(() => { if (!cancelled) setPdfLoading(false); });
     return () => { cancelled = true; };
-  }, [canPreview, previewPdfPath, pdfLoadAttempt]);
+  }, [canPreview, imageMode, previewPdfPath, pdfLoadAttempt]);
 
   // ?? View tracking ???????????????????????????????????????????????????????????
   useEffect(() => {
@@ -93,9 +125,9 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
     setCanvasReady(false);
   }, [slideoId]);
 
-  // ?? Render page to canvas ???????????????????????????????????????????????????
+  // ?? Render page to canvas (PDF.js mode only) ??????????????????????????????????????
   const renderCurrent = useCallback(() => {
-    if (!pdfDoc || !canvasRef.current || !wrapRef.current || !canPreview) return;
+    if (imageMode || !pdfDoc || !canvasRef.current || !wrapRef.current || !canPreview) return;
     const pageNum = pageIndices[idx];
     if (!Number.isInteger(pageNum) || pageNum <= 0) return;
     const seq = ++renderSeqRef.current;
@@ -115,7 +147,7 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
         if (!cancelled && seq === renderSeqRef.current) setPageRendering(false);
       });
     return () => { cancelled = true; };
-  }, [pdfDoc, idx, pageIndices, canPreview]);
+  }, [imageMode, pdfDoc, idx, pageIndices, canPreview]);
 
   useEffect(() => {
     const cleanup = renderCurrent();
@@ -130,7 +162,7 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
 
   // ?? Share ???????????????????????????????????????????????????????????????????
   const handleShare = async () => {
-    const url = `${window.location.origin}${buildSlideoPath({ id: slideoId, title: String(slideoId) })}`;
+    const url = `${window.location.origin}${buildSlideoPath({ id: slideoId, title })}`;
     try { await navigator.clipboard.writeText(url); } catch {}
     if (user) api.post(`/slideo/${slideoId}/share`).catch(() => {});
     toast.success('Link kopyalandı');
@@ -140,6 +172,7 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
   const total = pageIndices?.length ?? 0;
   const isLast = idx >= total - 1;
   const isFirst = idx === 0;
+  const isReady = imageMode ? currentImgLoaded : canvasReady;
 
   return (
     <div className="rounded-2xl border border-border bg-black overflow-hidden">
@@ -155,11 +188,11 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
             <Loader2 className="w-5 h-5 animate-spin" />
             <span>PDF henüz hazır değil</span>
           </div>
-        ) : pdfLoading ? (
+        ) : !imageMode && pdfLoading ? (
           <div className="flex h-[62vh] items-center justify-center text-white/50">
             <Loader2 className="h-7 w-7 animate-spin" />
           </div>
-        ) : pdfError ? (
+        ) : !imageMode && pdfError ? (
           <div className="flex h-[62vh] flex-col items-center justify-center gap-3 text-white/55">
             <p className="text-sm font-semibold">Önizleme yüklenemedi</p>
             <button
@@ -179,11 +212,38 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
           </div>
         ) : null}
 
-        {/* Canvas ? always mounted, opacity-based visibility */}
+        {/* Image mode (fast path) */}
+        {imageMode && canPreview && (() => {
+          const currentPageNum = pageIndices[idx];
+          const currentImg = slideImages.find((p) => p.pageNumber === currentPageNum);
+          return currentImg ? (
+            <div className="flex items-center justify-center min-h-[62vh]">
+              {!currentImgLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Loader2 className="h-7 w-7 animate-spin text-white/50" />
+                </div>
+              )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                key={currentPageNum}
+                src={currentImg.url}
+                alt={`Sayfa ${idx + 1}`}
+                onLoad={() => setCurrentImgLoaded(true)}
+                className={cn('max-w-full max-h-[62vh] object-contain transition-opacity duration-100', currentImgLoaded ? 'opacity-100' : 'opacity-0')}
+              />
+            </div>
+          ) : (
+            <div className="flex h-[62vh] items-center justify-center text-white/50">
+              <Loader2 className="h-7 w-7 animate-spin" />
+            </div>
+          );
+        })()}
+
+        {/* Canvas (PDF.js fallback) */}
         <div
           className={cn(
             'transition-opacity duration-150',
-            canPreview && !pdfError ? 'block' : 'hidden',
+            !imageMode && canPreview && !pdfError ? 'block' : 'hidden',
           )}
         >
           {pageRendering && (
@@ -265,9 +325,9 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
           )}
         </AnimatePresence>
 
-        {/* End screen ? last page reached */}
+        {/* End screen — last page reached */}
         <AnimatePresence>
-          {isLast && canvasReady && showControls && (
+          {isLast && isReady && showControls && (
             <motion.div
               key="detail-end"
               initial={{ opacity: 0, y: 12 }}
@@ -277,7 +337,7 @@ export default function SlideoDetailPreview({ slideoId, slideId, pageIndices, co
               className="absolute bottom-0 inset-x-0 pb-14 pt-10 px-3 bg-gradient-to-t from-black via-black/95 to-transparent pointer-events-none"
             >
               <a
-                href={buildSlidePath({ id: slideId, title: String(slideId) })}
+                href={buildSlidePath({ id: slideId, title: slideTitle })}
                 className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-white text-black font-bold text-sm pointer-events-auto active:scale-98 transition-all"
               >
                 <ExternalLink className="w-4 h-4" />
