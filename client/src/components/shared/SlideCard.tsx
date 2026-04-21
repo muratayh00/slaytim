@@ -19,6 +19,8 @@ interface SlideCardProps {
     likesCount: number;
     savesCount: number;
     viewsCount?: number;
+    isSponsored?: boolean;
+    sponsorName?: string | null;
     createdAt: string;
     user: { id: number; username: string; avatarUrl?: string | null };
     topic?: { id: number; title: string };
@@ -39,6 +41,11 @@ export default function SlideCard({ slide }: SlideCardProps) {
     <a href={href} className="block group">
       <article className="bg-card border border-border rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all card-hover">
         <div className="aspect-video relative overflow-hidden bg-muted border-b border-border/60">
+          {slide.isSponsored && (
+            <div className="absolute top-2 left-2 z-10 rounded-md bg-amber-500/90 px-2 py-1 text-[10px] font-bold text-white">
+              Sponsorlu
+            </div>
+          )}
           {thumbSrc && !thumbError ? (
             // Plain <img> avoids the Next.js image-optimizer round-trip.
             // Thumbnails are already small server-side images; optimizer adds
@@ -80,6 +87,11 @@ export default function SlideCard({ slide }: SlideCardProps) {
                 #{slide.topic.title}
               </span>
             </div>
+          )}
+          {slide.isSponsored && (
+            <p className="mt-2 text-[10px] text-amber-600 font-semibold">
+              Sponsor: {slide.sponsorName || 'Is Birligi'}
+            </p>
           )}
 
           <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-border/60">

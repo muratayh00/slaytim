@@ -61,6 +61,26 @@ export const analytics = {
     attempt: number;
   }) => track('slideo_view_track_retry_success', params),
 
+  adImpression: (params: { slot_id: string; placement: string; visible_ms?: number }) =>
+    track('ad_impression', params),
+
+  adClick: (params: { slot_id: string; placement: string }) =>
+    track('ad_click', params),
+
+  sponsoredView: (params: {
+    content_type: 'slide' | 'topic' | 'slideo';
+    content_id: number;
+    sponsor_name?: string;
+    campaign_id?: string;
+  }) => track('sponsored_view', params),
+
+  sponsoredClick: (params: {
+    content_type: 'slide' | 'topic' | 'slideo';
+    content_id: number;
+    sponsor_name?: string;
+    campaign_id?: string;
+  }) => track('sponsored_click', params),
+
   /**
    * Fires when the first visual (image or PDF page) is rendered for a slide.
    * Used to measure Time-to-First-Visual (TTFV) performance.
@@ -90,4 +110,3 @@ export const analytics = {
     }
   },
 };
-

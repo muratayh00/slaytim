@@ -28,10 +28,12 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     const title = `${cat.name} Slaytlari ve Konulari | Slaytim`;
     const description = buildCategorySeoDescription(cat.name);
     const url = `${BASE_URL}/kategori/${params.slug}`;
+    const topicCount = Number(cat?._count?.topics || 0);
 
     return {
       title,
       description,
+      ...(topicCount <= 0 ? { robots: { index: false, follow: false } } : {}),
       openGraph: { title, description, url, type: 'website', siteName: 'Slaytim' },
       twitter: { card: 'summary', title, description },
       alternates: { canonical: url },

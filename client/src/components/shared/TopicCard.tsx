@@ -15,6 +15,8 @@ interface TopicCardProps {
     description?: string | null;
     likesCount: number;
     viewsCount: number;
+    isSponsored?: boolean;
+    sponsorName?: string | null;
     createdAt: string;
     user: { id: number; username: string; avatarUrl?: string | null };
     category: { name: string; slug: string };
@@ -37,9 +39,16 @@ export default function TopicCard({ topic }: TopicCardProps) {
     <Link href={href} className="block group" prefetch={false}>
       <article className="bg-card border border-border rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all card-hover">
         <div className="px-4 py-3 border-b border-border/60 bg-muted/30 flex items-center justify-between">
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
-            {topic.category.name}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
+              {topic.category.name}
+            </span>
+            {topic.isSponsored && (
+              <span className="inline-flex items-center rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-bold text-white">
+                Sponsorlu
+              </span>
+            )}
+          </div>
           {topic._count !== undefined && (
             <span className="text-[11px] text-muted-foreground font-medium flex items-center gap-1">
               <Layers className="w-3 h-3" />
@@ -75,6 +84,11 @@ export default function TopicCard({ topic }: TopicCardProps) {
           {topic.description && (
             <p className="text-[12.5px] text-muted-foreground line-clamp-2 leading-relaxed">
               {topic.description}
+            </p>
+          )}
+          {topic.isSponsored && (
+            <p className="mt-2 text-[10px] text-amber-600 font-semibold">
+              Sponsor: {topic.sponsorName || 'Is Birligi'}
             </p>
           )}
 

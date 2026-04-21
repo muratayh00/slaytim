@@ -16,6 +16,7 @@ import AdUnit from '@/components/shared/AdUnit';
 import toast from 'react-hot-toast';
 import { resolveFileUrl } from '@/lib/pdfRenderer';
 import { buildCategoryPath, buildProfilePath, buildTopicPath, splitIdSlug } from '@/lib/url';
+import { analytics } from '@/lib/analytics';
 
 const AVATAR_COLORS = [
   'from-indigo-500 to-violet-500',
@@ -126,6 +127,21 @@ export default function TopicDetailPage() {
       cancelled = true;
     };
   }, [topicKey, topicId, isNumericTopicKey, user]);
+
+  useEffect(() => {
+    if (!topic?.isSponsored) return;
+    const viewKey = `sponsored:topic:view:${topic.id}`;
+    if (typeof window !== 'undefined' && sessionStorage.getItem(viewKey)) return;
+    analytics.sponsoredView({
+      content_type: 'topic',
+      content_id: Number(topic.id),
+      sponsor_name: String(topic.sponsorName || ''),
+      campaign_id: String(topic.sponsorCampaignId || ''),
+    });
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(viewKey, '1');
+    }
+  }, [topic?.id, topic?.isSponsored, topic?.sponsorName, topic?.sponsorCampaignId]);
 
   useEffect(() => {
     if (!topic) return;
@@ -253,6 +269,38 @@ export default function TopicDetailPage() {
             <p className="text-muted-foreground leading-relaxed text-sm sm:text-[15px] mb-4">
               {topic.description}
             </p>
+          )}
+          {topic.isSponsored && (
+            <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+              <p className="font-bold">Sponsorlu Icerik</p>
+              <p>{topic.sponsorDisclosure || 'Bu icerik sponsorlu is birligi kapsaminda yayinlanmistir.'}</p>
+              {topic.sponsorName && (
+                <p className="mt-1">
+                  Sponsor: <span className="font-semibold">{topic.sponsorName}</span>
+                  {topic.sponsorUrl && (
+                    <>
+                      {' '}·{' '}
+                      <a
+                        href={topic.sponsorUrl}
+                        target="_blank"
+                        rel="noopener noreferrer sponsored"
+                        className="underline"
+                        onClick={() =>
+                          analytics.sponsoredClick({
+                            content_type: 'topic',
+                            content_id: Number(topic.id),
+                            sponsor_name: String(topic.sponsorName || ''),
+                            campaign_id: String(topic.sponsorCampaignId || ''),
+                          })
+                        }
+                      >
+                        Sponsor Linki
+                      </a>
+                    </>
+                  )}
+                </p>
+              )}
+            </div>
           )}
 
           {/* ── Action buttons ── */}

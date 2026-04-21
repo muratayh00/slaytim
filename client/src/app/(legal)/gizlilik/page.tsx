@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   alternates: { canonical: 'https://slaytim.com/gizlilik' },
 };
 
-const LAST_UPDATED = '28 Mart 2026';
+const LAST_UPDATED = '20 Nisan 2026';
 
 export default function GizlilikPage() {
   return (
@@ -47,6 +47,7 @@ export default function GizlilikPage() {
         <li>Kişiselleştirme: ilgi alanlarına göre içerik önerisi (yerel algoritma, 3. taraf olmadan).</li>
         <li>Analitik: site performansı ve kullanım istatistikleri (onaylı çerezler ile).</li>
         <li>Reklamcılık: kişiselleştirilmiş reklamlar (yalnızca onaylı reklam çerezleri ile).</li>
+        <li>Sponsorlu içerik şeffaflığı: sponsor adı, kampanya kodu ve açıklama metni görüntüleme.</li>
         <li>Yasal yükümlülükler: yetkili makam talepleri.</li>
       </ul>
 

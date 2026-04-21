@@ -8,7 +8,7 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import toast from 'react-hot-toast';
-import { buildTopicPath } from '@/lib/url';
+import { buildTopicPath, slugifyTr } from '@/lib/url';
 
 const TITLE_MAX = 200;
 const DESC_MAX  = 1000;
@@ -181,6 +181,11 @@ function NewTopicContent() {
               disabled={loading}
               className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all text-sm disabled:opacity-60"
             />
+            {form.title.trim() && (
+              <p className="text-xs text-muted-foreground mt-1.5">
+                URL: <span className="font-mono text-foreground/70">slaytim.com/konular/{slugifyTr(form.title)}</span>
+              </p>
+            )}
           </div>
 
           {/* Description */}

@@ -3,7 +3,7 @@ const { authenticate } = require('../middleware/auth');
 const adminGuard = require('../middleware/admin');
 const {
   getStats,
-  getContent, hideContent, restoreContent, deleteContent,
+  getContent, hideContent, restoreContent, setContentSponsor, deleteContent,
   getUsers, warnUser, muteUser, banUser, updateRole,
   updateReportPriority, addReportNote,
   getContentIntelligence,
@@ -24,6 +24,7 @@ router.get('/stats', getStats);
 router.get('/content', getContent);
 router.post('/content/:type/:id/hide', hideContent);
 router.post('/content/:type/:id/restore', restoreContent);
+router.patch('/content/:type/:id/sponsor', setContentSponsor);
 router.delete('/content/:type/:id', deleteContent);
 
 // Users

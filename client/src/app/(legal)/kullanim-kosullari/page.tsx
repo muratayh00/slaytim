@@ -9,7 +9,7 @@ export default function TermsPage() {
   return (
     <article className="prose prose-sm max-w-none dark:prose-invert">
       <h1>Kullanım Koşulları</h1>
-      <p>Son güncelleme: 12 Nisan 2026</p>
+      <p>Son guncelleme: 20 Nisan 2026</p>
       <h2>1. Hizmet Kullanımı</h2>
       <p>Slaytim’e yüklenen içeriklerden kullanıcı sorumludur. Telif ihlali, zararlı yazılım veya yasa dışı içerik paylaşımı yasaktır.</p>
       <h2>2. Hesap Güvenliği</h2>
@@ -18,7 +18,17 @@ export default function TermsPage() {
       <p>Platform, raporlanan içerikleri inceleme ve gerekli durumlarda görünürlüğü kısıtlama/silme hakkını saklı tutar.</p>
       <h2>4. Hizmet Sürekliliği</h2>
       <p>Bakım, güvenlik veya altyapı gereksinimleri nedeniyle geçici kesintiler yaşanabilir.</p>
-      <h2>5. İletişim</h2>
+      <h2>5. Sponsorlu ve Ucretli Icerik Aciklamasi</h2>
+      <p>
+        Platformda sponsorlu veya ucretli is birligi kapsaminda yayinlanan icerikler
+        "Sponsorlu" etiketi ve aciklama metni ile isaretlenir. Reklamveren ile yapilan
+        is birligi, icerik sahibinin goruslerinden bagimsiz olabilir.
+      </p>
+      <p>
+        Sponsorlu iceriklerde sponsor markasi, kampanya kodu, aciklama metni ve varsa sponsor baglantisi
+        kullaniciya gorunur sekilde sunulur.
+      </p>
+      <h2>6. Iletisim</h2>
       <p>Kullanım koşullarıyla ilgili sorular için <a href="/iletisim">İletişim</a> sayfasını kullanın.</p>
     </article>
   );

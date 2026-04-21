@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   alternates: { canonical: 'https://slaytim.com/cerez-politikasi' },
 };
 
-const LAST_UPDATED = '28 Mart 2026';
+const LAST_UPDATED = '20 Nisan 2026';
 
 export default function CerezPolitikasiPage() {
   return (

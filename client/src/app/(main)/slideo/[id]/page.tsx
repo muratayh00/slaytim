@@ -61,10 +61,12 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     : `"${title}" slideo ozetini incele ve tam sunuma gec.`;
   const canonical = `${BASE_URL}${buildSlideoPath({ id: slideo.id, title: slideo.title })}`;
   const image = resolveUrl(slideo.slide?.thumbnailUrl);
+  const shouldNoIndex = !Array.isArray(slideo.pageIndices) || slideo.pageIndices.length === 0 || slideo.slide?.conversionStatus !== 'done';
 
   return {
     title,
     description,
+    ...(shouldNoIndex ? { robots: { index: false, follow: false } } : {}),
     openGraph: {
       type: 'article',
       siteName: 'Slaytim',

@@ -23,6 +23,49 @@ const removeUploadIfExists = (urlPath) => {
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 };
 
+const normalizeSponsorPayload = (body = {}) => {
+  const isSponsored = Boolean(body.isSponsored);
+  const sponsorName = String(body.sponsorName || '').trim().slice(0, 120) || null;
+  const sponsorUrl = String(body.sponsorUrl || '').trim().slice(0, 500) || null;
+  const sponsorDisclosure = String(body.sponsorDisclosure || '').trim().slice(0, 280) || null;
+  const sponsorCampaignId = String(body.sponsorCampaignId || '').trim().slice(0, 120) || null;
+  const sponsoredFrom = body.sponsoredFrom ? new Date(body.sponsoredFrom) : null;
+  const sponsoredTo = body.sponsoredTo ? new Date(body.sponsoredTo) : null;
+
+  const isValidDate = (value) => value instanceof Date && !Number.isNaN(value.getTime());
+  if (body.sponsoredFrom && !isValidDate(sponsoredFrom)) {
+    throw new Error('Invalid sponsoredFrom');
+  }
+  if (body.sponsoredTo && !isValidDate(sponsoredTo)) {
+    throw new Error('Invalid sponsoredTo');
+  }
+  if (isValidDate(sponsoredFrom) && isValidDate(sponsoredTo) && sponsoredFrom > sponsoredTo) {
+    throw new Error('sponsoredFrom must be before sponsoredTo');
+  }
+
+  if (!isSponsored) {
+    return {
+      isSponsored: false,
+      sponsorName: null,
+      sponsorUrl: null,
+      sponsorDisclosure: null,
+      sponsorCampaignId: null,
+      sponsoredFrom: null,
+      sponsoredTo: null,
+    };
+  }
+
+  return {
+    isSponsored: true,
+    sponsorName,
+    sponsorUrl,
+    sponsorDisclosure: sponsorDisclosure || 'Bu icerik sponsorlu is birligi kapsaminda yayinlanmistir.',
+    sponsorCampaignId,
+    sponsoredFrom: isValidDate(sponsoredFrom) ? sponsoredFrom : null,
+    sponsoredTo: isValidDate(sponsoredTo) ? sponsoredTo : null,
+  };
+};
+
 // ?? Audit Log Helper ??????????????????????????????????????????????????????????
 const auditLog = async (adminId, action, targetType, targetId, meta, ip) => {
   try {
@@ -202,6 +245,68 @@ const restoreContent = async (req, res) => {
   } catch (err) {
     logger.error('Admin: Failed to restore content', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to restore content' });
+  }
+};
+
+const setContentSponsor = async (req, res) => {
+  if (!guard(req, res)) return;
+  const { type, id } = req.params;
+  const entityId = Number(id);
+  if (!Number.isInteger(entityId) || entityId <= 0) {
+    return res.status(400).json({ error: 'Invalid id' });
+  }
+
+  try {
+    const payload = normalizeSponsorPayload(req.body || {});
+    if (payload.isSponsored && !payload.sponsorName) {
+      return res.status(400).json({ error: 'sponsorName is required when isSponsored=true' });
+    }
+
+    if (type === 'topic') {
+      const updated = await prisma.topic.update({
+        where: { id: entityId },
+        data: payload,
+        select: {
+          id: true,
+          isSponsored: true,
+          sponsorName: true,
+          sponsorUrl: true,
+          sponsorDisclosure: true,
+          sponsorCampaignId: true,
+          sponsoredFrom: true,
+          sponsoredTo: true,
+        },
+      });
+      await auditLog(req.user.id, 'set_sponsor_meta', 'topic', id, payload, req.ip);
+      return res.json(updated);
+    }
+
+    if (type === 'slide') {
+      const updated = await prisma.slide.update({
+        where: { id: entityId },
+        data: payload,
+        select: {
+          id: true,
+          isSponsored: true,
+          sponsorName: true,
+          sponsorUrl: true,
+          sponsorDisclosure: true,
+          sponsorCampaignId: true,
+          sponsoredFrom: true,
+          sponsoredTo: true,
+        },
+      });
+      await auditLog(req.user.id, 'set_sponsor_meta', 'slide', id, payload, req.ip);
+      return res.json(updated);
+    }
+
+    return res.status(400).json({ error: 'Invalid type' });
+  } catch (err) {
+    if (String(err?.message || '').toLowerCase().includes('invalid sponsored')) {
+      return res.status(400).json({ error: err.message });
+    }
+    logger.error('Admin: Failed to set sponsor metadata', { error: err.message, stack: err.stack });
+    return res.status(500).json({ error: 'Failed to set sponsor metadata' });
   }
 };
 
@@ -1023,7 +1128,7 @@ const retryPreview = async (req, res) => {
 
 module.exports = {
   getStats,
-  getContent, hideContent, restoreContent, deleteContent,
+  getContent, hideContent, restoreContent, setContentSponsor, deleteContent,
   getUsers, warnUser, muteUser, banUser, updateRole,
   updateReportPriority, addReportNote,
   getContentIntelligence,

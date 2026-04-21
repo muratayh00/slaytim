@@ -11,6 +11,7 @@ const {
   incrementView,
   trackPageEvent,
   reactToPage,
+  getMyReactions,
   listSlideComments,
   createSlideComment,
   removeSlideComment,
@@ -55,6 +56,7 @@ router.get('/my', authenticate, getMine);
 router.get('/topic/:topicId', validateNumericParam('topicId'), getByTopic);
 router.get('/slug/:slug', getBySlug);
 router.get('/:id/page-stats', validateNumericParam('id'), getPageStats);
+router.get('/:id/my-reactions', validateNumericParam('id'), optionalAuth, getMyReactions);
 router.get('/:id/insights', validateNumericParam('id'), authenticate, getCreatorInsights);
 router.get('/:id/comments', validateNumericParam('id'), listSlideComments);
 router.get('/:id/related', validateNumericParam('id'), getRelated);

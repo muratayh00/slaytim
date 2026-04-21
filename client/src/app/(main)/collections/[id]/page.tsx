@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Folder, Globe, Lock, Calendar, Loader2 } from 'lucide-react';
+import { ArrowLeft, Folder, Globe, Lock, Calendar, Loader2, Share2 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { formatDate } from '@/lib/utils';
@@ -140,6 +140,15 @@ export default function CollectionDetailPage() {
                   {followBusy ? '...' : following ? 'Takiptesin' : 'Takip Et'}
                 </button>
               )}
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}${buildCollectionPath(col)}`;
+                  navigator.clipboard.writeText(url).then(() => toast.success('Link kopyalandı')).catch(() => toast.error('Kopyalanamadı'));
+                }}
+                className="px-3.5 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors inline-flex items-center gap-1.5"
+              >
+                <Share2 className="w-3.5 h-3.5" /> Paylaş
+              </button>
               {isOwner && (
                 <Link
                   href={`${buildCollectionPath(col)}/edit`}

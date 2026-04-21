@@ -34,6 +34,13 @@ const slideSelect = {
   savesCount: true,
   viewsCount: true,
   downloadsCount: true,
+  isSponsored: true,
+  sponsorName: true,
+  sponsorUrl: true,
+  sponsorDisclosure: true,
+  sponsorCampaignId: true,
+  sponsoredFrom: true,
+  sponsoredTo: true,
   createdAt: true,
   updatedAt: true,
   user: { select: { id: true, username: true, avatarUrl: true } },
@@ -1338,6 +1345,32 @@ const retryConversion = async (req, res) => {
   }
 };
 
+const getMyReactions = async (req, res) => {
+  try {
+    const slideId = Number(req.params.id);
+    if (!Number.isInteger(slideId) || slideId <= 0) {
+      return res.status(400).json({ error: 'Invalid slide id' });
+    }
+
+    const conditions = [];
+    if (req.user?.id) conditions.push({ actorKey: `u:${req.user.id}` });
+    const sessionHeader = req.headers['x-view-session'];
+    if (sessionHeader) {
+      conditions.push({ actorKey: `${slideId}:s:${String(sessionHeader).slice(0, 96)}` });
+    }
+    if (conditions.length === 0) return res.json({ reactions: [] });
+
+    const rows = await prisma.slidePageReaction.findMany({
+      where: { slideId, OR: conditions },
+      select: { pageNumber: true, reactionType: true, emoji: true },
+    });
+    return res.json({ reactions: rows });
+  } catch (err) {
+    logger.error('Failed to fetch my reactions', { error: err.message });
+    return res.status(500).json({ error: 'Failed to fetch reactions' });
+  }
+};
+
 module.exports = {
   getByTopic,
   getOne,
@@ -1350,6 +1383,7 @@ module.exports = {
   incrementView,
   trackPageEvent,
   reactToPage,
+  getMyReactions,
   listSlideComments,
   createSlideComment,
   removeSlideComment,

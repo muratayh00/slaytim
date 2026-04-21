@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import Script from 'next/script';
 import { getApiBaseUrl } from '@/lib/api-origin';
 import { buildProfilePath, buildTopicPath, splitIdSlug } from '@/lib/url';
@@ -41,20 +41,21 @@ async function fetchTopic(paramValue: string) {
 export async function generateMetadata({ params }: { params: RouteParams }): Promise<Metadata> {
   try {
     const key = getRouteKey(params);
-    if (!key) return { title: 'Konu Bulunamadı' };
+    if (!key) return { title: 'Konu Bulunamadi', robots: { index: false, follow: false } };
 
     const topic = await fetchTopic(key);
-    if (!topic) return { title: 'Konu Bulunamadı' };
+    if (!topic) return { title: 'Konu Bulunamadi', robots: { index: false, follow: false } };
 
     const title = topic.title as string;
     const description = topic.description
       ? (topic.description as string).slice(0, 155)
-      : `${topic._count?.slides || 0} slayt içeren "${title}" konusunu keşfet.`;
+      : `${topic._count?.slides || 0} slayt iceren "${title}" konusunu kesfet.`;
     const url = `${BASE_URL}${buildTopicPath({ id: topic.id, slug: topic.slug, title: topic.title })}`;
 
     return {
       title,
       description,
+      ...((Number(topic?._count?.slides || 0) <= 0) ? { robots: { index: false, follow: false } } : {}),
       openGraph: {
         title,
         description,
@@ -66,7 +67,7 @@ export async function generateMetadata({ params }: { params: RouteParams }): Pro
       alternates: { canonical: url },
     };
   } catch {
-    return { title: 'Konu' };
+    return { title: 'Konu', robots: { index: false, follow: false } };
   }
 }
 
@@ -89,11 +90,11 @@ export default async function TopicLayout({
           '@context': 'https://schema.org',
           '@type': 'Article',
           headline: topic.title,
-          description: topic.description || `${topic._count?.slides || 0} slayt içeren konu.`,
+          description: topic.description || `${topic._count?.slides || 0} slayt iceren konu.`,
           url,
           author: {
             '@type': 'Person',
-            name: topic.user?.username || 'Slaytim Kullanıcısı',
+            name: topic.user?.username || 'Slaytim Kullanicisi',
             url: topic.user?.username ? `${BASE_URL}${buildProfilePath(topic.user.username)}` : BASE_URL,
           },
           publisher: { '@type': 'Organization', name: 'Slaytim', url: BASE_URL },

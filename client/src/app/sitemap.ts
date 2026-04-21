@@ -16,6 +16,9 @@ function toSafeDate(input?: string): Date {
   return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
 }
 
+const isValidEntityId = (value: unknown): value is number =>
+  Number.isInteger(Number(value)) && Number(value) > 0;
+
 async function fetchJson<T>(path: string): Promise<T | null> {
   if (!API_URL) return null;
 
@@ -69,8 +72,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/gizlilik`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
     { url: `${BASE_URL}/kvkk`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
     { url: `${BASE_URL}/cerez-politikasi`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.4 },
-    { url: `${BASE_URL}/login`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.3 },
-    { url: `${BASE_URL}/register`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.3 },
+    { url: `${BASE_URL}/rooms`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.7 },
+    { url: `${BASE_URL}/collections`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.65 },
   ];
 
   const categoriesData = await fetchJson<{ id: number; slug: string; name: string }[]>('/categories');
@@ -84,32 +87,49 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const topicsData = await fetchJson<{ topics: { id: number; slug?: string; title?: string; createdAt: string }[] }>(
     '/topics?sort=latest&limit=200&page=1',
   );
-  const topicPages: MetadataRoute.Sitemap = (topicsData?.topics || []).map((topic) => ({
-    url: `${BASE_URL}${buildTopicPath({ id: topic.id, slug: topic.slug, title: topic.title })}`,
-    lastModified: toSafeDate(topic.createdAt),
-    changeFrequency: 'weekly',
-    priority: 0.7,
-  }));
+  const topicPages: MetadataRoute.Sitemap = (topicsData?.topics || [])
+    .filter((topic) => isValidEntityId(topic?.id))
+    .map((topic) => ({
+      url: `${BASE_URL}${buildTopicPath({ id: topic.id, slug: topic.slug, title: topic.title })}`,
+      lastModified: toSafeDate(topic.createdAt),
+      changeFrequency: 'weekly',
+      priority: 0.7,
+    }));
 
-  const slidesData = await fetchJson<{ id: number; slug?: string; title?: string; createdAt: string }[]>(
+  const slidesData = await fetchJson<{ id: number; slug?: string; title?: string; createdAt: string; conversionStatus?: string }[]>(
     '/slides/popular?limit=300',
   );
-  const slidePages: MetadataRoute.Sitemap = (slidesData || []).map((slide) => ({
-    url: `${BASE_URL}${buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title })}`,
-    lastModified: toSafeDate(slide.createdAt),
-    changeFrequency: 'monthly',
-    priority: 0.65,
-  }));
+  const slidePages: MetadataRoute.Sitemap = (slidesData || [])
+    .filter((slide) => isValidEntityId(slide?.id))
+    .filter((slide) => !slide?.conversionStatus || slide.conversionStatus === 'done')
+    .map((slide) => ({
+      url: `${BASE_URL}${buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title })}`,
+      lastModified: toSafeDate(slide.createdAt),
+      changeFrequency: 'monthly',
+      priority: 0.65,
+    }));
 
   const slideoData = await fetchJson<{ slideos: { id: number; title?: string; createdAt: string }[] }>(
     '/slideo/feed?sort=new&limit=200&page=1',
   );
-  const slideoPages: MetadataRoute.Sitemap = (slideoData?.slideos || []).map((slideo) => ({
-    url: `${BASE_URL}${buildSlideoPath({ id: slideo.id, title: slideo.title })}`,
-    lastModified: toSafeDate(slideo.createdAt),
-    changeFrequency: 'weekly',
-    priority: 0.7,
-  }));
+  const slideoPages: MetadataRoute.Sitemap = (slideoData?.slideos || [])
+    .filter((slideo) => isValidEntityId(slideo?.id))
+    .map((slideo) => ({
+      url: `${BASE_URL}${buildSlideoPath({ id: slideo.id, title: slideo.title })}`,
+      lastModified: toSafeDate(slideo.createdAt),
+      changeFrequency: 'weekly',
+      priority: 0.7,
+    }));
 
-  return [...staticPages, ...categoryPages, ...topicPages, ...slidePages, ...slideoPages];
+  const roomsData = await fetchJson<{ rooms: { id: number; slug?: string; updatedAt?: string; createdAt?: string }[] }>('/rooms');
+  const roomPages: MetadataRoute.Sitemap = (roomsData?.rooms || [])
+    .filter((room) => isValidEntityId(room?.id) && Boolean(String(room?.slug || '').trim()))
+    .map((room) => ({
+      url: `${BASE_URL}/rooms/${encodeURIComponent(String(room.slug).trim())}`,
+      lastModified: toSafeDate(room.updatedAt || room.createdAt),
+      changeFrequency: 'weekly',
+      priority: 0.6,
+    }));
+
+  return [...staticPages, ...categoryPages, ...topicPages, ...slidePages, ...slideoPages, ...roomPages];
 }

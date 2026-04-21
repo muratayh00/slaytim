@@ -10,6 +10,12 @@ const EVENT_TYPES = new Set([
   'ab_exposure',
   'hover',
   'impression',
+  'ad_viewed',
+  'ad_clicked',
+  'ad_impression',
+  'ad_click',
+  'sponsored_view',
+  'sponsored_click',
   'session_summary',
 ]);
 

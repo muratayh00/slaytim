@@ -288,6 +288,7 @@ export default function RoomsPage() {
                 <div className="mt-4 flex items-center gap-2">
                   <Link
                     href={buildRoomPath(room)}
+                    prefetch={false}
                     className="px-3 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
                   >
                     Odayi Ac

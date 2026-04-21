@@ -27,7 +27,17 @@ export default function Navbar() {
   const profileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setDark(document.documentElement.classList.contains('dark'));
+    // Restore persisted dark mode preference
+    const saved = localStorage.getItem('theme');
+    if (saved === 'dark') {
+      document.documentElement.classList.add('dark');
+      setDark(true);
+    } else if (saved === 'light') {
+      document.documentElement.classList.remove('dark');
+      setDark(false);
+    } else {
+      setDark(document.documentElement.classList.contains('dark'));
+    }
     const onScroll = () => setScrolled(window.scrollY > 8);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
@@ -54,14 +64,23 @@ export default function Navbar() {
     setProfileOpen(false);
     setMobileOpen(false);
     if (pathname === '/') {
+      // Ana sayfada her zaman light mod — tercih kaydedilmez
       document.documentElement.classList.remove('dark');
       setDark(false);
+    } else {
+      // Diğer sayfalarda kaydedilmiş tercihi uygula
+      const saved = localStorage.getItem('theme');
+      if (saved === 'dark') {
+        document.documentElement.classList.add('dark');
+        setDark(true);
+      }
     }
   }, [pathname]);
 
   const toggleDark = () => {
-    document.documentElement.classList.toggle('dark');
-    setDark((d) => !d);
+    const isDark = document.documentElement.classList.toggle('dark');
+    setDark(isDark);
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
   };
 
   const handleLogout = () => {

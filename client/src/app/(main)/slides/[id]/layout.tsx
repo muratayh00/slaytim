@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import Script from 'next/script';
 import { Suspense } from 'react';
 import { buildProfilePath, buildSlidePath, buildTopicPath, splitIdSlug } from '@/lib/url';
@@ -37,21 +37,21 @@ function getParamId(params: { id?: string; slug?: string }): string {
 export async function generateMetadata({ params }: { params: { id?: string; slug?: string } }): Promise<Metadata> {
   try {
     const slide = await fetchSlide(getParamId(params));
-    if (!slide) return { title: 'Slayt Bulunamadı' };
+    if (!slide) return { title: 'Slayt Bulunamadi', robots: { index: false, follow: false } };
 
     const title = slide.title as string;
     const description = slide.description
       ? (slide.description as string).slice(0, 155)
-      : `"${title}" sunumunu görüntüle ve indir.`;
+      : `"${title}" sunumunu goruntule ve indir.`;
     const url = `${BASE_URL}${buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title })}`;
     const image = resolveUrl(slide.thumbnailUrl);
 
-    const isPending = slide.conversionStatus === 'pending' || slide.conversionStatus === 'processing';
+    const shouldNoIndex = !slide.pdfUrl || slide.conversionStatus !== 'done';
 
     return {
       title,
       description,
-      ...(isPending ? { robots: { index: false, follow: false } } : {}),
+      ...(shouldNoIndex ? { robots: { index: false, follow: false } } : {}),
       openGraph: {
         title,
         description,
@@ -69,7 +69,7 @@ export async function generateMetadata({ params }: { params: { id?: string; slug
       alternates: { canonical: url },
     };
   } catch {
-    return { title: 'Slayt' };
+    return { title: 'Slayt', robots: { index: false, follow: false } };
   }
 }
 
@@ -105,7 +105,7 @@ export default async function SlideLayout({
         url,
         author: {
           '@type': 'Person',
-          name: slide.user?.username || 'Slaytim Kullanıcısı',
+          name: slide.user?.username || 'Slaytim Kullanicisi',
           url: slide.user?.username ? `${BASE_URL}${buildProfilePath(slide.user.username)}` : BASE_URL,
         },
         publisher: { '@type': 'Organization', name: 'Slaytim', url: BASE_URL },
@@ -126,7 +126,9 @@ export default async function SlideLayout({
         } : undefined,
       };
     }
-  } catch { /* silently skip */ }
+  } catch {
+    // silently skip
+  }
 
   return (
     <>

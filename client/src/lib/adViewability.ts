@@ -7,6 +7,8 @@
  * All events are fire-and-forget and never block the UI thread.
  */
 
+import { analytics } from '@/lib/analytics';
+
 declare global {
   interface Window {
     gtag?: (...args: unknown[]) => void;
@@ -77,6 +79,11 @@ function gtagEvent(name: string, params: Record<string, unknown>) {
 
 /** Fire when an ad slot enters viewability threshold */
 export function trackAdViewed(slotId: string, placementLabel: string, visibleMs: number) {
+  analytics.adImpression({
+    slot_id: slotId,
+    placement: placementLabel,
+    visible_ms: visibleMs,
+  });
   gtagEvent('ad_viewed', {
     slot_id: slotId,
     placement: placementLabel,
@@ -86,6 +93,7 @@ export function trackAdViewed(slotId: string, placementLabel: string, visibleMs:
 
 /** Fire when a user clicks on an ad container (best-effort, AdSense manages real clicks) */
 export function trackAdClicked(slotId: string, placementLabel: string) {
+  analytics.adClick({ slot_id: slotId, placement: placementLabel });
   gtagEvent('ad_clicked', { slot_id: slotId, placement: placementLabel });
 }
 

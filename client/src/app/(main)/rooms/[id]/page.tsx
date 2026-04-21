@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Users, Crown, Lock, Globe, Share2, Plus, Send, Loader2, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Users, Crown, Lock, Globe, Share2, Plus, Send, Loader2, MessageCircle, Trash2, Settings } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import toast from 'react-hot-toast';
@@ -265,6 +265,26 @@ export default function RoomDetailPage() {
     }
   };
 
+  const deleteRoom = async () => {
+    if (!confirm(`"${room?.name}" odasını kalıcı olarak silmek istediğine emin misin? Tüm mesajlar silinecek.`)) return;
+    try {
+      await api.delete(`/rooms/${roomSlug}`);
+      toast.success('Oda silindi');
+      window.location.href = '/rooms';
+    } catch {
+      toast.error('Oda silinemedi');
+    }
+  };
+
+  const deleteMessage = async (messageId: number) => {
+    try {
+      await api.delete(`/rooms/${roomSlug}/messages/${messageId}`);
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    } catch {
+      toast.error('Mesaj silinemedi');
+    }
+  };
+
   const shareRoom = async () => {
     const slug = room?.slug || roomSlug;
     const url = `${window.location.origin}${buildRoomPath({ slug })}`;
@@ -355,6 +375,14 @@ export default function RoomDetailPage() {
               <Plus className="w-4 h-4" /> Bu Odada Konu Aç
             </Link>
           )}
+          {isOwner && (
+            <button
+              onClick={deleteRoom}
+              className="px-4 py-2 rounded-xl border border-red-500/30 bg-red-500/5 text-red-600 text-sm font-semibold hover:bg-red-500/10 inline-flex items-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" /> Odayı Sil
+            </button>
+          )}
         </div>
       </div>
 
@@ -397,18 +425,25 @@ export default function RoomDetailPage() {
             </div>
 
             <div className="border border-border rounded-2xl p-5 bg-card">
-              <h2 className="font-bold mb-3">Üyeler</h2>
-              <div className="space-y-2">
-                {Array.isArray(room.members) && room.members.map((m: any) => (
-                  <div key={m.user?.id} className="flex items-center justify-between py-2 border-b border-border/60 last:border-b-0">
-                    <div className="text-sm font-medium">{m.user?.username || 'Kullanıcı'}</div>
-                    <div className="text-xs text-muted-foreground inline-flex items-center gap-1">
-                      {m.role === 'owner' && <Crown className="w-3.5 h-3.5 text-amber-500" />}
-                      {m.role}
-                    </div>
-                  </div>
-                ))}
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-bold">Üyeler <span className="text-muted-foreground font-normal text-sm">({room._count?.members || 0})</span></h2>
               </div>
+              {Array.isArray(room.members) && room.members.length > 5 && (
+                <MemberSearch members={room.members} />
+              )}
+              {Array.isArray(room.members) && room.members.length <= 5 && (
+                <div className="space-y-2">
+                  {room.members.map((m: any) => (
+                    <div key={m.user?.id} className="flex items-center justify-between py-2 border-b border-border/60 last:border-b-0">
+                      <div className="text-sm font-medium">{m.user?.username || 'Kullanıcı'}</div>
+                      <div className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                        {m.role === 'owner' && <Crown className="w-3.5 h-3.5 text-amber-500" />}
+                        {m.role}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -464,10 +499,22 @@ export default function RoomDetailPage() {
                     ) : (
                       messages.map((m) => {
                         const mine = m.user?.id === user?.id;
+                        const canDelete = mine || isOwner;
                         return (
-                          <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                          <div key={m.id} className={`group flex ${mine ? 'justify-end' : 'justify-start'}`}>
                             <div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs ${mine ? 'bg-primary text-white' : 'bg-card border border-border'}`}>
-                              <div className={`font-semibold mb-1 ${mine ? 'text-white/90' : 'text-foreground'}`}>{m.user?.username || 'Kullanıcı'}</div>
+                              <div className={`flex items-center justify-between gap-2 mb-1 ${mine ? 'text-white/90' : 'text-foreground'}`}>
+                                <span className="font-semibold">{m.user?.username || 'Kullanıcı'}</span>
+                                {canDelete && (
+                                  <button
+                                    onClick={() => deleteMessage(m.id)}
+                                    className={`opacity-0 group-hover:opacity-100 transition-opacity ${mine ? 'text-white/60 hover:text-white' : 'text-muted-foreground hover:text-red-500'}`}
+                                    title="Mesajı sil"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
                               <p className="whitespace-pre-wrap break-words leading-relaxed">{m.content}</p>
                               <div className={`mt-1 text-[10px] ${mine ? 'text-white/70' : 'text-muted-foreground'}`}>
                                 {formatMessageTime(m.createdAt)}
@@ -509,6 +556,39 @@ export default function RoomDetailPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function MemberSearch({ members }: { members: any[] }) {
+  const [q, setQ] = useState('');
+  const filtered = q.trim()
+    ? members.filter((m) => m.user?.username?.toLowerCase().includes(q.toLowerCase()))
+    : members;
+
+  return (
+    <div>
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Üye ara..."
+        className="w-full px-3 py-1.5 text-xs rounded-lg border border-border bg-muted/40 focus:outline-none mb-2"
+      />
+      <div className="space-y-1 max-h-48 overflow-y-auto">
+        {filtered.length === 0 ? (
+          <p className="text-xs text-muted-foreground py-2">Üye bulunamadı</p>
+        ) : (
+          filtered.map((m: any) => (
+            <div key={m.user?.id} className="flex items-center justify-between py-1.5 border-b border-border/60 last:border-b-0">
+              <div className="text-sm font-medium">{m.user?.username || 'Kullanıcı'}</div>
+              <div className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                {m.role === 'owner' && <Crown className="w-3.5 h-3.5 text-amber-500" />}
+                {m.role}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

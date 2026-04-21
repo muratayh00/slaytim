@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, MessageCircle, Send } from 'lucide-react';
+import { BarChart3, MessageCircle, Send, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import toast from 'react-hot-toast';
@@ -54,6 +54,10 @@ export default function SlideAnalyticsPanel({
   const [stats, setStats] = useState<PageStat[]>([]);
   const [comments, setComments] = useState<SlideComment[]>([]);
   const [commentText, setCommentText] = useState('');
+  // Tracks which reactions the user has already sent this session.
+  // Key format: "{pageNumber}-{reactionType}-{emoji}" — includes page so
+  // switching pages correctly resets button states.
+  const [reactedKeys, setReactedKeys] = useState<Set<string>>(new Set());
   const enterAtRef = useRef<number>(Date.now());
   const prevPageRef = useRef<number>(currentPage);
   const pagesViewedRef = useRef<Set<number>>(new Set([currentPage]));
@@ -68,6 +72,19 @@ export default function SlideAnalyticsPanel({
     () => stats.find((s) => s.pageNumber === currentPage) || null,
     [stats, currentPage],
   );
+
+  // Fetch reactions the current user/session has already sent (persisted on server)
+  useEffect(() => {
+    api.get(`/slides/${slideId}/my-reactions`, {
+      headers: { 'X-View-Session': sessionId },
+    }).then(({ data }) => {
+      const rows: { pageNumber: number; reactionType: string; emoji?: string | null }[] =
+        Array.isArray(data?.reactions) ? data.reactions : [];
+      setReactedKeys(
+        new Set(rows.map((r) => `${r.pageNumber}-${r.reactionType}-${r.emoji || ''}`)),
+      );
+    }).catch(() => {});
+  }, [slideId, sessionId]);
 
   const reloadStats = useCallback(async () => {
     try {
@@ -161,7 +178,16 @@ export default function SlideAnalyticsPanel({
     };
   }, [slideId, sessionId]);
 
+  const reactionKey = (reactionType: string, emoji?: string) =>
+    `${currentPage}-${reactionType}-${emoji || ''}`;
+
+  const hasReacted = (reactionType: string, emoji?: string) =>
+    reactedKeys.has(reactionKey(reactionType, emoji));
+
   const sendReaction = async (reactionType: string, emoji?: string) => {
+    const key = reactionKey(reactionType, emoji);
+    if (reactedKeys.has(key)) return; // already sent this session
+
     try {
       if (reactionType === 'like') interactionsRef.current.likeClicked = true;
       if (reactionType === 'save') interactionsRef.current.saveClicked = true;
@@ -173,16 +199,20 @@ export default function SlideAnalyticsPanel({
         { headers: { 'X-View-Session': sessionId } },
       );
 
+      // Mark as sent whether the backend deduplicated or not
+      setReactedKeys((prev) => new Set(prev).add(key));
       reloadStats();
     } catch {
       toast.error('Tepki kaydedilemedi');
     }
   };
 
+  const [commentBusy, setCommentBusy] = useState(false);
+
   const submitComment = async () => {
     if (!user) return toast.error('Yorum için giriş yapmalısın');
-    if (!commentText.trim()) return;
-
+    if (!commentText.trim() || commentBusy) return;
+    setCommentBusy(true);
     try {
       const { data } = await api.post(`/slides/${slideId}/comments`, {
         pageNumber: currentPage,
@@ -194,6 +224,19 @@ export default function SlideAnalyticsPanel({
       reloadStats();
     } catch {
       toast.error('Yorum gönderilemedi');
+    } finally {
+      setCommentBusy(false);
+    }
+  };
+
+  const deleteComment = async (commentId: number) => {
+    if (!confirm('Bu yorumu silmek istediğine emin misin?')) return;
+    try {
+      await api.delete(`/slides/${slideId}/comments/${commentId}`);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      reloadStats();
+    } catch {
+      toast.error('Yorum silinemedi');
     }
   };
 
@@ -242,16 +285,63 @@ export default function SlideAnalyticsPanel({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => sendReaction('like')} className="px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted">Beğendim</button>
-          <button onClick={() => sendReaction('save')} className="px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted">Kaydettim</button>
-          <button onClick={() => sendReaction('share')} className="px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted">Paylaşırım</button>
-          <button onClick={() => sendReaction('emoji', '🔥')} className="px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted">🔥</button>
-          <button onClick={() => sendReaction('emoji', '👏')} className="px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted">👏</button>
-          {reactionButtons.map((r) => (
-            <button key={r.key} onClick={() => sendReaction(r.key)} className="px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted">
-              {r.label}
-            </button>
-          ))}
+          {(
+            [
+              { type: 'like',  label: 'Beğendim' },
+              { type: 'save',  label: 'Kaydettim' },
+              { type: 'share', label: 'Paylaşırım' },
+            ] as const
+          ).map(({ type, label }) => {
+            const done = hasReacted(type);
+            return (
+              <button
+                key={type}
+                onClick={() => sendReaction(type)}
+                disabled={done}
+                className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+                  done
+                    ? 'border-primary/40 bg-primary/10 text-primary cursor-default'
+                    : 'border-border hover:bg-muted'
+                }`}
+              >
+                {done ? '✓ ' : ''}{label}
+              </button>
+            );
+          })}
+          {(['🔥', '👏'] as const).map((em) => {
+            const done = hasReacted('emoji', em);
+            return (
+              <button
+                key={em}
+                onClick={() => sendReaction('emoji', em)}
+                disabled={done}
+                className={`px-3 py-1.5 rounded-lg border text-xs transition-colors ${
+                  done
+                    ? 'border-primary/40 bg-primary/10 cursor-default opacity-60'
+                    : 'border-border hover:bg-muted'
+                }`}
+              >
+                {em}
+              </button>
+            );
+          })}
+          {reactionButtons.map((r) => {
+            const done = hasReacted(r.key);
+            return (
+              <button
+                key={r.key}
+                onClick={() => sendReaction(r.key)}
+                disabled={done}
+                className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+                  done
+                    ? 'border-primary/40 bg-primary/10 text-primary cursor-default'
+                    : 'border-border hover:bg-muted'
+                }`}
+              >
+                {done ? '✓ ' : ''}{r.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -268,7 +358,11 @@ export default function SlideAnalyticsPanel({
             placeholder="Bu sayfa hakkında yorum yaz..."
             className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm"
           />
-          <button onClick={submitComment} className="px-3 py-2 rounded-lg bg-primary text-white text-sm font-bold">
+          <button
+            onClick={submitComment}
+            disabled={commentBusy || !commentText.trim()}
+            className="px-3 py-2 rounded-lg bg-primary text-white text-sm font-bold disabled:opacity-50"
+          >
             <Send className="w-4 h-4" />
           </button>
         </div>
@@ -277,7 +371,18 @@ export default function SlideAnalyticsPanel({
           {comments.length === 0 && <p className="text-xs text-muted-foreground">Henüz yorum yok.</p>}
           {comments.map((c) => (
             <div key={c.id} className="rounded-lg border border-border p-2.5">
-              <p className="text-xs font-semibold">@{c.user.username}</p>
+              <div className="flex items-center justify-between gap-2 mb-0.5">
+                <p className="text-xs font-semibold">@{c.user.username}</p>
+                {user && (user.id === c.user.id || (user as any).isAdmin) && (
+                  <button
+                    onClick={() => deleteComment(c.id)}
+                    className="text-muted-foreground hover:text-red-500 transition-colors"
+                    title="Yorumu sil"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
               <p className="text-sm">{c.content}</p>
             </div>
           ))}

@@ -302,6 +302,54 @@ const leave = async (req, res) => {
 const follow = async (req, res) => join(req, res);
 const unfollow = async (req, res) => leave(req, res);
 
+const deleteRoom = async (req, res) => {
+  try {
+    const resolved = await resolveRoom(req.params.id);
+    if (!resolved) return res.status(404).json({ error: 'Room not found' });
+    const room = await prisma.room.findUnique({ where: { id: resolved.id } });
+    if (!room) return res.status(404).json({ error: 'Room not found' });
+    if (room.ownerId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+
+    await prisma.room.delete({ where: { id: resolved.id } });
+    res.json({ success: true });
+  } catch (err) {
+    logger.error('Failed to delete room', { error: err.message, stack: err.stack });
+    res.status(500).json({ error: 'Failed to delete room' });
+  }
+};
+
+const deleteMessage = async (req, res) => {
+  try {
+    const resolved = await resolveRoom(req.params.id);
+    if (!resolved) return res.status(404).json({ error: 'Room not found' });
+    const roomId = resolved.id;
+
+    const messageId = Number(req.params.messageId);
+    if (!Number.isInteger(messageId) || messageId <= 0) {
+      return res.status(400).json({ error: 'Invalid message ID' });
+    }
+
+    const message = await prisma.roomMessage.findUnique({ where: { id: messageId } });
+    if (!message) return res.status(404).json({ error: 'Message not found' });
+    if (message.roomId !== roomId) return res.status(400).json({ error: 'Message does not belong to this room' });
+
+    const membership = await prisma.roomMember.findUnique({
+      where: { roomId_userId: { roomId, userId: req.user.id } },
+      select: { role: true },
+    });
+    const isOwnerOrAdmin = membership?.role === 'owner' || req.user.isAdmin;
+    if (message.userId !== req.user.id && !isOwnerOrAdmin) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    await prisma.roomMessage.delete({ where: { id: messageId } });
+    res.json({ success: true });
+  } catch (err) {
+    logger.error('Failed to delete message', { error: err.message, stack: err.stack });
+    res.status(500).json({ error: 'Failed to delete message' });
+  }
+};
+
 const ensureRoomMember = async (roomId, userId) => {
   const room = await prisma.room.findUnique({
     where: { id: roomId },
@@ -424,6 +472,8 @@ module.exports = {
   follow,
   unfollow,
   accessByName,
+  deleteRoom,
+  deleteMessage,
   getMessages,
   createMessage,
   streamMessages,

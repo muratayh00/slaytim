@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { buildProfilePath } from '@/lib/url';
 import { getApiBaseUrl } from '@/lib/api-origin';
 
@@ -23,18 +23,23 @@ async function fetchProfile(username: string) {
 export async function generateMetadata({ params }: { params: { username: string } }): Promise<Metadata> {
   try {
     const profile = await fetchProfile(params.username);
-    if (!profile) return { title: 'Kullanıcı Bulunamadı' };
+    if (!profile) return { title: 'Kullanici Bulunamadi', robots: { index: false, follow: false } };
 
     const title = `@${profile.username}`;
     const description = profile.bio
       ? profile.bio.slice(0, 155)
-      : `${profile._count?.topics || 0} konu ve ${profile._count?.slides || 0} slayt. Slaytim'de @${profile.username} profilini keşfet.`;
+      : `${profile._count?.topics || 0} konu ve ${profile._count?.slides || 0} slayt. Slaytim'de @${profile.username} profilini kesfet.`;
     const url = `${BASE_URL}${buildProfilePath(params.username)}`;
     const image = profile.avatarUrl || undefined;
+    const totalPublicContent =
+      Number(profile?._count?.topics || 0)
+      + Number(profile?._count?.slides || 0)
+      + Number(profile?._count?.slideos || 0);
 
     return {
       title,
       description,
+      ...(totalPublicContent <= 0 ? { robots: { index: false, follow: false } } : {}),
       openGraph: {
         title,
         description,
@@ -52,7 +57,7 @@ export async function generateMetadata({ params }: { params: { username: string 
       alternates: { canonical: url },
     };
   } catch {
-    return { title: 'Profil' };
+    return { title: 'Profil', robots: { index: false, follow: false } };
   }
 }
 

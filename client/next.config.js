@@ -115,6 +115,18 @@ const nextConfig = {
       }] : []),
     ];
   },
+
+  async redirects() {
+    return [
+      // Legacy route aliases -> canonical Turkish slug routes
+      { source: '/topics', destination: '/kesfet', permanent: true },
+      { source: '/topics/:id', destination: '/konu/:id', permanent: true },
+      { source: '/slides/:id', destination: '/slayt/:id', permanent: true },
+      { source: '/categories', destination: '/kategori', permanent: true },
+      { source: '/categories/:slug', destination: '/kategori/:slug', permanent: true },
+      { source: '/profile/:username', destination: '/@:username', permanent: true },
+    ];
+  },
 };
 
 // Sentry is only wired when the env var is present; safe to deploy without it.

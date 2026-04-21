@@ -551,6 +551,21 @@ export default function SlideDetailPage() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
+    if (!slide?.isSponsored) return;
+    const viewKey = `sponsored:slide:view:${slide.id}`;
+    if (typeof window !== 'undefined' && sessionStorage.getItem(viewKey)) return;
+    analytics.sponsoredView({
+      content_type: 'slide',
+      content_id: Number(slide.id),
+      sponsor_name: String(slide.sponsorName || ''),
+      campaign_id: String(slide.sponsorCampaignId || ''),
+    });
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(viewKey, '1');
+    }
+  }, [slide?.id, slide?.isSponsored, slide?.sponsorName, slide?.sponsorCampaignId]);
+
+  useEffect(() => {
     if (!userId || !id) return;
     let cancelled = false;
     Promise.allSettled([api.get('/likes/me'), api.get('/saves/me')]).then(([likes, saves]) => {
@@ -1119,6 +1134,38 @@ export default function SlideDetailPage() {
               <h1 className="text-2xl font-extrabold mb-2 leading-tight tracking-tight">{slide.title}</h1>
               {slide.description && (
                 <p className="text-muted-foreground leading-relaxed text-[15px]">{slide.description}</p>
+              )}
+              {slide.isSponsored && (
+                <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+                  <p className="font-bold">Sponsorlu Icerik</p>
+                  <p>{slide.sponsorDisclosure || 'Bu icerik sponsorlu is birligi kapsaminda yayinlanmistir.'}</p>
+                  {slide.sponsorName && (
+                    <p className="mt-1">
+                      Sponsor: <span className="font-semibold">{slide.sponsorName}</span>
+                      {slide.sponsorUrl && (
+                        <>
+                          {' '}·{' '}
+                          <a
+                            href={slide.sponsorUrl}
+                            target="_blank"
+                            rel="noopener noreferrer sponsored"
+                            className="underline"
+                            onClick={() =>
+                              analytics.sponsoredClick({
+                                content_type: 'slide',
+                                content_id: Number(slide.id),
+                                sponsor_name: String(slide.sponsorName || ''),
+                                campaign_id: String(slide.sponsorCampaignId || ''),
+                              })
+                            }
+                          >
+                            Sponsor Linki
+                          </a>
+                        </>
+                      )}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0 flex-wrap">
