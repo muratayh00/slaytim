@@ -19,6 +19,13 @@ interface Category {
   name: string;
 }
 
+interface PageImage {
+  pageNumber: number;
+  url: string;
+  width?: number;
+  height?: number;
+}
+
 interface PreviewMeta {
   pageCount: number;
   previewUrl: string;
@@ -51,18 +58,29 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
   const [displayProgress, setDisplayProgress] = useState(0);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const imgPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const conversionStartedAtRef = useRef<number>(0);
   const pollErrorCountRef = useRef(0);
 
+  // Image-based preview (fast path)
+  const [pageImages, setPageImages] = useState<PageImage[]>([]);
+  const [imgTotalPages, setImgTotalPages] = useState(0);
+  const [imgPreviewStatus, setImgPreviewStatus] = useState('');
+
+  // PDF iframe fallback (slow path)
   const [previewMeta, setPreviewMeta] = useState<PreviewMeta | null>(null);
-  const [activePage, setActivePage] = useState(1);
-  const [selectedPages, setSelectedPages] = useState<number[]>([]);
   const [previewFrameLoading, setPreviewFrameLoading] = useState(false);
   const [previewCacheKey, setPreviewCacheKey] = useState('');
+
+  const [activePage, setActivePage] = useState(1);
+  const [selectedPages, setSelectedPages] = useState<number[]>([]);
 
   const [slideoTitle, setSlideoTitle] = useState('');
   const [slideoDesc, setSlideoDesc] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Whether we're showing image thumbnails or PDF iframe
+  const useImageMode = pageImages.length > 0;
 
   useEffect(() => {
     api.get('/categories').then((r) => setCategories(r.data)).catch(() => {});
@@ -71,9 +89,37 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
   useEffect(
     () => () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      if (imgPollRef.current) clearInterval(imgPollRef.current);
     },
     [],
   );
+
+  // Poll for progressive image generation when previewStatus === 'processing'
+  useEffect(() => {
+    if (!useImageMode || imgPreviewStatus !== 'processing' || !slideId) {
+      if (imgPollRef.current) { clearInterval(imgPollRef.current); imgPollRef.current = null; }
+      return;
+    }
+    if (imgPollRef.current) return;
+
+    imgPollRef.current = setInterval(async () => {
+      try {
+        const { data } = await api.get(`/slides/${slideId}/preview-meta`);
+        if (data?.previewMode === 'images' && Array.isArray(data?.pages) && data.pages.length > 0) {
+          setPageImages(data.pages);
+          setImgTotalPages(Number(data.totalPages || data.pages.length));
+          setImgPreviewStatus(String(data.previewStatus || ''));
+        }
+        if (data?.previewStatus === 'ready') {
+          if (imgPollRef.current) { clearInterval(imgPollRef.current); imgPollRef.current = null; }
+        }
+      } catch { /* ignore */ }
+    }, 3000);
+
+    return () => {
+      if (imgPollRef.current) { clearInterval(imgPollRef.current); imgPollRef.current = null; }
+    };
+  }, [useImageMode, imgPreviewStatus, slideId]);
 
   const validateAndSetFile = useCallback(
     (picked: File | null) => {
@@ -110,6 +156,7 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
 
   const resetToUpload = useCallback(() => {
     if (pollRef.current) clearInterval(pollRef.current);
+    if (imgPollRef.current) { clearInterval(imgPollRef.current); imgPollRef.current = null; }
     setStep('upload');
     setConversionPhase('uploading');
     setSessionId(null);
@@ -119,6 +166,9 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
     setUploadProgress(0);
     setConversionProgress(0);
     setDisplayProgress(0);
+    setPageImages([]);
+    setImgTotalPages(0);
+    setImgPreviewStatus('');
     setPreviewMeta(null);
     setActivePage(1);
     setSelectedPages([]);
@@ -126,9 +176,30 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
     setPreviewCacheKey('');
   }, []);
 
-  const loadPreviewMeta = useCallback(async (id: number) => {
+  const loadPreviewMeta = useCallback(async (id: number, resolvedSlideId?: number) => {
     const { data } = await api.get(`/slideo-v3/session/${id}/preview-meta`);
     const pageCount = Math.max(1, Number(data?.pageCount || 0));
+    const sId = resolvedSlideId || Number(data?.slideId || 0) || null;
+
+    setSlideId(sId);
+    setActivePage(1);
+    setSelectedPages([]);
+
+    // Try the fast path: check if WebP preview images are ready for this slide
+    if (sId) {
+      try {
+        const { data: imgData } = await api.get(`/slides/${sId}/preview-meta`);
+        if (imgData?.previewMode === 'images' && Array.isArray(imgData?.pages) && imgData.pages.length > 0) {
+          setPageImages(imgData.pages);
+          setImgTotalPages(Number(imgData.totalPages || imgData.pages.length));
+          setImgPreviewStatus(String(imgData.previewStatus || ''));
+          setStep('select');
+          return;
+        }
+      } catch { /* not ready yet — fall through to PDF iframe */ }
+    }
+
+    // Fall back to PDF iframe
     const previewUrl = String(data?.previewUrl || '').trim();
     if (!previewUrl) throw new Error('Preview URL missing');
 
@@ -138,16 +209,13 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
       : `${apiOrigin}${previewUrl.startsWith('/') ? '' : '/'}${previewUrl}`;
 
     setPreviewMeta({ pageCount, previewUrl: absolutePreview });
-    setSlideId(Number(data?.slideId || 0) || null);
-    setActivePage(1);
-    setSelectedPages([]);
     setPreviewFrameLoading(true);
     setPreviewCacheKey(String(Date.now()));
     setStep('select');
   }, []);
 
   const startPolling = useCallback(
-    (id: number) => {
+    (id: number, resolvedSlideId?: number) => {
       conversionStartedAtRef.current = Date.now();
       setConversionFailed(false);
       setConversionTimedOut(false);
@@ -174,7 +242,7 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
             if (pollRef.current) clearInterval(pollRef.current);
             setConversionPhase('preparing');
             setConversionProgress(100);
-            await loadPreviewMeta(id);
+            await loadPreviewMeta(id, resolvedSlideId);
             return;
           }
           if (status === 'failed') {
@@ -208,6 +276,9 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
     setConversionTimedOut(false);
     setSessionId(null);
     setSlideId(null);
+    setPageImages([]);
+    setImgTotalPages(0);
+    setImgPreviewStatus('');
     setPreviewMeta(null);
     setPreviewFrameLoading(false);
     setPreviewCacheKey('');
@@ -230,8 +301,9 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
 
       setUploadProgress(35);
       const createdSessionId = Number(data?.sessionId || 0);
+      const createdSlideId = Number(data?.slideId || 0) || undefined;
       setSessionId(createdSessionId || null);
-      setSlideId(Number(data?.slideId || 0) || null);
+      setSlideId(createdSlideId || null);
 
       if (String(data?.status) === 'failed') {
         setConversionFailed(true);
@@ -244,7 +316,7 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
         toast.error('Session olusturulamadi');
         return;
       }
-      startPolling(createdSessionId);
+      startPolling(createdSessionId, createdSlideId);
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Yukleme basarisiz');
       setStep('upload');
@@ -302,16 +374,28 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
     setDisplayProgress((prev) => Math.max(prev, Math.max(3, combined)));
   }, [step, conversionFailed, conversionTimedOut, uploadProgress, conversionProgress]);
 
-  const pages = useMemo(() => {
-    const total = previewMeta?.pageCount || 0;
-    return Array.from({ length: total }, (_, i) => i + 1);
-  }, [previewMeta?.pageCount]);
+  // Total page count: use imgTotalPages in image mode, previewMeta.pageCount otherwise
+  const totalPages = useImageMode ? imgTotalPages : (previewMeta?.pageCount || 0);
+  const pages = useMemo(
+    () => Array.from({ length: totalPages }, (_, i) => i + 1),
+    [totalPages],
+  );
 
   const previewSrc = useMemo(() => {
     if (!previewMeta || !slideId) return '';
     const cacheKey = previewCacheKey || 'v3';
     return `${previewMeta.previewUrl}?session=${cacheKey}#page=${activePage}&zoom=page-fit`;
   }, [previewMeta, slideId, activePage, previewCacheKey]);
+
+  const currentImage = useMemo(
+    () => pageImages.find((p) => p.pageNumber === activePage) || null,
+    [pageImages, activePage],
+  );
+
+  const canPrev = activePage > 1;
+  const canNext = activePage < totalPages;
+  const generatedCount = pageImages.length;
+  const stillGenerating = useImageMode && imgPreviewStatus === 'processing' && generatedCount < imgTotalPages;
 
   const steps: Step[] = ['upload', 'converting', 'select'];
 
@@ -337,10 +421,16 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
               <Play className="w-4 h-4 text-primary" fill="currentColor" />
               Slideo Olustur
             </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
               {step === 'upload' && 'PPT/PPTX yukle'}
               {step === 'converting' && 'LibreOffice ile sayfa onizlemeleri hazirlaniyor'}
               {step === 'select' && '3-7 sayfa sec ve Slideo olustur'}
+              {step === 'select' && stillGenerating && (
+                <span className="text-amber-500 inline-flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  {generatedCount}/{imgTotalPages} sayfa hazir
+                </span>
+              )}
             </p>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-muted transition-colors">
@@ -479,10 +569,90 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
             </div>
           )}
 
-          {step === 'select' && previewMeta && (
-            <div className="p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-1 border border-border rounded-xl p-3 space-y-3">
-                <div className="flex items-center justify-between">
+          {step === 'select' && totalPages > 0 && (
+            <div className="p-4 space-y-3">
+              {/* Main preview area */}
+              <div className="border border-border rounded-xl overflow-hidden bg-black min-h-[52vh] relative">
+                {/* Image mode (fast path) */}
+                {useImageMode && (
+                  currentImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={currentImage.pageNumber}
+                      src={currentImage.url}
+                      alt={`Sayfa ${activePage}`}
+                      className="w-full h-[52vh] object-contain"
+                    />
+                  ) : (
+                    <div className="h-[52vh] flex flex-col items-center justify-center text-white/60 gap-3">
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                      <p className="text-sm">Sayfa {activePage} henuz hazirlaniyor...</p>
+                    </div>
+                  )
+                )}
+
+                {/* PDF iframe fallback (slow path) */}
+                {!useImageMode && (
+                  <>
+                    {previewFrameLoading && (
+                      <div className="absolute inset-0 z-10 bg-card/80 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Sayfa onizleme yukleniyor...
+                      </div>
+                    )}
+                    <iframe
+                      title="Slideo page preview"
+                      src={previewSrc}
+                      className="w-full h-[52vh]"
+                      onLoad={() => setPreviewFrameLoading(false)}
+                    />
+                  </>
+                )}
+
+                {/* Page counter */}
+                <div className="absolute top-3 right-3 z-10 px-2.5 py-1 rounded-lg bg-black/60 text-white text-xs font-bold">
+                  {activePage} / {totalPages}
+                </div>
+
+                {/* Navigation */}
+                <div className="absolute bottom-3 left-3 right-3 z-10 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => canPrev && setActivePage((p) => p - 1)}
+                    disabled={!canPrev}
+                    className="px-3 py-2 rounded-xl bg-black/65 text-white text-xs font-bold border border-white/20 disabled:opacity-35"
+                  >
+                    Onceki
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => togglePage(activePage)}
+                    disabled={useImageMode && !currentImage}
+                    className={cn(
+                      'px-4 py-2 rounded-xl text-xs font-black border transition-colors disabled:opacity-40',
+                      selectedPages.includes(activePage)
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-black/65 text-white border-white/20',
+                    )}
+                  >
+                    {selectedPages.includes(activePage) ? 'Secimden Cikar' : 'Bu Sayfayi Sec'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => canNext && setActivePage((p) => p + 1)}
+                    disabled={!canNext}
+                    className="px-3 py-2 rounded-xl bg-black/65 text-white text-xs font-bold border border-white/20 disabled:opacity-35"
+                  >
+                    Sonraki
+                  </button>
+                </div>
+              </div>
+
+              {/* Page grid */}
+              <div className="border border-border rounded-xl bg-muted/20 p-3">
+                <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-semibold text-muted-foreground">
                     Secilen: {selectedPages.length}/7 {selectedPages.length < 3 ? '(en az 3)' : ''}
                   </p>
@@ -491,42 +661,87 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-4 gap-2 max-h-[45vh] overflow-y-auto pr-1">
-                  {pages.map((page) => {
-                    const selected = selectedPages.includes(page);
+                {/* Selected page chips */}
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {selectedPages.length === 0 && (
+                    <span className="text-xs text-muted-foreground">Henuz sayfa secilmedi</span>
+                  )}
+                  {selectedPages.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setActivePage(p)}
+                      className={cn(
+                        'h-8 px-3 rounded-lg text-xs font-bold border',
+                        activePage === p ? 'bg-primary text-white border-primary' : 'bg-card border-border',
+                      )}
+                    >
+                      Sayfa {p}
+                    </button>
+                  ))}
+                </div>
+
+                {/* All pages */}
+                <p className="text-[11px] text-muted-foreground mb-2">Tum sayfalar (dokun: onizle / sec)</p>
+                <div className="flex flex-wrap gap-2 max-h-[30vh] overflow-y-auto pr-1">
+                  {pages.map((p) => {
+                    const selected = selectedPages.includes(p);
+                    const img = pageImages.find((pi) => pi.pageNumber === p);
+                    const isActive = activePage === p;
+
+                    if (useImageMode) {
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => { setActivePage(p); togglePage(p); }}
+                          className={cn(
+                            'relative w-16 h-12 rounded-lg border overflow-hidden transition-all',
+                            selected ? 'border-primary ring-2 ring-primary/40' : 'border-border',
+                            isActive ? 'ring-2 ring-primary' : '',
+                          )}
+                          title={`Sayfa ${p}`}
+                        >
+                          {img ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={img.url} alt={`Sayfa ${p}`} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-muted flex items-center justify-center">
+                              <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                            </div>
+                          )}
+                          <span className="absolute bottom-0.5 right-1 text-[9px] font-bold text-white drop-shadow">{p}</span>
+                          {selected && (
+                            <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                              <div className="w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                                <span className="text-[9px] text-white font-black">✓</span>
+                              </div>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    }
+
                     return (
                       <button
-                        key={page}
+                        key={p}
+                        type="button"
                         onClick={() => {
-                          setActivePage(page);
-                          togglePage(page);
+                          setActivePage(p);
+                          togglePage(p);
+                          if (!useImageMode) setPreviewFrameLoading(true);
                         }}
                         className={cn(
-                          'h-10 rounded-lg border text-xs font-bold transition-colors',
-                          activePage === page ? 'border-primary' : 'border-border',
+                          'h-10 rounded-lg border text-xs font-bold transition-colors px-3',
+                          isActive ? 'border-primary' : 'border-border',
                           selected ? 'bg-primary text-white' : 'bg-muted/40 hover:bg-muted',
                         )}
                       >
-                        {page}
+                        {p}
                       </button>
                     );
                   })}
                 </div>
-              </div>
-
-              <div className="lg:col-span-2 border border-border rounded-xl overflow-hidden bg-muted/20 min-h-[52vh] relative">
-                {previewFrameLoading && (
-                  <div className="absolute inset-0 z-10 bg-card/80 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Sayfa onizleme yukleniyor...
-                  </div>
-                )}
-                <iframe
-                  title="Slideo page preview"
-                  src={previewSrc}
-                  className="w-full h-[52vh]"
-                  onLoad={() => setPreviewFrameLoading(false)}
-                />
               </div>
             </div>
           )}
