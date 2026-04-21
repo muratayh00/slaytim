@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Eye, Lock, Database, Users, Clock, Mail, Shield } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Gizlilik Politikası | Slaytim',
@@ -8,126 +9,184 @@ export const metadata: Metadata = {
   alternates: { canonical: 'https://slaytim.com/gizlilik' },
 };
 
-const LAST_UPDATED = '20 Nisan 2026';
+const LAST_UPDATED = '21 Nisan 2026';
 
 export default function GizlilikPage() {
   return (
-    <article className="prose prose-sm md:prose-base dark:prose-invert max-w-none">
-      <h1>Gizlilik Politikası</h1>
-      <p className="text-muted-foreground text-sm">Son güncelleme: {LAST_UPDATED}</p>
+    <div className="space-y-8">
+      {/* Hero */}
+      <div className="flex items-start gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+          <Eye className="w-6 h-6 text-primary" />
+        </div>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">Gizlilik Politikası</h1>
+          <p className="text-sm text-muted-foreground mt-1.5">Son güncelleme: {LAST_UPDATED}</p>
+        </div>
+      </div>
 
-      <p>
-        Bu politika, <strong>slaytim.com</strong> hizmetlerini kullanırken kişisel verilerinizin
-        nasıl toplandığını, işlendiğini ve korunduğunu açıklamaktadır. Sitemizi kullanarak bu
-        politikayı kabul etmiş sayılırsınız.
+      <p className="text-sm text-muted-foreground leading-relaxed border-l-2 border-primary/30 pl-4">
+        Bu politika, <strong className="text-foreground">slaytim.com</strong> hizmetlerini kullanırken kişisel verilerinizin
+        nasıl toplandığını, işlendiğini ve korunduğunu açıklamaktadır. Sitemizi kullanarak bu politikayı kabul etmiş sayılırsınız.
       </p>
 
-      <h2>1. Topladığımız Bilgiler</h2>
+      {/* Section 1 */}
+      <Section icon={<Database className="w-5 h-5 text-primary" />} title="1. Topladığımız Bilgiler">
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground mb-2">Doğrudan Sağladığınız Bilgiler</p>
+            <ul className="space-y-1.5">
+              {[
+                ['Hesap bilgileri', 'Kullanıcı adı, e-posta adresi, şifre (hashed)'],
+                ['Profil bilgileri', 'Biyografi, avatar görseli'],
+                ['İçerik', 'Yüklediğiniz slaytlar, yorumlarınız, konu başlıklarınız'],
+                ['İletişim', 'Bize gönderdiğiniz geri bildirim ve destek talepleri'],
+              ].map(([label, val]) => (
+                <li key={label} className="flex items-start gap-2 text-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
+                  <span><strong className="text-foreground">{label}:</strong> <span className="text-muted-foreground">{val}</span></span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground mb-2">Otomatik Olarak Toplanan Bilgiler</p>
+            <ul className="space-y-1.5">
+              {[
+                'IP adresi ve tarayıcı bilgisi (sunucu erişim logları, 90 gün saklanır)',
+                'Görüntülenen slayt ve konu başlıkları (görüntülenme sayacı)',
+                'Etkileşimler: beğeni, kaydetme, takip etme, yorum',
+                'Çerez kimlikleri (rıza vermeniz hâlinde analitik ve reklam çerezleri)',
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 mt-1.5 shrink-0" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </Section>
 
-      <h3>1.1 Doğrudan Sağladığınız Bilgiler</h3>
-      <ul>
-        <li><strong>Hesap bilgileri:</strong> Kullanıcı adı, e-posta adresi, şifre (hashed).</li>
-        <li><strong>Profil bilgileri:</strong> Biyografi, avatar görseli.</li>
-        <li><strong>İçerik:</strong> Yüklediğiniz slaytlar, yorumlarınız, konu başlıklarınız.</li>
-        <li><strong>İletişim:</strong> Bize gönderdiğiniz geri bildirim ve destek talepleri.</li>
-      </ul>
+      {/* Section 2 */}
+      <Section icon={<Eye className="w-5 h-5 text-primary" />} title="2. Bilgileri Nasıl Kullanıyoruz">
+        <div className="grid gap-2 sm:grid-cols-2">
+          {[
+            ['Hizmet Sunumu', 'Hesap yönetimi, içerik gösterimi, bildirimler'],
+            ['Güvenlik', 'Spam tespiti, kötüye kullanım önleme, rate limiting'],
+            ['Kişiselleştirme', 'İlgi alanlarına göre içerik önerisi (yerel algoritma)'],
+            ['Analitik', 'Site performansı ve kullanım istatistikleri'],
+            ['Reklamcılık', 'Kişiselleştirilmiş reklamlar (yalnızca onaylı çerezlerle)'],
+            ['Yasal', 'Yetkili makam taleplerine yanıt'],
+          ].map(([title, desc]) => (
+            <div key={title} className="p-3.5 rounded-xl border border-border bg-muted/20">
+              <p className="text-sm font-semibold text-foreground">{title}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
 
-      <h3>1.2 Otomatik Olarak Toplanan Bilgiler</h3>
-      <ul>
-        <li>IP adresi ve tarayıcı bilgisi (sunucu erişim logları, 90 gün saklanır).</li>
-        <li>Görüntülenen slayt ve konu başlıkları (görüntülenme sayacı).</li>
-        <li>Etkileşimler: beğeni, kaydetme, takip etme, yorum.</li>
-        <li>Çerez kimlikleri (rıza vermeniz hâlinde analitik ve reklam çerezleri).</li>
-      </ul>
+      {/* Section 3 */}
+      <Section icon={<Users className="w-5 h-5 text-primary" />} title="3. Bilgilerin Paylaşımı">
+        <p className="text-sm text-muted-foreground">
+          Kişisel verilerinizi <strong className="text-foreground">satmıyor, kiralamıyor</strong> veya ticari amaçla üçüncü taraflarla paylaşmıyoruz. Yalnızca şu durumlarda paylaşım yapılabilir:
+        </p>
+        <ul className="space-y-2 mt-2">
+          {[
+            ['Altyapı sağlayıcısı', 'Sunucu ve depolama hizmetleri (veri işleme sözleşmesi kapsamında)'],
+            ['Google AdSense', 'Reklam çerezlerine onay vermeniz hâlinde reklam kimlikleri ve ilgi kategorileri'],
+            ['Yasal zorunluluk', 'Mahkeme kararı veya resmi makam talebi'],
+            ['Kullanıcı izni', 'Açıkça onay vermeniz hâlinde'],
+          ].map(([who, what]) => (
+            <li key={who} className="flex gap-3 p-3 rounded-xl bg-muted/30 border border-border/60">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">{who}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{what}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Section>
 
-      <h2>2. Bilgileri Nasıl Kullanıyoruz</h2>
-      <ul>
-        <li>Hizmet sunumu: hesap yönetimi, içerik gösterimi, bildirimler.</li>
-        <li>Güvenlik: spam tespiti, kötüye kullanım önleme, rate limiting.</li>
-        <li>Kişiselleştirme: ilgi alanlarına göre içerik önerisi (yerel algoritma, 3. taraf olmadan).</li>
-        <li>Analitik: site performansı ve kullanım istatistikleri (onaylı çerezler ile).</li>
-        <li>Reklamcılık: kişiselleştirilmiş reklamlar (yalnızca onaylı reklam çerezleri ile).</li>
-        <li>Sponsorlu içerik şeffaflığı: sponsor adı, kampanya kodu ve açıklama metni görüntüleme.</li>
-        <li>Yasal yükümlülükler: yetkili makam talepleri.</li>
-      </ul>
+      {/* Section 4 */}
+      <Section icon={<Lock className="w-5 h-5 text-primary" />} title="4. Veri Güvenliği">
+        <div className="grid gap-2 sm:grid-cols-2">
+          {[
+            ['bcrypt', 'Parola hashleme (cost 10); düz metin saklanmaz'],
+            ['JWT', 'Kimlik doğrulama tokenları 7 günde geçersiz olur'],
+            ['HTTPS', 'Tüm bağlantılar TLS ile şifrelenir'],
+            ['Helmet', 'HTTP güvenlik başlıkları uygulanır'],
+            ['50 MB Limit', 'Magic byte doğrulaması ile dosya tipi kontrolü'],
+            ['Rate Limiting', 'Brute-force saldırılarına karşı IP koruması'],
+          ].map(([tech, desc]) => (
+            <div key={tech} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/20">
+              <code className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded shrink-0">{tech}</code>
+              <span className="text-xs text-muted-foreground">{desc}</span>
+            </div>
+          ))}
+        </div>
+      </Section>
 
-      <h2>3. Bilgilerin Paylaşımı</h2>
-      <p>
-        Kişisel verilerinizi satmıyor, kiralamıyor veya ticari amaçla üçüncü taraflarla
-        paylaşmıyoruz. Yalnızca şu durumlarda paylaşım yapılabilir:
-      </p>
-      <ul>
-        <li>
-          <strong>Altyapı sağlayıcısı:</strong> Sunucu ve depolama hizmetleri için (veri işleme
-          sözleşmesi kapsamında).
-        </li>
-        <li>
-          <strong>Google AdSense:</strong> Reklam çerezlerine onay vermeniz hâlinde (reklam
-          kimlikleri ve ilgi kategorileri). Ayrıntılar için{' '}
-          <Link href="/cerez-politikasi">Çerez Politikamızı</Link> inceleyin.
-        </li>
-        <li>
-          <strong>Yasal zorunluluk:</strong> Mahkeme kararı veya resmi makam talebi.
-        </li>
-        <li>
-          <strong>Kullanıcı izni:</strong> Açıkça onay vermeniz hâlinde.
-        </li>
-      </ul>
+      {/* Section 5 */}
+      <Section icon={<Clock className="w-5 h-5 text-primary" />} title="5. Veri Saklama">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {[
+            ['Hesap verileri', 'Hesap silinene kadar + 30 gün yedekten kaldırma'],
+            ['Slayt dosyaları', 'Slayt silindiğinde anında kaldırılır'],
+            ['Sunucu logları', '90 gün'],
+            ['Çerez verileri', 'Zorunlu: 1 yıl · Analitik/Reklam: en fazla 2 yıl'],
+          ].map(([label, value]) => (
+            <div key={label} className="p-3.5 rounded-xl border border-border bg-muted/20">
+              <p className="text-xs font-semibold text-foreground">{label}</p>
+              <p className="text-xs text-muted-foreground mt-1">{value}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
 
-      <h2>4. Veri Güvenliği</h2>
-      <p>Verilerinizin korunması için uygulanan teknik önlemler:</p>
-      <ul>
-        <li>Parolalar <strong>bcrypt</strong> (cost factor 10) ile hashlenir; düz metin saklanmaz.</li>
-        <li>Kimlik doğrulama <strong>JWT</strong> ile yapılır, tokenlar 7 gün sonra geçersiz olur.</li>
-        <li>Tüm bağlantılar <strong>HTTPS</strong> üzerinden şifrelenir.</li>
-        <li>HTTP güvenlik başlıkları (<strong>Helmet</strong>) uygulanır.</li>
-        <li>Yükleme boyutu 50 MB ile sınırlıdır; dosya türü magic byte doğrulaması yapılır.</li>
-        <li>Brute-force saldırılarına karşı IP bazlı <strong>rate limiting</strong> aktiftir.</li>
-        <li>Yeni hesaplar için kademeli yükleme limiti (spam önleme).</li>
-      </ul>
+      {/* Section 6 */}
+      <Section icon={<Shield className="w-5 h-5 text-primary" />} title="6. Çocukların Gizliliği">
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Slaytim, 13 yaşın altındaki bireylere yönelik değildir. 13 yaşın altındaki birinden bilerek veri toplamıyoruz.
+          Bu durumun farkındaysanız lütfen bize bildirin.
+        </p>
+      </Section>
 
-      <h2>5. Veri Saklama</h2>
-      <ul>
-        <li>
-          <strong>Hesap verileri:</strong> Hesabınızı silene kadar aktif tutulur. Silme işleminden
-          sonra 30 gün yedekten de kaldırılır.
-        </li>
-        <li>
-          <strong>Slayt dosyaları:</strong> Slayt silindiğinde disk üzerinden anında kaldırılır
-          (dosya, PDF dönüştürmesi ve küçük resim dahil).
-        </li>
-        <li>
-          <strong>Sunucu logları:</strong> 90 gün.
-        </li>
-        <li>
-          <strong>Çerez verileri:</strong> Çerez politikasındaki süreye göre (zorunlu çerez 1 yıl,
-          analitik/reklam çerezleri en fazla 2 yıl).
-        </li>
-      </ul>
+      {/* Section 7 */}
+      <Section icon={<Eye className="w-5 h-5 text-primary" />} title="7. Haklarınız">
+        <p className="text-sm text-muted-foreground">
+          KVKK madde 11 kapsamındaki haklarınız için{' '}
+          <Link href="/kvkk" className="text-primary hover:underline font-medium">KVKK Aydınlatma Metnini</Link>{' '}
+          inceleyin. Talepler en geç <strong className="text-foreground">30 gün</strong> içinde yanıtlanır.
+        </p>
+      </Section>
 
-      <h2>6. Çocukların Gizliliği</h2>
-      <p>
-        Slaytim, 13 yaşın altındaki bireylere yönelik değildir. 13 yaşın altındaki birinden
-        bilerek veri toplamıyoruz. Bu durumun farkındaysanız lütfen bize bildirin.
-      </p>
+      {/* Contact */}
+      <section className="bg-card border border-border rounded-2xl p-5 md:p-6 space-y-3">
+        <h2 className="font-bold text-base text-foreground">8. İletişim</h2>
+        <p className="text-sm text-muted-foreground">Gizlilik politikamıza ilişkin soru ve talepleriniz için:</p>
+        <div className="inline-flex items-center gap-3 px-4 py-2.5 rounded-xl border border-border bg-muted/30">
+          <Mail className="w-4 h-4 text-primary shrink-0" />
+          <div>
+            <p className="text-xs text-muted-foreground">Gizlilik İletişim</p>
+            <a href="mailto:admin@slaytim.com" className="text-sm font-semibold text-primary hover:underline">admin@slaytim.com</a>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
 
-      <h2>7. Haklarınız</h2>
-      <p>
-        KVKK madde 11 kapsamındaki haklarınız için <Link href="/kvkk">KVKK Aydınlatma Metnini</Link>{' '}
-        inceleyin. Talepler en geç 30 gün içinde yanıtlanır.
-      </p>
-
-      <h2>8. Değişiklikler</h2>
-      <p>
-        Bu politika zaman zaman güncellenebilir. Önemli değişiklikler hesap e-postanıza bildirilir.
-        Güncelleme tarihini düzenli olarak kontrol etmenizi öneririz.
-      </p>
-
-      <h2>9. İletişim</h2>
-      <p>
-        Gizlilik politikamıza ilişkin soru ve talepleriniz için:{' '}
-        <a href="mailto:kvkk@slaytim.com">kvkk@slaytim.com</a>
-      </p>
-    </article>
+function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <section className="bg-card border border-border rounded-2xl p-5 md:p-6 space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">{icon}</div>
+        <h2 className="font-bold text-base text-foreground">{title}</h2>
+      </div>
+      <div className="space-y-3">{children}</div>
+    </section>
   );
 }
