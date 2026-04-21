@@ -431,6 +431,7 @@ export default function SlideViewer({
         <div className="relative rounded-2xl overflow-hidden bg-zinc-900">
           {coverUrl ? (
             <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={coverUrl}
                 alt="Slayt önizlemesi"
@@ -555,6 +556,7 @@ export default function SlideViewer({
             setDoc() and the first canvas paint so the canvas never flashes blank. */}
         {!firstRenderDone && coverUrl && (
           <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden rounded-2xl">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={coverUrl}
               alt=""

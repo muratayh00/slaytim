@@ -81,6 +81,7 @@ export default function EditProfileModal({ profile, onClose, onSuccess }: Props)
             />
             {form.avatarUrl && (
               <div className="flex items-center gap-2 mt-1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={form.avatarUrl}
                   alt=""

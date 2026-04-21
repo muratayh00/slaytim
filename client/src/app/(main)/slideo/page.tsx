@@ -216,7 +216,7 @@ function SlideoPageContent() {
         </button>
       </div>
 
-      <div className="absolute right-4 top-1/2 -translate-y-1/2 z-40 hidden md:flex flex-col gap-2">
+      <div className="absolute left-4 top-1/2 -translate-y-1/2 z-40 hidden md:flex flex-col gap-2">
         <button
           onClick={goPrev}
           disabled={activeIdx === 0}

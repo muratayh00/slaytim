@@ -89,7 +89,9 @@ function SlidePageImage({
       {!loaded && (
         <div className={cn('w-full bg-muted/60 animate-pulse rounded-lg aspect-video', SLIDE_MAX_H)} />
       )}
-      {/* Image — scales to fill width, never taller than SLIDE_MAX_H */}
+      {/* Image — scales to fill width, never taller than SLIDE_MAX_H.
+          next/image fill mode is incompatible with h-auto + max-h constraints. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={page.url}
         alt={`Sayfa ${page.pageNumber}`}
@@ -240,6 +242,7 @@ export default function ImageSlideViewer({
                 )}
               >
                 <div className="relative w-full" style={{ paddingTop: '66%' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={p.url}
                     alt={`Sayfa ${p.pageNumber}`}
@@ -274,7 +277,9 @@ export default function ImageSlideViewer({
               : 'max-w-3xl mx-auto'
           )}>
             {isFullscreen ? (
-              // Fullscreen: fill available height, no max-h cap
+              // Fullscreen: fill available height, no max-h cap.
+              // next/image fill mode can't express max-w-full max-h-full here.
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={currentPageData.url}
                 alt={`Sayfa ${currentPageData.pageNumber}`}

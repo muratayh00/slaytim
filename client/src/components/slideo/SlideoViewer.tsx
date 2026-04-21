@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   Heart, Bookmark, Share2, ExternalLink, Loader2, Play, ChevronRight,
   RefreshCw,
@@ -634,15 +635,16 @@ export default function SlideoViewer({
             {/* Creator row */}
             <div className="flex items-center gap-2 mb-1.5">
               <div className={cn(
-                'w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-black text-white overFlow-hidden relative',
+                'w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-black text-white overflow-hidden relative',
                 avatarColor,
               )}>
                 {slideo.user.username.slice(0, 1).toUpperCase()}
                 {slideo.user.avatarUrl && (
-                  <img
+                  <Image
                     src={resolveFileUrl(slideo.user.avatarUrl)}
                     alt=""
-                    className="absolute inset-0 w-full h-full object-cover"
+                    fill
+                    className="object-cover"
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                   />
                 )}
@@ -741,13 +743,14 @@ function MiniSlideoCard({ slideo: s }: { slideo: SlideoItem }) {
   const avatarColor = AVATAR_COLORS[s.user.id % AVATAR_COLORS.length];
   return (
     <Link href={`/slideo?focus=${s.id}`} className="shrink-0 w-[70px] flex flex-col gap-1.5 group">
-      <div className="w-[70px] h-[54px] rounded-xl overFlow-hidden bg-white/8 border border-white/12 flex items-center justify-center relative">
+      <div className="w-[70px] h-[54px] rounded-xl overflow-hidden bg-white/8 border border-white/12 flex items-center justify-center relative">
         <Play className="w-4 h-4 text-white/30" fill="currentColor" />
         {s.slide.thumbnailUrl && (
-          <img
+          <Image
             src={resolveFileUrl(s.slide.thumbnailUrl)}
             alt=""
-            className="absolute inset-0 w-full h-full object-cover"
+            fill
+            className="object-cover"
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
           />
         )}
@@ -760,15 +763,16 @@ function MiniSlideoCard({ slideo: s }: { slideo: SlideoItem }) {
       </p>
       <div className="flex items-center gap-1">
         <div className={cn(
-          'w-3 h-3 rounded-full shrink-0 flex items-center justify-center text-[5px] font-black text-white overFlow-hidden relative',
+          'w-3 h-3 rounded-full shrink-0 flex items-center justify-center text-[5px] font-black text-white overflow-hidden relative',
           avatarColor,
         )}>
           {s.user.username.slice(0, 1).toUpperCase()}
           {s.user.avatarUrl && (
-            <img
+            <Image
               src={resolveFileUrl(s.user.avatarUrl)}
               alt=""
-              className="absolute inset-0 w-full h-full object-cover"
+              fill
+              className="object-cover"
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
             />
           )}

@@ -120,6 +120,10 @@ const nextConfig = {
     return [
       // Legacy route aliases -> canonical Turkish slug routes
       { source: '/topics', destination: '/kesfet', permanent: true },
+      // /topics/new must come BEFORE /topics/:id — Next.js redirects run before
+      // the filesystem, so without this specific rule /topics/new would be caught
+      // by the :id wildcard and redirected to /konu/new (404).
+      { source: '/topics/new', destination: '/konu/yeni', permanent: true },
       { source: '/topics/:id', destination: '/konu/:id', permanent: true },
       { source: '/slides/:id', destination: '/slayt/:id', permanent: true },
       { source: '/categories', destination: '/kategori', permanent: true },

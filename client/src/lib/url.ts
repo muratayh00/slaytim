@@ -86,7 +86,7 @@ export function buildRoomPath(room: { slug?: string | null; name?: string | null
 export function buildTopicCreatePath(roomId?: number | string): string {
   const normalized = typeof roomId === 'string' ? Number(roomId) : roomId;
   if (Number.isInteger(normalized) && Number(normalized) > 0) {
-    return `/topics/new?roomId=${Number(normalized)}`;
+    return `/konu/yeni?roomId=${Number(normalized)}`;
   }
-  return '/topics/new';
+  return '/konu/yeni';
 }
