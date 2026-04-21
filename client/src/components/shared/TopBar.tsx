@@ -1,5 +1,6 @@
 ﻿'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Search, Plus, Users } from 'lucide-react';
@@ -49,9 +50,7 @@ export default function TopBar() {
               <div className="w-7 h-7 rounded-lg border border-border bg-muted/70 flex items-center justify-center text-[10px] font-black text-primary overflow-hidden relative shrink-0">
                 {user.username.slice(0, 2).toUpperCase()}
                 {resolveMediaUrl(user.avatarUrl) && (
-                  <img src={resolveMediaUrl(user.avatarUrl)!} alt={user.username}
-                    className="absolute inset-0 w-full h-full object-cover"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                  <Image src={resolveMediaUrl(user.avatarUrl)!} alt={user.username} fill className="object-cover" />
                 )}
               </div>
               <span className="text-[13px] font-semibold max-w-[100px] truncate">{user.username}</span>

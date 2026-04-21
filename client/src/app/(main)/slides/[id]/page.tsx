@@ -1,5 +1,6 @@
 ﻿'use client';
 
+import Image from 'next/image';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useSearchParams, usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -436,7 +437,7 @@ function RelatedSection({ slides, title }: { slides: any[]; title: string }) {
 
 // ?? Main page ?????????????????????????????????????????????????????????????????
 
-export default function SlideDetailPage() {
+export default function SlideDetailPage({ initialSlide }: { initialSlide?: any } = {}) {
   const params = useParams();
   const rawParam = String((params as Record<string, string>)?.id || (params as Record<string, string>)?.slug || '');
   const { id: parsedId, slug: parsedSlug } = splitIdSlug(rawParam);
@@ -445,8 +446,9 @@ export default function SlideDetailPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user } = useAuthStore();
-  const [slide, setSlide] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [slide, setSlide] = useState<any>(initialSlide || null);
+  const [loading, setLoading] = useState(!initialSlide);
+  const hasInitialDataRef = useRef(Boolean(initialSlide));
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showReport, setShowReport] = useState(false);
@@ -533,7 +535,9 @@ export default function SlideDetailPage() {
 
   const load = useCallback(async () => {
     if (!sessionId) return;
-    setLoading(true);
+    // Don't show loading spinner if we already have SSR initial data
+    if (!hasInitialDataRef.current) setLoading(true);
+    hasInitialDataRef.current = false;
     try {
       const { data } = await api.get(`/slides/${id}`);
       setSlide(data);
@@ -1098,7 +1102,7 @@ export default function SlideDetailPage() {
         ) : (
           <div className={`aspect-video bg-gradient-to-br ${bgGradient} border border-border rounded-2xl flex items-center justify-center mb-6 overflow-hidden relative`}>
             {slide.thumbnailUrl ? (
-              <img src={resolveFileUrl(slide.thumbnailUrl)} alt={slide.title} className="w-full h-full object-cover" />
+              <Image src={resolveFileUrl(slide.thumbnailUrl)!} alt={slide.title} fill className="object-cover" />
             ) : (
               <div className="flex flex-col items-center gap-4">
                 {(slide.conversionStatus === 'pending' || slide.conversionStatus === 'processing') ? (
@@ -1277,9 +1281,9 @@ export default function SlideDetailPage() {
               onClick={trackProfileVisit}
               className="flex items-center gap-2.5 hover:text-primary transition-colors group"
             >
-              <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-xs font-bold text-white ring-2 ring-white/20 shadow-sm overflow-hidden`}>
+              <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-xs font-bold text-white ring-2 ring-white/20 shadow-sm overflow-hidden relative`}>
                 {slide.user.avatarUrl
-                  ? <img src={resolveFileUrl(slide.user.avatarUrl)} alt="" className="w-full h-full object-cover" />
+                  ? <Image src={resolveFileUrl(slide.user.avatarUrl)!} alt={slide.user.username} fill className="object-cover" />
                   : slide.user.username.slice(0, 2).toUpperCase()}
               </div>
               <span className="text-sm font-semibold">{slide.user.username}</span>
@@ -1397,7 +1401,7 @@ export default function SlideDetailPage() {
                     <div className="aspect-video bg-black/80 relative flex items-center justify-center overflow-hidden">
                       <Play className="w-8 h-8 text-white/20" fill="currentColor" />
                       {s.slide?.thumbnailUrl ? (
-                        <img src={resolveFileUrl(s.slide.thumbnailUrl)} alt="" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                        <Image src={resolveFileUrl(s.slide.thumbnailUrl)!} alt={s.title || ''} fill className="object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                       ) : null}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                       <span className="absolute top-1.5 right-1.5 bg-black/70 text-white/80 text-[9px] font-bold px-1.5 py-0.5 rounded-full">
@@ -1408,8 +1412,8 @@ export default function SlideDetailPage() {
                       <p className="text-[11px] font-bold leading-tight line-clamp-2 mb-1.5 group-hover:text-primary transition-colors">{s.title}</p>
                       <div className="flex items-center justify-between text-[9px] text-muted-foreground">
                         <div className="flex items-center gap-1">
-                          <div className={cn('w-3.5 h-3.5 rounded-full flex items-center justify-center text-[6px] font-black text-white overflow-hidden shrink-0', avatarColors[s.user.id % avatarColors.length])}>
-                            {s.user.avatarUrl ? <img src={resolveFileUrl(s.user.avatarUrl)} alt="" className="w-full h-full object-cover" /> : s.user.username.slice(0,1).toUpperCase()}
+                          <div className={cn('w-3.5 h-3.5 rounded-full flex items-center justify-center text-[6px] font-black text-white overflow-hidden shrink-0 relative', avatarColors[s.user.id % avatarColors.length])}>
+                            {s.user.avatarUrl ? <Image src={resolveFileUrl(s.user.avatarUrl)!} alt="" fill className="object-cover" /> : s.user.username.slice(0,1).toUpperCase()}
                           </div>
                           <span className="truncate max-w-[60px]">{s.user.username}</span>
                         </div>

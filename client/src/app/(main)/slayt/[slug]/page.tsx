@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { notFound, permanentRedirect } from 'next/navigation';
 import SlideDetailClientPage from '../../slides/[id]/page';
 import { buildSlidePath, splitIdSlug } from '@/lib/url';
@@ -56,5 +57,21 @@ export default async function SlideCanonicalPage({
     permanentRedirect(`${canonicalPath}${toQueryString(searchParams)}`);
   }
 
-  return <SlideDetailClientPage />;
+  // SlideDetailClientPage calls useSearchParams() — in Next.js 14, any client
+  // component that uses useSearchParams() must be wrapped in <Suspense> when
+  // rendered from a server component, otherwise Next.js bails out of SSR for
+  // the entire subtree and the page returns no <h1> in the initial HTML.
+  return (
+    <Suspense fallback={
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="skeleton h-8 w-48 mb-6 rounded-xl" />
+        <div className="skeleton aspect-video rounded-2xl mb-6" />
+        <div className="skeleton h-10 w-2/3 rounded-xl mb-4" />
+        <div className="skeleton h-5 w-full rounded-xl mb-2" />
+        <div className="skeleton h-5 w-3/4 rounded-xl" />
+      </div>
+    }>
+      <SlideDetailClientPage initialSlide={slide} />
+    </Suspense>
+  );
 }

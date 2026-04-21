@@ -1,5 +1,6 @@
 ﻿'use client';
 
+import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Play, Search, X } from 'lucide-react';
@@ -130,10 +131,9 @@ export default function SelectSlideForSlideoModal({ onClose, onCreated }: Props)
                     onClick={() => setSelectedSlide(s)}
                     className="text-left border border-border rounded-xl overflow-hidden bg-muted/20 hover:border-primary/50 hover:bg-muted/40 transition-colors"
                   >
-                    <div className="h-28 bg-black/60 flex items-center justify-center">
+                    <div className="h-28 bg-black/60 flex items-center justify-center relative overflow-hidden">
                       {s.thumbnailUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={resolveFileUrl(s.thumbnailUrl)} alt="" className="w-full h-full object-cover" />
+                        <Image src={resolveFileUrl(s.thumbnailUrl)!} alt="" fill className="object-cover" />
                       ) : (
                         <Play className="w-5 h-5 text-white/40" fill="currentColor" />
                       )}

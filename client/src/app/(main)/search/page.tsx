@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { Suspense, useEffect, useRef, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -25,9 +26,9 @@ function UserSearchCard({ user }: { user: any }) {
   return (
     <Link href={buildProfilePath(user.username)}
       className="flex items-center gap-3 p-4 rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-card transition-all group">
-      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center font-bold text-white text-sm shrink-0 overflow-hidden`}>
+      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center font-bold text-white text-sm shrink-0 overflow-hidden relative`}>
         {user.avatarUrl
-          ? <img src={resolveFileUrl(user.avatarUrl)} alt="" className="w-full h-full object-cover" />
+          ? <Image src={resolveFileUrl(user.avatarUrl)!} alt="" fill className="object-cover" />
           : user.username.slice(0, 1).toUpperCase()}
       </div>
       <div className="min-w-0 flex-1">

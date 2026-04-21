@@ -1,5 +1,6 @@
 ﻿'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -190,9 +191,7 @@ export default function Sidebar() {
                 <div className="w-7 h-7 rounded-lg border border-border bg-muted/70 flex items-center justify-center text-[10px] font-black text-primary shrink-0 overflow-hidden relative">
                   {user.username.slice(0, 2).toUpperCase()}
                   {resolveMediaUrl(user.avatarUrl) && (
-                    <img src={resolveMediaUrl(user.avatarUrl)!} alt={user.username}
-                      className="absolute inset-0 w-full h-full object-cover"
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                    <Image src={resolveMediaUrl(user.avatarUrl)!} alt={user.username} fill className="object-cover" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">

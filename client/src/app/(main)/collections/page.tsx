@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -31,8 +32,7 @@ function CollectionCard({ col, onDelete }: { col: any; onDelete: (id: number) =>
         <Link href={buildCollectionPath(col)}>
           <div className="aspect-video bg-muted relative overflow-hidden">
             {cover ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={resolveFileUrl(cover)} alt={col.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <Image src={resolveFileUrl(cover)!} alt={col.name} fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <Folder className="w-12 h-12 text-muted-foreground/20" strokeWidth={1} />

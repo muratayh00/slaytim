@@ -1,5 +1,6 @@
 ﻿'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -183,9 +184,7 @@ export default function Navbar() {
                     <div className="w-9 h-9 rounded-lg border border-border bg-muted/60 flex items-center justify-center text-xs font-black text-primary overflow-hidden relative">
                       {user.username.slice(0, 2).toUpperCase()}
                       {resolveMediaUrl(user.avatarUrl) && (
-                        <img src={resolveMediaUrl(user.avatarUrl)!} alt={user.username}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                        <Image src={resolveMediaUrl(user.avatarUrl)!} alt={user.username} fill className="object-cover" />
                       )}
                     </div>
                     <ChevronDown className={cn('w-3.5 h-3.5 text-muted-foreground transition-transform', profileOpen && 'rotate-180')} />

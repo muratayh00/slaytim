@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Heart, Eye, Layers, ArrowUpRight } from 'lucide-react';
 import { formatRelative } from '@/lib/utils';
 import { buildTopicPath } from '@/lib/url';
@@ -59,16 +60,19 @@ export default function TopicCard({ topic }: TopicCardProps) {
 
         <div className="p-4">
           <div className="flex items-center gap-2 mb-2.5">
-            {/* Avatar: always render initials underneath; overlay img on top.
-                If the img fails (404, expired URL), onError hides it and the
-                coloured initial shows through — no broken-image icon ever. */}
+            {/* Avatar: render initials as background; overlay next/image on top.
+                fill + sizes="24px" lets the optimizer serve a pre-sized WebP
+                without the browser decoding a larger image. */}
             <div className={`w-6 h-6 rounded-full ${avatarColor} flex items-center justify-center text-[9px] font-black text-white shrink-0 overflow-hidden relative`}>
               {topic.user.username.slice(0, 2).toUpperCase()}
               {avatarSrc && !avatarError && (
-                <img
+                <Image
                   src={avatarSrc}
                   alt={topic.user.username}
-                  className="absolute inset-0 w-full h-full object-cover"
+                  fill
+                  sizes="24px"
+                  className="object-cover"
+                  loading="lazy"
                   onError={() => setAvatarError(true)}
                 />
               )}

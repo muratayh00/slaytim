@@ -524,7 +524,9 @@ export default function SlideViewer({
                     }`}
                   >
                     {thumb
-                      ? <img src={thumb} alt={`Sayfa ${i + 1}`} className="w-full h-auto" />
+                      ? // PDF.js canvas → data URL; next/image cannot optimize data URLs.
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={thumb} alt={`Sayfa ${i + 1}`} className="w-full h-auto" />
                       : <div className="aspect-video bg-white/5 flex items-center justify-center">
                           <Loader2 className="w-4 h-4 animate-spin text-white/20" />
                         </div>
@@ -682,7 +684,9 @@ export default function SlideViewer({
               title={`Sayfa ${i + 1}`}
             >
               {thumb
-                ? <img src={thumb} alt={`${i + 1}`} className="w-full h-auto" loading="lazy" />
+                ? // PDF.js canvas → data URL; next/image cannot optimize data URLs.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={thumb} alt={`${i + 1}`} className="w-full h-auto" loading="lazy" />
                 : <div className="aspect-[4/3] bg-muted animate-pulse" />
               }
               <p className="text-[9px] text-center text-muted-foreground mt-0.5 pb-0.5">{i + 1}</p>

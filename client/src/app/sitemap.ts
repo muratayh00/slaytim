@@ -1,5 +1,5 @@
 import { MetadataRoute } from 'next';
-import { buildCategoryPath, buildSlideoPath, buildSlidePath, buildTopicPath } from '@/lib/url';
+import { buildCategoryPath, buildCollectionPath, buildSlideoPath, buildSlidePath, buildTopicPath } from '@/lib/url';
 import { getApiBaseUrl } from '@/lib/api-origin';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
@@ -131,5 +131,68 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     }));
 
-  return [...staticPages, ...categoryPages, ...topicPages, ...slidePages, ...slideoPages, ...roomPages];
+  const collectionsData = await fetchJson<{ collections: { id: number; slug?: string; name?: string; updatedAt?: string; createdAt?: string; isPublic?: boolean }[] }>(
+    '/collections?sort=latest&limit=200&page=1',
+  );
+  const collectionPages: MetadataRoute.Sitemap = (collectionsData?.collections || [])
+    .filter((col) => isValidEntityId(col?.id) && col?.isPublic !== false)
+    .map((col) => ({
+      url: `${BASE_URL}${buildCollectionPath({ id: col.id, slug: col.slug, name: col.name })}`,
+      lastModified: toSafeDate(col.updatedAt || col.createdAt),
+      changeFrequency: 'weekly',
+      priority: 0.6,
+    }));
+
+  // ── Profiles ───────────────────────────────────────────────────────────────
+  // Only index profiles that have at least one topic (quality signal).
+  // Uses a dedicated "popular contributors" endpoint; falls back to empty list
+  // if the endpoint doesn't exist yet so the build never fails.
+  const usersData = await fetchJson<{ users: { username: string; updatedAt?: string; createdAt?: string; _count?: { topics?: number; slides?: number } }[] }>(
+    '/users?sort=popular&limit=200',
+  );
+  const profilePages: MetadataRoute.Sitemap = (usersData?.users || [])
+    .filter((u) =>
+      Boolean(String(u?.username || '').trim()) &&
+      Number(u?._count?.topics || 0) + Number(u?._count?.slides || 0) > 0
+    )
+    .map((u) => ({
+      url: `${BASE_URL}/@${encodeURIComponent(String(u.username).trim())}`,
+      lastModified: toSafeDate(u.updatedAt || u.createdAt),
+      changeFrequency: 'weekly' as const,
+      priority: 0.55,
+    }));
+
+  // ── Etiket / Tag pages ──────────────────────────────────────────────────────
+  // Only index tags that have actual content (at least 1 topic or slide).
+  const tagsData = await fetchJson<{ tags?: { slug: string; label?: string; updatedAt?: string; totals?: { all?: number } }[]; } | { slug: string; label?: string; updatedAt?: string; totals?: { all?: number } }[]>(
+    '/tags',
+  );
+  const tagsArray = Array.isArray(tagsData)
+    ? tagsData
+    : Array.isArray((tagsData as any)?.tags)
+      ? (tagsData as any).tags
+      : [];
+  const tagPages: MetadataRoute.Sitemap = tagsArray
+    .filter((t: any) =>
+      Boolean(String(t?.slug || '').trim()) &&
+      Number(t?.totals?.all || t?.count || 0) > 0
+    )
+    .map((t: any) => ({
+      url: `${BASE_URL}/etiket/${encodeURIComponent(String(t.slug).trim())}`,
+      lastModified: toSafeDate(t.updatedAt),
+      changeFrequency: 'weekly' as const,
+      priority: 0.5,
+    }));
+
+  return [
+    ...staticPages,
+    ...categoryPages,
+    ...topicPages,
+    ...slidePages,
+    ...slideoPages,
+    ...roomPages,
+    ...collectionPages,
+    ...profilePages,
+    ...tagPages,
+  ];
 }

@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Tag, LayoutGrid, Loader2, ArrowLeft, Bookmark } from 'lucide-react';
@@ -11,17 +11,38 @@ import { TopicCardSkeleton } from '@/components/shared/Skeleton';
 import toast from 'react-hot-toast';
 import { buildTopicCreatePath } from '@/lib/url';
 
-export default function CategoryPage() {
+export default function CategoryPage({
+  initialCategory,
+  initialTopics,
+}: {
+  initialCategory?: any;
+  initialTopics?: any[];
+} = {}) {
   const { slug } = useParams();
   const { user } = useAuthStore();
-  const [category, setCategory] = useState<any>(null);
-  const [topics, setTopics] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [category, setCategory] = useState<any>(initialCategory || null);
+  const [topics, setTopics] = useState<any[]>(initialTopics || []);
+  const [loading, setLoading] = useState(!initialCategory);
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  // Skip the first API fetch when SSR initial data is provided; still run on
+  // subsequent slug/user changes (e.g. navigation to a different category).
+  const hasInitialDataRef = useRef(Boolean(initialCategory));
 
   useEffect(() => {
+    if (hasInitialDataRef.current) {
+      hasInitialDataRef.current = false;
+      // Initial data came from SSR — only resolve follow state client-side.
+      if (user && category) {
+        api.get('/follows/me')
+          .then(({ data }) => setFollowing((data.categories || []).includes(category.id)))
+          .catch(() => {});
+      }
+      return;
+    }
+
     const load = async () => {
+      setLoading(true);
       try {
         const [cat, t] = await Promise.all([
           api.get(`/categories/${slug}`),
@@ -42,7 +63,7 @@ export default function CategoryPage() {
       }
     };
     load();
-  }, [slug, user]);
+  }, [slug, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFollow = async () => {
     if (!user) return toast.error('Giriş yapmalısın');

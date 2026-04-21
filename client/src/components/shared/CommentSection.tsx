@@ -1,5 +1,6 @@
 ﻿'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { MessageCircle, Send, Trash2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -140,9 +141,7 @@ export default function CommentSection({ topicId }: { topicId: number }) {
                       <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-xs font-bold text-white overflow-hidden relative`}>
                         {comment.user.username.slice(0, 2).toUpperCase()}
                         {resolveMediaUrl(comment.user.avatarUrl) && (
-                          <img src={resolveMediaUrl(comment.user.avatarUrl)!} alt={comment.user.username}
-                            className="absolute inset-0 w-full h-full object-cover"
-                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                          <Image src={resolveMediaUrl(comment.user.avatarUrl)!} alt={comment.user.username} fill className="object-cover" />
                         )}
                       </div>
                     </Link>

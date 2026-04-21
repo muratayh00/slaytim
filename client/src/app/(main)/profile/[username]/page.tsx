@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -32,19 +33,28 @@ const AVATAR_COLORS = [
 
 type ProfilePageProps = {
   forcedUsername?: string;
+  initialProfile?: any;
+  initialDetails?: any;
+  initialTopics?: any[];
 };
 
-export default function ProfilePage({ forcedUsername }: ProfilePageProps) {
+export default function ProfilePage({
+  forcedUsername,
+  initialProfile,
+  initialDetails,
+  initialTopics,
+}: ProfilePageProps) {
   const params = useParams();
   const rawUsername = forcedUsername || String((params as { username?: string })?.username || '');
   const username = decodeURIComponent(rawUsername).replace(/^@+/, '').trim();
   const { user: me } = useAuthStore();
-  const [profile, setProfile] = useState<any>(null);
-  const [details, setDetails] = useState<any>(null);
-  const [myTopics, setMyTopics] = useState<any[]>([]);
+  const hasInitialData = Boolean(initialProfile);
+  const [profile, setProfile] = useState<any>(initialProfile || null);
+  const [details, setDetails] = useState<any>(initialDetails || null);
+  const [myTopics, setMyTopics] = useState<any[]>(initialTopics || []);
   const [mySlideos, setMySlideos] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('topics');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialProfile);
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [blocked, setBlocked] = useState(false);
@@ -56,32 +66,53 @@ export default function ProfilePage({ forcedUsername }: ProfilePageProps) {
   useEffect(() => {
     const load = async () => {
       try {
-        const [p, d, t, sl, b] = await Promise.all([
-          api.get(`/users/${username}`),
-          api.get(`/users/${username}/details`),
-          api.get(`/users/${username}/topics`),
-          api.get(`/users/${username}/slideos`).catch(() => ({ data: [] })),
-          api.get(`/badges/user/${username}`).catch(() => ({ data: { badges: [] } })),
-        ]);
-        setProfile(p.data);
-        setDetails(d.data);
-        setMyTopics(t.data);
-        setMySlideos(sl.data);
-        setBadges(b.data.badges || []);
-
-        if (me && me.username !== username) {
-          const [follows, blockStatus] = await Promise.all([
-            api.get('/follows/me'),
-            api.get(`/blocks/check/${p.data.id}`),
+        if (hasInitialData) {
+          // SSR already provided profile, details and topics — only fetch
+          // the client-specific extras: slideos, badges and follow/block state.
+          const [sl, b] = await Promise.all([
+            api.get(`/users/${username}/slideos`).catch(() => ({ data: [] })),
+            api.get(`/badges/user/${username}`).catch(() => ({ data: { badges: [] } })),
           ]);
-          setFollowing(follows.data.users.includes(p.data.id));
-          setBlocked(blockStatus.data.blocked);
+          setMySlideos(sl.data);
+          setBadges(b.data.badges || []);
+
+          if (me && profile && me.username !== username) {
+            const [follows, blockStatus] = await Promise.all([
+              api.get('/follows/me'),
+              api.get(`/blocks/check/${profile.id}`),
+            ]);
+            setFollowing(follows.data.users.includes(profile.id));
+            setBlocked(blockStatus.data.blocked);
+          }
+        } else {
+          const [p, d, t, sl, b] = await Promise.all([
+            api.get(`/users/${username}`),
+            api.get(`/users/${username}/details`),
+            api.get(`/users/${username}/topics`),
+            api.get(`/users/${username}/slideos`).catch(() => ({ data: [] })),
+            api.get(`/badges/user/${username}`).catch(() => ({ data: { badges: [] } })),
+          ]);
+          setProfile(p.data);
+          setDetails(d.data);
+          setMyTopics(t.data);
+          setMySlideos(sl.data);
+          setBadges(b.data.badges || []);
+
+          if (me && me.username !== username) {
+            const [follows, blockStatus] = await Promise.all([
+              api.get('/follows/me'),
+              api.get(`/blocks/check/${p.data.id}`),
+            ]);
+            setFollowing(follows.data.users.includes(p.data.id));
+            setBlocked(blockStatus.data.blocked);
+          }
         }
       } finally {
         setLoading(false);
       }
     };
     load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username, me]);
 
   const handleFollow = async () => {
@@ -189,9 +220,7 @@ export default function ProfilePage({ forcedUsername }: ProfilePageProps) {
               >
                 <div className="aspect-video bg-black/80 flex items-center justify-center relative">
                   {s.slide?.thumbnailUrl ? (
-                    <img src={resolveFileUrl(s.slide.thumbnailUrl)}
-                      alt={s.title} className="w-full h-full object-cover opacity-80"
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                    <Image src={resolveFileUrl(s.slide.thumbnailUrl)!} alt={s.title || ''} fill className="object-cover opacity-80" />
                   ) : (
                     <Play className="w-10 h-10 text-white/30" fill="currentColor" />
                   )}
@@ -297,9 +326,9 @@ export default function ProfilePage({ forcedUsername }: ProfilePageProps) {
 
         <div className="px-6 sm:px-8 pb-6 sm:pb-8">
           <div className="flex items-end justify-between gap-4 -mt-10 mb-5 flex-wrap">
-            <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-2xl font-bold text-white ring-4 ring-card shadow-lg overflow-hidden`}>
+            <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-2xl font-bold text-white ring-4 ring-card shadow-lg overflow-hidden relative`}>
               {profile.avatarUrl ? (
-                <img src={resolveFileUrl(profile.avatarUrl)} alt={profile.username} className="w-full h-full object-cover" />
+                <Image src={resolveFileUrl(profile.avatarUrl)!} alt={profile.username} fill className="object-cover" />
               ) : (
                 getInitials(profile.username)
               )}
@@ -499,9 +528,9 @@ function UserCard({ user }: { user: any }) {
   return (
     <Link href={buildProfilePath(user.username)}
       className="flex items-center gap-3 p-4 rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-card transition-all">
-      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${uGradient} flex items-center justify-center font-bold text-white text-sm shrink-0 overflow-hidden`}>
+      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${uGradient} flex items-center justify-center font-bold text-white text-sm shrink-0 overflow-hidden relative`}>
         {user.avatarUrl
-          ? <img src={resolveFileUrl(user.avatarUrl)} alt="" className="w-full h-full rounded-full object-cover" />
+          ? <Image src={resolveFileUrl(user.avatarUrl)!} alt="" fill className="object-cover rounded-full" />
           : user.username.slice(0, 1).toUpperCase()}
       </div>
       <div className="min-w-0">

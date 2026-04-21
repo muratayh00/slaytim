@@ -56,5 +56,5 @@ export default async function TopicCanonicalPage({
     permanentRedirect(`${canonicalPath}${toQueryString(searchParams)}`);
   }
 
-  return <TopicDetailClientPage />;
+  return <TopicDetailClientPage initialTopic={topic} />;
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { Heart, Bookmark, ArrowUpRight, Presentation, Lock, Eye } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { resolveMediaUrl } from '@/lib/media';
@@ -25,9 +26,11 @@ interface SlideCardProps {
     user: { id: number; username: string; avatarUrl?: string | null };
     topic?: { id: number; title: string };
   };
+  /** Set true for the first visible card on the page to hint fetchpriority=high */
+  priority?: boolean;
 }
 
-export default function SlideCard({ slide }: SlideCardProps) {
+export default function SlideCard({ slide, priority = false }: SlideCardProps) {
   const { user } = useAuthStore();
   const avatarColor = AVATAR_COLORS[slide.user.id % AVATAR_COLORS.length];
   const fileExt = slide.fileUrl?.split('.').pop()?.toUpperCase() || 'PPTX';
@@ -40,6 +43,9 @@ export default function SlideCard({ slide }: SlideCardProps) {
   return (
     <a href={href} className="block group">
       <article className="bg-card border border-border rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all card-hover">
+        {/* Thumbnail — next/image for automatic WebP/AVIF conversion, correct
+            srcset, and fetchpriority=high on the LCP element. The fill mode
+            fills the aspect-video container without a hard-coded width/height. */}
         <div className="aspect-video relative overflow-hidden bg-muted border-b border-border/60">
           {slide.isSponsored && (
             <div className="absolute top-2 left-2 z-10 rounded-md bg-amber-500/90 px-2 py-1 text-[10px] font-bold text-white">
@@ -47,14 +53,14 @@ export default function SlideCard({ slide }: SlideCardProps) {
             </div>
           )}
           {thumbSrc && !thumbError ? (
-            // Plain <img> avoids the Next.js image-optimizer round-trip.
-            // Thumbnails are already small server-side images; optimizer adds
-            // latency and a failure point without meaningful quality gain here.
-            <img
+            <Image
               src={thumbSrc}
               alt={slide.title}
-              className="absolute inset-0 w-full h-full object-cover"
-              loading="lazy"
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              className="object-cover"
+              loading={priority ? 'eager' : 'lazy'}
+              priority={priority}
               onError={() => setThumbError(true)}
             />
           ) : (
@@ -65,7 +71,7 @@ export default function SlideCard({ slide }: SlideCardProps) {
           )}
 
           {!user && (
-            <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-black/70 text-white rounded-md px-2 py-1">
+            <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 bg-black/70 text-white rounded-md px-2 py-1">
               <Lock className="w-3 h-3" />
               <span className="text-[10px] font-semibold">Uye ol</span>
             </div>
@@ -99,10 +105,11 @@ export default function SlideCard({ slide }: SlideCardProps) {
               <div className={`w-5 h-5 rounded-full ${avatarColor} flex items-center justify-center text-[8px] font-black text-white overflow-hidden shrink-0 relative`}>
                 {slide.user.username.slice(0, 1).toUpperCase()}
                 {avatarSrc && !avatarError && (
-                  <img
+                  <Image
                     src={avatarSrc}
                     alt={slide.user.username}
-                    className="absolute inset-0 w-full h-full object-cover"
+                    fill
+                    className="object-cover"
                     onError={() => setAvatarError(true)}
                   />
                 )}

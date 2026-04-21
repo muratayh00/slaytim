@@ -1,6 +1,7 @@
 ﻿'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Heart, Eye, Tag, Calendar, Upload, ArrowLeft, LayoutGrid, Flag, Pin, PinOff } from 'lucide-react';
@@ -43,7 +44,7 @@ const toSlidesArray = (payload: any): any[] => {
   return arr.filter((item) => item && typeof item === 'object');
 };
 
-export default function TopicDetailPage() {
+export default function TopicDetailPage({ initialTopic }: { initialTopic?: any } = {}) {
   const params = useParams();
   const router = useRouter();
   const rawParam = String((params as Record<string, string>)?.id || (params as Record<string, string>)?.slug || '');
@@ -53,9 +54,10 @@ export default function TopicDetailPage() {
   const isNumericTopicKey = Number.isInteger(topicId) && topicId > 0;
   const { user } = useAuthStore();
 
-  const [topic, setTopic] = useState<any>(null);
+  const [topic, setTopic] = useState<any>(initialTopic || null);
   const [slideItemsState, setSlideItemsState] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialTopic);
+  const hasInitialDataRef = useRef(Boolean(initialTopic));
   const [liked, setLiked] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [sort, setSort] = useState('latest');
@@ -83,7 +85,9 @@ export default function TopicDetailPage() {
     let cancelled = false;
 
     const load = async () => {
-      setLoading(true);
+      // Don't show the loading skeleton when SSR already provided initial data.
+      if (!hasInitialDataRef.current) setLoading(true);
+      hasInitialDataRef.current = false;
       try {
         const topicRes = await api.get(
           isNumericTopicKey
@@ -352,9 +356,9 @@ export default function TopicDetailPage() {
               href={topicUser.username ? buildProfilePath(topicUser.username) : '/'}
               className="flex items-center gap-2.5 hover:text-primary transition-colors group min-w-0"
             >
-              <div className={`w-8 h-8 shrink-0 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-xs font-bold text-white ring-2 ring-white/20 shadow-sm overflow-hidden`}>
+              <div className={`w-8 h-8 shrink-0 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-xs font-bold text-white ring-2 ring-white/20 shadow-sm overflow-hidden relative`}>
                 {topicUser.avatarUrl ? (
-                  <img src={resolveFileUrl(topicUser.avatarUrl)} alt="" className="w-full h-full object-cover" />
+                  <Image src={resolveFileUrl(topicUser.avatarUrl)!} alt={String(topicUser.username || '')} fill className="object-cover" />
                 ) : (
                   String(topicUser.username || '?').slice(0, 2).toUpperCase()
                 )}
