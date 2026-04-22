@@ -105,7 +105,12 @@ async function putBuffer(buffer, key, contentType) {
       throw new Error('Remote storage driver is configured but client could not be initialised — check STORAGE_BUCKET / STORAGE_ACCESS_KEY_ID / STORAGE_SECRET_ACCESS_KEY.');
     }
     const sanitizedKey = String(key || '').replace(/^\/+/, '');
-    const localPath = path.join(__dirname, '../../uploads', sanitizedKey);
+    const uploadsRoot = path.resolve(__dirname, '../../uploads');
+    const localPath = path.resolve(uploadsRoot, sanitizedKey);
+    // Guard against path traversal via ".." components in the key.
+    if (!localPath.startsWith(uploadsRoot + path.sep) && localPath !== uploadsRoot) {
+      throw new Error('Path traversal attempt rejected');
+    }
     await fs.promises.mkdir(path.dirname(localPath), { recursive: true });
     await fs.promises.writeFile(localPath, buffer);
     return toUploadsUrl(localPath);
@@ -211,7 +216,12 @@ async function deleteStoredObject(fileUrl) {
 
   // Local path cleanup for development/local mode.
   if (fileUrl.startsWith('/uploads/')) {
-    const localPath = path.join(__dirname, '../../', fileUrl.replace(/^\/+/, ''));
+    const uploadsRoot = path.resolve(__dirname, '../../uploads');
+    const localPath = path.resolve(uploadsRoot, fileUrl.replace(/^\/uploads\//, ''));
+    // Guard against path traversal via ".." components stored in the database.
+    if (!localPath.startsWith(uploadsRoot + path.sep) && localPath !== uploadsRoot) {
+      return { deleted: false, reason: 'path_traversal' };
+    }
     try {
       if (fs.existsSync(localPath)) fs.unlinkSync(localPath);
       return { deleted: true, driver: 'local' };

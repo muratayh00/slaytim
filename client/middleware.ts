@@ -64,6 +64,7 @@ export function middleware(request: NextRequest): NextResponse {
   if (pathname === "/discover") return redirect(request, "/kesfet");
 
   if (pathname === "/topics") return redirect(request, "/kesfet");
+  if (pathname === "/topics/new") return redirect(request, "/konu/yeni");
   if (pathname.startsWith("/topics/")) {
     const token = pathname.slice("/topics/".length);
     return redirect(request, `/konu/${token}`);

@@ -19,7 +19,12 @@ const removeUploadIfExists = (urlPath) => {
   if (!urlPath || typeof urlPath !== 'string') return;
   if (!urlPath.startsWith('/uploads/')) return;
 
-  const filePath = path.join(__dirname, '../../', urlPath);
+  // Resolve to an absolute path and verify it stays within the uploads directory.
+  // path.join() alone does not prevent traversal via ".." components embedded in
+  // database-stored paths (e.g. /uploads/../../../etc/passwd).
+  const uploadsRoot = path.resolve(__dirname, '../../uploads');
+  const filePath = path.resolve(uploadsRoot, urlPath.replace(/^\/uploads\//, ''));
+  if (!filePath.startsWith(uploadsRoot + path.sep) && filePath !== uploadsRoot) return;
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 };
 

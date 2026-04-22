@@ -33,13 +33,32 @@ export default async function HomePage() {
     fetchJson<{ slideos: any[] }>('/slideo/feed?sort=popular&limit=8'),
   ]);
 
+  const base = (process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com').replace(/\/+$/, '');
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Slaytim',
+    url: base,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: `${base}/search?q={search_term_string}`,
+      'query-input': 'required name=search_term_string',
+    },
+  };
+
   return (
-    <HomeClient
-      initialTrending={(trending || []).slice(0, 6)}
-      initialLatest={latestData?.topics || []}
-      initialPopular={popular || []}
-      initialCategories={categories || []}
-      initialTrendingSlideos={slideoData?.slideos || []}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
+      <HomeClient
+        initialTrending={(trending || []).slice(0, 6)}
+        initialLatest={latestData?.topics || []}
+        initialPopular={popular || []}
+        initialCategories={categories || []}
+        initialTrendingSlideos={slideoData?.slideos || []}
+      />
+    </>
   );
 }

@@ -33,6 +33,10 @@ export default function RoomsPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const myRoomIds = useMemo(() => new Set(myRooms.map((r) => r.id)), [myRooms]);
+  const ownedRoomsCount = useMemo(
+    () => myRooms.filter((r) => r.owner?.id === user?.id).length,
+    [myRooms, user?.id],
+  );
 
   // Client-side filter — backend also supports ?q= for server-side search
   const filteredRooms = useMemo(() => {
@@ -104,7 +108,13 @@ export default function RoomsPage() {
       }
       await load();
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Oda olusturulamadi');
+      const code = err?.response?.data?.code;
+      if (code === 'ROOM_LIMIT_REACHED') {
+        const maxRooms = Number(err?.response?.data?.maxRooms || 2);
+        toast.error(`Oda limiti doldu. En fazla ${maxRooms} oda acabilirsin.`);
+      } else {
+        toast.error(err?.response?.data?.error || 'Oda olusturulamadi');
+      }
     } finally {
       setCreateBusy(false);
     }
@@ -176,6 +186,9 @@ export default function RoomsPage() {
 
       {createOpen && user && (
         <div className="mb-6 border border-border rounded-2xl p-4 bg-card">
+          <p className="text-xs text-muted-foreground mb-3">
+            Oda limiti: <span className="font-semibold">{ownedRoomsCount}/2</span>
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <input
               value={form.name}

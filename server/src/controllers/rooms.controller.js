@@ -22,6 +22,8 @@ const roomSelect = {
   _count: { select: { members: true } },
 };
 
+const MAX_OWNED_ROOMS = 2;
+
 /**
  * Resolves a room by either numeric ID or slug string.
  * Returns { id } (numeric) or null if not found.
@@ -148,6 +150,17 @@ const create = async (req, res) => {
       if (!accessPassword || accessPassword.length < 4) {
         return res.status(400).json({ error: 'Kapali oda icin en az 4 karakter sifre gerekli' });
       }
+    }
+
+    const ownedRoomCount = await prisma.room.count({
+      where: { ownerId: req.user.id },
+    });
+    if (ownedRoomCount >= MAX_OWNED_ROOMS) {
+      return res.status(400).json({
+        error: `En fazla ${MAX_OWNED_ROOMS} oda acabilirsin`,
+        code: 'ROOM_LIMIT_REACHED',
+        maxRooms: MAX_OWNED_ROOMS,
+      });
     }
 
     const slug = await uniqueSlug(prisma.room, toSlug(name));

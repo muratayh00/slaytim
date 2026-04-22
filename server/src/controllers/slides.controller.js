@@ -815,8 +815,11 @@ const getBySlug = async (req, res) => {
 
 const toUploadAbsPath = (urlPath) => {
   if (!urlPath || typeof urlPath !== 'string') return null;
-  const normalized = urlPath.replace(/^\/+/, '');
-  return path.join(__dirname, '../../', normalized);
+  if (!urlPath.startsWith('/uploads/')) return null;
+  const uploadsRoot = path.resolve(__dirname, '../../uploads');
+  const resolved = path.resolve(uploadsRoot, urlPath.replace(/^\/uploads\//, ''));
+  if (!resolved.startsWith(uploadsRoot + path.sep) && resolved !== uploadsRoot) return null;
+  return resolved;
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

@@ -357,11 +357,46 @@ export default function SlideoViewer({
     }
   }, [user, slideo.id, feedVariant, feedSubjectKey]);
 
-  const handleShare = useCallback(() => {
+  const handleShare = useCallback(async () => {
     const url = `${window.location.origin}${buildSlideoPath({ id: slideo.id, title: slideo.title })}`;
-    navigator.clipboard?.writeText(url).catch(() => {});
-    if (user) api.post(`/slideo/${slideo.id}/share`, { variant: feedVariant, subjectKey: feedSubjectKey }).catch(() => {});
-    toast.success('Link kopyalandı');
+
+    // Mobile: Web Share API (native share sheet)
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ title: slideo.title, url });
+        if (user) api.post(`/slideo/${slideo.id}/share`, { variant: feedVariant, subjectKey: feedSubjectKey }).catch(() => {});
+        return;
+      } catch (e: any) {
+        // User cancelled — don't fall through to clipboard
+        if (e?.name === 'AbortError') return;
+      }
+    }
+
+    // Desktop: Clipboard API with execCommand fallback
+    let copied = false;
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      try { await navigator.clipboard.writeText(url); copied = true; } catch {}
+    }
+    if (!copied) {
+      // execCommand fallback for browsers that block Clipboard API
+      try {
+        const el = document.createElement('textarea');
+        el.value = url;
+        el.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
+        document.body.appendChild(el);
+        el.focus();
+        el.select();
+        copied = document.execCommand('copy');
+        document.body.removeChild(el);
+      } catch {}
+    }
+
+    if (copied) {
+      if (user) api.post(`/slideo/${slideo.id}/share`, { variant: feedVariant, subjectKey: feedSubjectKey }).catch(() => {});
+      toast.success('Link kopyalandı');
+    } else {
+      toast.error('Kopyalanamadı, linki elle kopyala:\n' + url, { duration: 6000 });
+    }
   }, [slideo.id, slideo.title, user, feedVariant, feedSubjectKey]);
 
   // ?? Keyboard shortcuts ??????????????????????????????????????????????????????
