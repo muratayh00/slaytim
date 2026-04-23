@@ -63,30 +63,6 @@ export function middleware(request: NextRequest): NextResponse {
 
   if (pathname === "/discover") return redirect(request, "/kesfet");
 
-  if (pathname === "/topics") return redirect(request, "/kesfet");
-  if (pathname === "/topics/new") return redirect(request, "/konu/yeni");
-  if (pathname.startsWith("/topics/")) {
-    const token = pathname.slice("/topics/".length);
-    return redirect(request, `/konu/${token}`);
-  }
-
-  if (pathname.startsWith("/slides/")) {
-    const token = pathname.slice("/slides/".length);
-    return redirect(request, `/slayt/${token}`);
-  }
-
-  if (pathname === "/profile") return redirect(request, "/");
-  if (pathname.startsWith("/profile/")) {
-    const username = pathname.slice("/profile/".length);
-    return redirect(request, `/@${username}`);
-  }
-
-  if (pathname === "/categories") return redirect(request, "/kategori");
-  if (pathname.startsWith("/categories/")) {
-    const slug = pathname.slice("/categories/".length);
-    return redirect(request, `/kategori/${slug}`);
-  }
-
   if (pathname.startsWith("/@")) {
     const username = pathname.slice(2);
     if (!username) return redirect(request, "/");
@@ -103,5 +79,7 @@ export function middleware(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!api|embed|_next/static|_next/image|_next/webpack-hmr|favicon.ico|robots.txt|sitemap.xml|ads.txt|pdf\\.min\\.mjs|pdf\\.legacy\\.min\\.mjs|pdf\\.worker\\.min\\.mjs|openjpeg\\.wasm|jbig2\\.wasm|qcms_bg\\.wasm).*)",
+  ],
 };

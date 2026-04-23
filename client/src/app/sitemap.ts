@@ -76,8 +76,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/collections`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.65 },
   ];
 
-  const categoriesData = await fetchJson<{ id: number; slug: string; name: string }[]>('/categories');
-  const categoryPages: MetadataRoute.Sitemap = (categoriesData || []).map((cat) => ({
+  const categoriesData = await fetchJson<{ id: number; slug: string; name: string; isMain?: boolean; parentId?: number | null }[]>('/categories');
+  const categoryPages: MetadataRoute.Sitemap = (categoriesData || [])
+    .filter((cat) => cat?.isMain === true || cat?.parentId == null)
+    .map((cat) => ({
     url: `${BASE_URL}${buildCategoryPath(cat.slug)}`,
     lastModified: new Date(),
     changeFrequency: 'daily',
@@ -164,8 +166,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // ── Etiket / Tag pages ──────────────────────────────────────────────────────
   // Only index tags that have actual content (at least 1 topic or slide).
-  const tagsData = await fetchJson<{ tags?: { slug: string; label?: string; updatedAt?: string; totals?: { all?: number } }[]; } | { slug: string; label?: string; updatedAt?: string; totals?: { all?: number } }[]>(
-    '/tags',
+  const tagsData = await fetchJson<{
+    tags?: {
+      slug: string;
+      label?: string;
+      updatedAt?: string;
+      totals?: { all?: number };
+      seo?: { indexable?: boolean; minItems?: number; recentItems?: number };
+    }[];
+  } | {
+    slug: string;
+    label?: string;
+    updatedAt?: string;
+    totals?: { all?: number };
+    seo?: { indexable?: boolean; minItems?: number; recentItems?: number };
+  }[]>(
+    '/tags?indexableOnly=1&limit=1000',
   );
   const tagsArray = Array.isArray(tagsData)
     ? tagsData
@@ -175,7 +191,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const tagPages: MetadataRoute.Sitemap = tagsArray
     .filter((t: any) =>
       Boolean(String(t?.slug || '').trim()) &&
-      Number(t?.totals?.all || t?.count || 0) > 0
+      Number(t?.totals?.all || t?.count || 0) > 0 &&
+      (t?.seo?.indexable === true || Number(t?.totals?.all || 0) >= Number(t?.seo?.minItems || 5))
     )
     .map((t: any) => ({
       url: `${BASE_URL}/etiket/${encodeURIComponent(String(t.slug).trim())}`,

@@ -19,6 +19,46 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const CONVERSION_TIMEOUT_MS = 45_000; // Kullanıcıyı bekletmemek için kısa polling, sonrası arka planda devam eder
 
 type UploadPhase = 'uploading' | 'converting';
+const TAG_STOPWORDS = new Set([
+  've',
+  'ile',
+  'icin',
+  'gibi',
+  'bir',
+  'bu',
+  'sunu',
+  'slide',
+  'slayt',
+  'ppt',
+  'pptx',
+  'pdf',
+  'the',
+  'and',
+]);
+
+function normalizeTag(input: string): string {
+  return String(input || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^\p{L}\p{N}\s-]+/gu, '')
+    .replace(/\s+/g, ' ')
+    .slice(0, 36);
+}
+
+function extractTagCandidates(title: string, description: string): string[] {
+  const words = `${title} ${description}`
+    .split(/[\s,.;:!?()/"'[\]{}<>]+/g)
+    .map((w) => normalizeTag(w))
+    .filter((w) => w.length >= 3 && !TAG_STOPWORDS.has(w));
+
+  const unique: string[] = [];
+  for (const word of words) {
+    if (unique.includes(word)) continue;
+    unique.push(word);
+    if (unique.length >= 8) break;
+  }
+  return unique;
+}
 
 function navigateSafely(router: ReturnType<typeof useRouter>, path: string) {
   try {
@@ -47,6 +87,10 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
   const [conversionPercent, setConversionPercent] = useState(0);
   const [phase, setPhase] = useState<UploadPhase>('uploading');
   const [conversionStatus, setConversionStatus] = useState<string>('');
+  const [tagInput, setTagInput] = useState('');
+  const [manualTags, setManualTags] = useState<string[]>([]);
+
+  const suggestedTags = extractTagCandidates(form.title, form.description).filter((tag) => !manualTags.includes(tag));
 
   const validateAndSetFile = useCallback((picked: File | null) => {
     if (!picked) return;
@@ -169,6 +213,18 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
       }
 
       analytics.uploadComplete({ slide_id: data.id, title: data.title });
+
+      const allTags = [...manualTags]
+        .map((tag) => normalizeTag(tag))
+        .filter((tag, index, arr) => tag.length >= 2 && arr.indexOf(tag) === index)
+        .slice(0, 8);
+      if (allTags.length > 0 && Number.isInteger(Number(data?.id))) {
+        await api.patch(`/slides/${data.id}/metadata`, {
+          tags: allTags,
+          tagSource: 'manual',
+        }).catch(() => {});
+      }
+
       if (converted) toast.success('Slayt yüklendi!');
       onSuccess(data);
       onClose();
@@ -187,6 +243,21 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
       setConversionPercent(0);
       setLoading(false);
     }
+  };
+
+  const addTag = (rawValue: string) => {
+    const tag = normalizeTag(rawValue);
+    if (!tag || tag.length < 2) return;
+    setManualTags((prev) => {
+      if (prev.includes(tag)) return prev;
+      if (prev.length >= 8) return prev;
+      return [...prev, tag];
+    });
+    setTagInput('');
+  };
+
+  const removeTag = (tag: string) => {
+    setManualTags((prev) => prev.filter((x) => x !== tag));
   };
 
   // Yükleme = %60, Dönüştürme = %40 payı
@@ -281,6 +352,51 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm resize-none"
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Etiketler (opsiyonel)</label>
+            <div className="flex flex-wrap gap-2">
+              {manualTags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => removeTag(tag)}
+                  className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary"
+                  title="Kaldirmak icin tikla"
+                >
+                  {tag} ×
+                </button>
+              ))}
+            </div>
+            <input
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ',') {
+                  e.preventDefault();
+                  addTag(tagInput);
+                } else if (e.key === 'Backspace' && !tagInput && manualTags.length > 0) {
+                  removeTag(manualTags[manualTags.length - 1]);
+                }
+              }}
+              placeholder="Etiket ekle ve Enter'a bas..."
+              className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
+            />
+            {suggestedTags.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {suggestedTags.slice(0, 6).map((tag) => (
+                  <button
+                    key={`s-${tag}`}
+                    type="button"
+                    onClick={() => addTag(tag)}
+                    className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-border/80"
+                  >
+                    + {tag}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {loading && (

@@ -47,6 +47,25 @@ const slideSelect = {
   topic: { select: { id: true, title: true, slug: true, category: { select: { name: true, slug: true } } } },
 };
 
+const slideMetadataSelect = {
+  ...slideSelect,
+  tags: {
+    select: {
+      source: true,
+      confidence: true,
+      tag: { select: { id: true, name: true, slug: true } },
+    },
+  },
+  seoMeta: {
+    select: {
+      seoTitle: true,
+      seoDescription: true,
+      keywordSummary: true,
+      updatedAt: true,
+    },
+  },
+};
+
 const PAGE_EVENT_TYPES = new Set(['view', 'drop', 'profile_visit', 'follow_convert']);
 const PAGE_REACTION_TYPES = new Set(['like', 'save', 'share', 'emoji', 'confused', 'summary', 'exam']);
 const MAX_COMMENT_LEN = 500;
@@ -71,6 +90,15 @@ const toPageNumber = (value) => {
   const n = Number(value);
   if (!Number.isInteger(n) || n <= 0) return null;
   return n;
+};
+
+const parseTagArray = (value) => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((tag) => String(tag || '').trim().toLowerCase())
+    .filter((tag) => tag.length >= 2 && tag.length <= 48)
+    .filter((tag, index, arr) => arr.indexOf(tag) === index)
+    .slice(0, 10);
 };
 
 const mapSlideUploadError = (err) => {
@@ -1150,6 +1178,193 @@ const update = async (req, res) => {
   }
 };
 
+const applySlideMetadata = async ({ slideId, userId, isAdmin, body = {}, markPublished = false }) => {
+  const slide = await prisma.slide.findUnique({
+    where: { id: slideId },
+    select: {
+      id: true,
+      userId: true,
+      topicId: true,
+    },
+  });
+  if (!slide) {
+    const err = new Error('Slide not found');
+    err.status = 404;
+    throw err;
+  }
+  if (slide.userId !== userId && !isAdmin) {
+    const err = new Error('Forbidden');
+    err.status = 403;
+    throw err;
+  }
+
+  const updateData = {};
+  if (body.title !== undefined) {
+    const title = sanitizeText(body.title, 200);
+    if (!title) {
+      const err = new Error('Baslik zorunlu');
+      err.status = 400;
+      throw err;
+    }
+    updateData.title = title;
+    updateData.slug = await uniqueSlug(prisma.slide, toSlug(title), slideId);
+  }
+  if (body.description !== undefined) {
+    updateData.description = sanitizeText(body.description, 1000) || null;
+  }
+
+  const numericMainCategoryId = Number(body.mainCategoryId || body.categoryId);
+  const numericSubcategoryId = Number(body.subcategoryId);
+  if (Number.isInteger(numericMainCategoryId) && numericMainCategoryId > 0) {
+    const mainCategory = await prisma.category.findUnique({
+      where: { id: numericMainCategoryId },
+      select: { id: true, parentId: true, isActive: true },
+    });
+    if (!mainCategory || mainCategory.isActive === false) {
+      const err = new Error('Kategori bulunamadi');
+      err.status = 400;
+      throw err;
+    }
+    const resolvedMainId = mainCategory.parentId ? mainCategory.parentId : mainCategory.id;
+    let resolvedSubcategoryId = null;
+    if (Number.isInteger(numericSubcategoryId) && numericSubcategoryId > 0) {
+      const sub = await prisma.category.findUnique({
+        where: { id: numericSubcategoryId },
+        select: { id: true, parentId: true, isActive: true },
+      });
+      if (!sub || sub.isActive === false || sub.parentId !== resolvedMainId) {
+        const err = new Error('Alt kategori secimi gecersiz');
+        err.status = 400;
+        throw err;
+      }
+      resolvedSubcategoryId = sub.id;
+    } else if (mainCategory.parentId) {
+      resolvedSubcategoryId = mainCategory.id;
+    }
+
+    await prisma.topic.update({
+      where: { id: slide.topicId },
+      data: {
+        categoryId: resolvedMainId,
+        subcategoryId: resolvedSubcategoryId,
+      },
+    });
+  }
+
+  const tagNames = parseTagArray(body.tags);
+  const seoTitle = body.seoTitle !== undefined ? sanitizeText(body.seoTitle, 70) || null : undefined;
+  const seoDescription = body.seoDescription !== undefined ? sanitizeText(body.seoDescription, 160) || null : undefined;
+
+  await prisma.$transaction(async (tx) => {
+    if (Object.keys(updateData).length > 0) {
+      await tx.slide.update({
+        where: { id: slideId },
+        data: updateData,
+      });
+    }
+
+    if (tagNames.length > 0 || body.tags !== undefined) {
+      const existing = await tx.slideTag.findMany({
+        where: { slideId },
+        select: { id: true, tagId: true },
+      });
+      if (existing.length) {
+        await tx.slideTag.deleteMany({ where: { slideId } });
+      }
+      if (tagNames.length) {
+        for (const tagName of tagNames) {
+          const tagSlug = toSlug(tagName);
+          if (!tagSlug) continue;
+          const tag = await tx.tag.upsert({
+            where: { slug: tagSlug },
+            update: { name: tagName },
+            create: { name: tagName, slug: tagSlug },
+          });
+          await tx.slideTag.create({
+            data: {
+              slideId,
+              tagId: tag.id,
+              source: body.tagSource ? String(body.tagSource).slice(0, 24) : 'user',
+              confidence: null,
+            },
+          });
+        }
+      }
+    }
+
+    if (seoTitle !== undefined || seoDescription !== undefined || body.keywordSummary !== undefined) {
+      await tx.slideSeoMeta.upsert({
+        where: { slideId },
+        update: {
+          seoTitle,
+          seoDescription,
+          keywordSummary: body.keywordSummary !== undefined ? sanitizeText(body.keywordSummary, 500) || null : undefined,
+        },
+        create: {
+          slideId,
+          seoTitle: seoTitle || null,
+          seoDescription: seoDescription || null,
+          keywordSummary: body.keywordSummary !== undefined ? sanitizeText(body.keywordSummary, 500) || null : null,
+        },
+      });
+    }
+  });
+
+  const updated = await prisma.slide.findUnique({
+    where: { id: slideId },
+    select: slideMetadataSelect,
+  });
+
+  return normalizeSlideMedia({
+    ...updated,
+    publishStatus: markPublished ? 'published' : 'draft',
+  });
+};
+
+const saveMetadata = async (req, res) => {
+  try {
+    const slideId = Number(req.params.id);
+    if (!Number.isInteger(slideId) || slideId <= 0) {
+      return res.status(400).json({ error: 'Invalid slide id' });
+    }
+
+    const updated = await applySlideMetadata({
+      slideId,
+      userId: req.user.id,
+      isAdmin: req.user.isAdmin,
+      body: req.body,
+      markPublished: false,
+    });
+    return res.json(updated);
+  } catch (err) {
+    if (err?.status) return res.status(err.status).json({ error: err.message });
+    logger.error('Failed to save slide metadata', { error: err.message, stack: err.stack });
+    return res.status(500).json({ error: 'Failed to save slide metadata' });
+  }
+};
+
+const publishSlide = async (req, res) => {
+  try {
+    const slideId = Number(req.params.id);
+    if (!Number.isInteger(slideId) || slideId <= 0) {
+      return res.status(400).json({ error: 'Invalid slide id' });
+    }
+
+    const updated = await applySlideMetadata({
+      slideId,
+      userId: req.user.id,
+      isAdmin: req.user.isAdmin,
+      body: req.body,
+      markPublished: true,
+    });
+    return res.json(updated);
+  } catch (err) {
+    if (err?.status) return res.status(err.status).json({ error: err.message });
+    logger.error('Failed to publish slide metadata', { error: err.message, stack: err.stack });
+    return res.status(500).json({ error: 'Failed to publish slide' });
+  }
+};
+
 const updateThumbnail = async (req, res) => {
   try {
     const slideId = Number(req.params.id);
@@ -1381,6 +1596,8 @@ module.exports = {
   getMine,
   create,
   update,
+  saveMetadata,
+  publishSlide,
   updateThumbnail,
   getPopular,
   incrementView,

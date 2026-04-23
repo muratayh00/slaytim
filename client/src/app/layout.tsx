@@ -8,6 +8,7 @@ import CookieBanner from '@/components/shared/CookieBanner';
 import AdSenseScript from '@/components/shared/AdSenseScript';
 import GlobalErrorBoundary from '@/components/shared/GlobalErrorBoundary';
 import GoogleAnalytics from '@/components/analytics/GoogleAnalytics';
+import BuildVersionGuard from '@/components/shared/BuildVersionGuard';
 
 const font = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -82,6 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
             <CookieBanner />
             <AdSenseScript />
+            <BuildVersionGuard />
             <Suspense fallback={null}>
               <GoogleAnalytics />
             </Suspense>

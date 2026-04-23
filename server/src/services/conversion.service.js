@@ -858,7 +858,69 @@ async function reconcileMissingConversionJobs(options = {}) {
   return reconcileRedisQueue(options);
 }
 
+async function recoverStuckConversionJobs(options = {}) {
+  const thresholdMinutes = Math.max(1, Number(options.thresholdMinutes || process.env.CONVERSION_STUCK_MINUTES || 10));
+  const threshold = new Date(Date.now() - thresholdMinutes * 60 * 1000);
+  const maxRecover = Math.max(1, Number(options.limit || process.env.CONVERSION_STUCK_RECOVER_LIMIT || 50));
+
+  const stuckJobs = await prisma.conversionJob.findMany({
+    where: {
+      status: 'processing',
+      lockedAt: { lt: threshold },
+      slide: { deletedAt: null },
+    },
+    orderBy: { lockedAt: 'asc' },
+    take: maxRecover,
+    select: {
+      slideId: true,
+      attempts: true,
+      lockedAt: true,
+    },
+  });
+
+  if (!stuckJobs.length) {
+    return { thresholdMinutes, recovered: 0, queued: 0 };
+  }
+
+  let requeued = 0;
+  for (const job of stuckJobs) {
+    await prisma.conversionJob.update({
+      where: { slideId: job.slideId },
+      data: {
+        status: 'queued',
+        lockedAt: null,
+        nextAttemptAt: new Date(),
+        lastError: `Auto-recovered: processing lock older than ${thresholdMinutes}m`,
+      },
+    }).catch(() => {});
+
+    await prisma.slide.updateMany({
+      where: { id: job.slideId, conversionStatus: 'processing' },
+      data: { conversionStatus: 'pending' },
+    }).catch(() => {});
+
+    try {
+      await enqueueSlideConversion(job.slideId);
+      requeued += 1;
+    } catch (err) {
+      logger.warn('[conversion] Failed to requeue stuck job', {
+        slideId: job.slideId,
+        error: err?.message || String(err),
+      });
+    }
+  }
+
+  return {
+    thresholdMinutes,
+    recovered: stuckJobs.length,
+    queued: requeued,
+  };
+}
+
 async function getUploadPipelineHealth() {
+  const stuck5mThreshold = new Date(Date.now() - 5 * 60 * 1000);
+  const stuck10mThreshold = new Date(Date.now() - 10 * 60 * 1000);
+
   const [jobs, stageCounts, queue] = await Promise.all([
     prisma.conversionJob.findMany({
       orderBy: { updatedAt: 'desc' },
@@ -886,6 +948,24 @@ async function getUploadPipelineHealth() {
     return acc;
   }, {});
 
+  const [processingOver5m, processingOver10m] = await Promise.all([
+    prisma.conversionJob.count({
+      where: {
+        status: 'processing',
+        lockedAt: { lt: stuck5mThreshold },
+      },
+    }),
+    prisma.conversionJob.count({
+      where: {
+        status: 'processing',
+        lockedAt: { lt: stuck10mThreshold },
+      },
+    }),
+  ]);
+
+  const processingTotal = Number(stages.processing || 0);
+  const stuckRatio = processingTotal > 0 ? Number((processingOver10m / processingTotal).toFixed(4)) : 0;
+
   return {
     status: 'ok',
     scanners: {
@@ -900,6 +980,13 @@ async function getUploadPipelineHealth() {
     },
     queue,
     stages,
+    processingHealth: {
+      processingTotal,
+      processingOver5m,
+      processingOver10m,
+      stuckRatio,
+      warning: processingOver10m > 0 || stuckRatio >= 0.2,
+    },
     recentJobs: jobs,
   };
 }
@@ -910,6 +997,7 @@ module.exports = {
   reconcileMissingConversionJobs,
   getConversionQueueState,
   getUploadPipelineHealth,
+  recoverStuckConversionJobs,
   hasLibreOffice,
   hasPowerPoint,
   getLibreOfficeBinary,

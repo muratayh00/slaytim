@@ -3,11 +3,34 @@ const logger = require('../lib/logger');
 
 const getAll = async (req, res) => {
   try {
+    const activeOnly = String(req.query?.activeOnly || '') === '1';
     const categories = await prisma.category.findMany({
+      where: activeOnly ? { isActive: true } : undefined,
       orderBy: { name: 'asc' },
       include: { _count: { select: { topics: true, followedCategories: true } } },
     });
-    res.json(categories);
+
+    if (String(req.query?.tree || '') === '1') {
+      const mainCategories = categories
+        .filter((cat) => (cat.isMain || cat.parentId === null) && cat.isActive !== false)
+        .sort((a, b) => {
+          if ((a.sortOrder || 0) !== (b.sortOrder || 0)) return (a.sortOrder || 0) - (b.sortOrder || 0);
+          return String(a.name || '').localeCompare(String(b.name || ''), 'tr');
+        })
+        .map((main) => ({
+          ...main,
+          children: categories
+            .filter((sub) => sub.parentId === main.id && sub.isActive !== false)
+            .sort((a, b) => {
+              if ((a.sortOrder || 0) !== (b.sortOrder || 0)) return (a.sortOrder || 0) - (b.sortOrder || 0);
+              return String(a.name || '').localeCompare(String(b.name || ''), 'tr');
+            }),
+        }));
+
+      return res.json({ mainCategories, categories });
+    }
+
+    return res.json(categories);
   } catch (err) {
     logger.error('Failed to fetch categories', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch categories' });

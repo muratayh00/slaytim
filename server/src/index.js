@@ -21,6 +21,7 @@ const { seedBadges } = require('./services/badge.service');
 const {
   enqueueSlideConversion,
   reconcileMissingConversionJobs,
+  recoverStuckConversionJobs,
   hasLibreOffice,
   hasPowerPoint,
   getLibreOfficeBinary,
@@ -478,11 +479,20 @@ async function queuePendingConversions() {
 
 async function runConversionQueueReconciler() {
   try {
-    const result = await reconcileMissingConversionJobs({
-      limit: Number(process.env.CONVERSION_RECONCILE_LIMIT || 500),
-    });
+    const [result, recovered] = await Promise.all([
+      reconcileMissingConversionJobs({
+        limit: Number(process.env.CONVERSION_RECONCILE_LIMIT || 500),
+      }),
+      recoverStuckConversionJobs({
+        thresholdMinutes: Number(process.env.CONVERSION_STUCK_MINUTES || 10),
+        limit: Number(process.env.CONVERSION_STUCK_RECOVER_LIMIT || 50),
+      }),
+    ]);
     if ((result?.reEnqueued || 0) > 0) {
       logger.warn('[conversion] Reconciler re-enqueued missing jobs', result);
+    }
+    if ((recovered?.recovered || 0) > 0) {
+      logger.warn('[conversion] Auto recovered stuck processing jobs', recovered);
     }
   } catch (err) {
     logger.error('[conversion] Reconciler failed', { error: err?.message || String(err) });

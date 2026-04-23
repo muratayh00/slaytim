@@ -11,6 +11,7 @@ const topicSelect = {
   description: true,
   slug: true,
   roomId: true,
+  subcategoryId: true,
   likesCount: true,
   viewsCount: true,
   isSponsored: true,
@@ -23,7 +24,8 @@ const topicSelect = {
   createdAt: true,
   updatedAt: true,
   user: { select: { id: true, username: true, avatarUrl: true } },
-  category: { select: { id: true, name: true, slug: true } },
+  category: { select: { id: true, name: true, slug: true, parentId: true, isMain: true } },
+  subcategory: { select: { id: true, name: true, slug: true, parentId: true } },
   room: { select: { id: true, name: true, slug: true, isPublic: true } },
   pinnedSlideId: true,
   pinnedSlide: { select: { id: true, title: true, thumbnailUrl: true } },
@@ -46,6 +48,40 @@ function clearTopicCaches() {
   ttlCache.clear('topic-feed');
   ttlCache.clear('topic-trending');
 }
+
+const resolveTopicCategorySelection = async ({ categoryId, mainCategoryId, subcategoryId }) => {
+  const providedMain = Number(mainCategoryId ?? categoryId);
+  if (!Number.isInteger(providedMain) || providedMain <= 0) {
+    return { error: 'Gecerli ana kategori zorunlu' };
+  }
+
+  const main = await prisma.category.findUnique({
+    where: { id: providedMain },
+    select: { id: true, isMain: true, parentId: true, isActive: true },
+  });
+  if (!main || main.isActive === false) return { error: 'Kategori bulunamadi' };
+
+  const resolvedMainId = main.parentId ? main.parentId : main.id;
+  let resolvedSubcategoryId = null;
+
+  const providedSub = Number(subcategoryId);
+  if (Number.isInteger(providedSub) && providedSub > 0) {
+    const sub = await prisma.category.findUnique({
+      where: { id: providedSub },
+      select: { id: true, parentId: true, isActive: true },
+    });
+    if (!sub || sub.isActive === false) return { error: 'Alt kategori bulunamadi' };
+    if (!sub.parentId || sub.parentId !== resolvedMainId) {
+      return { error: 'Alt kategori secili ana kategoriye ait degil' };
+    }
+    resolvedSubcategoryId = sub.id;
+  } else if (main.parentId) {
+    // Backward compatibility: when legacy categoryId points to a child category.
+    resolvedSubcategoryId = main.id;
+  }
+
+  return { categoryId: resolvedMainId, subcategoryId: resolvedSubcategoryId };
+};
 
 // ?? Algorithm 1: Hot/Trending Score ??????????????????????????????????????????
 // hot_score = (likes + slides*4 + views*0.05) / (age_hours + 2)^1.5
@@ -156,7 +192,8 @@ const getOne = async (req, res) => {
       where: { id: topicId },
       include: {
         user: { select: { id: true, username: true, avatarUrl: true } },
-        category: { select: { id: true, name: true, slug: true } },
+        category: { select: { id: true, name: true, slug: true, parentId: true, isMain: true } },
+        subcategory: { select: { id: true, name: true, slug: true, parentId: true } },
         pinnedSlide: { select: { id: true, title: true, thumbnailUrl: true } },
         _count: { select: { slides: true, likes: true } },
       },
@@ -191,17 +228,16 @@ const getOne = async (req, res) => {
 
 const create = async (req, res) => {
   try {
-    const { title: rawTitle, description: rawDesc, categoryId, roomId } = req.body;
-    const categoryIdNum = Number(categoryId);
+    const { title: rawTitle, description: rawDesc, categoryId, mainCategoryId, subcategoryId, roomId } = req.body;
     const roomIdNum = roomId !== undefined && roomId !== null && String(roomId).trim() !== '' ? Number(roomId) : null;
     const title = sanitizeText(rawTitle, 200);
     const description = sanitizeText(rawDesc, 1000) || null;
     if (!title) return res.status(400).json({ error: 'Baslik zorunlu' });
-    if (!Number.isInteger(categoryIdNum) || categoryIdNum <= 0) {
-      return res.status(400).json({ error: 'Gecerli kategori zorunlu' });
+
+    const selection = await resolveTopicCategorySelection({ categoryId, mainCategoryId, subcategoryId });
+    if (selection.error) {
+      return res.status(400).json({ error: selection.error });
     }
-    const category = await prisma.category.findUnique({ where: { id: categoryIdNum }, select: { id: true } });
-    if (!category) return res.status(404).json({ error: 'Kategori bulunamadi' });
 
     if (roomIdNum !== null) {
       if (!Number.isInteger(roomIdNum) || roomIdNum <= 0) {
@@ -219,10 +255,19 @@ const create = async (req, res) => {
     const slug = await uniqueSlug(prisma.topic, toSlug(title));
 
     const topic = await prisma.topic.create({
-      data: { title, description, categoryId: categoryIdNum, roomId: roomIdNum, userId: req.user.id, slug },
+      data: {
+        title,
+        description,
+        categoryId: selection.categoryId,
+        subcategoryId: selection.subcategoryId,
+        roomId: roomIdNum,
+        userId: req.user.id,
+        slug,
+      },
       include: {
         user: { select: { id: true, username: true, avatarUrl: true } },
-        category: { select: { id: true, name: true, slug: true } },
+        category: { select: { id: true, name: true, slug: true, parentId: true, isMain: true } },
+        subcategory: { select: { id: true, name: true, slug: true, parentId: true } },
         room: { select: { id: true, name: true, slug: true, isPublic: true } },
       },
     });
@@ -241,7 +286,8 @@ const getBySlug = async (req, res) => {
       where: { slug },
       include: {
         user: { select: { id: true, username: true, avatarUrl: true } },
-        category: { select: { id: true, name: true, slug: true } },
+        category: { select: { id: true, name: true, slug: true, parentId: true, isMain: true } },
+        subcategory: { select: { id: true, name: true, slug: true, parentId: true } },
         pinnedSlide: { select: { id: true, title: true, thumbnailUrl: true } },
         _count: { select: { slides: true, likes: true } },
       },
@@ -255,7 +301,8 @@ const getBySlug = async (req, res) => {
             where: { id: fallbackId },
             include: {
               user: { select: { id: true, username: true, avatarUrl: true } },
-              category: { select: { id: true, name: true, slug: true } },
+              category: { select: { id: true, name: true, slug: true, parentId: true, isMain: true } },
+              subcategory: { select: { id: true, name: true, slug: true, parentId: true } },
               pinnedSlide: { select: { id: true, title: true, thumbnailUrl: true } },
               _count: { select: { slides: true, likes: true } },
             },
@@ -296,7 +343,7 @@ const update = async (req, res) => {
     if (topic.userId !== req.user.id && !req.user.isAdmin) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    const { title: rawTitle, description: rawDesc, categoryId } = req.body;
+    const { title: rawTitle, description: rawDesc, categoryId, mainCategoryId, subcategoryId } = req.body;
     const data = {};
     if (rawTitle !== undefined) {
       const title = sanitizeText(rawTitle, 200);
@@ -305,14 +352,11 @@ const update = async (req, res) => {
       data.slug = await uniqueSlug(prisma.topic, toSlug(title), Number(id));
     }
     if (rawDesc !== undefined) data.description = sanitizeText(rawDesc, 1000) || null;
-    if (categoryId !== undefined) {
-      const categoryIdNum = Number(categoryId);
-      if (!Number.isInteger(categoryIdNum) || categoryIdNum <= 0) {
-        return res.status(400).json({ error: 'Gecerli kategori zorunlu' });
-      }
-      const category = await prisma.category.findUnique({ where: { id: categoryIdNum }, select: { id: true } });
-      if (!category) return res.status(404).json({ error: 'Kategori bulunamadi' });
-      data.categoryId = categoryIdNum;
+    if (categoryId !== undefined || mainCategoryId !== undefined || subcategoryId !== undefined) {
+      const selection = await resolveTopicCategorySelection({ categoryId, mainCategoryId, subcategoryId });
+      if (selection.error) return res.status(400).json({ error: selection.error });
+      data.categoryId = selection.categoryId;
+      data.subcategoryId = selection.subcategoryId;
     }
     const updated = await prisma.topic.update({ where: { id: Number(id) }, data, select: topicSelect });
     clearTopicCaches();

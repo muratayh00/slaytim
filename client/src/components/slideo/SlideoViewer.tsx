@@ -179,14 +179,17 @@ export default function SlideoViewer({
   useEffect(() => {
     if (!isActive || slideo.slide.conversionStatus !== 'done') return;
     if (imageMode || slideImages.length > 0) return; // already loaded
+    let cancelled = false;
     api.get(`/slides/${slideo.slide.id}/preview-meta`)
       .then(({ data }) => {
+        if (cancelled) return;
         if (data?.previewMode === 'images' && Array.isArray(data.pages) && data.pages.length > 0) {
           setSlideImages(data.pages);
           setImageMode(true);
         }
       })
       .catch(() => { /* fall through to PDF.js */ });
+    return () => { cancelled = true; };
   }, [isActive, slideo.slide.conversionStatus, slideo.slide.id, imageMode, slideImages.length]);
 
   // ?? PDF load (only when image mode unavailable) ?????????????????????????????

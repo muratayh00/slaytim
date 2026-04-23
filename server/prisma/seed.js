@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const { categoryData } = require('./categoryData');
+const { categoryTreeData } = require('./categoryTreeData');
 const fs = require('fs');
 const path = require('path');
 
@@ -28,13 +29,72 @@ async function main() {
     console.warn('[seed] uploads/slides altinda .pptx bulunamadi; bozuk preview olusmamasi icin demo slayt kayitlari atlanacak.');
   }
 
-  // Kategoriler
+  // Main/Sub category tree
   const cats = {};
+  const curatedSlugs = new Set();
+  for (const main of categoryTreeData) {
+    curatedSlugs.add(main.slug);
+    const mainCategory = await prisma.category.upsert({
+      where: { slug: main.slug },
+      update: {
+        name: main.name,
+        isMain: true,
+        isActive: true,
+        parentId: null,
+        sortOrder: Number(main.sortOrder || 0),
+      },
+      create: {
+        name: main.name,
+        slug: main.slug,
+        isMain: true,
+        isActive: true,
+        parentId: null,
+        sortOrder: Number(main.sortOrder || 0),
+      },
+    });
+    cats[main.slug] = mainCategory;
+
+    for (const child of main.children || []) {
+      curatedSlugs.add(child.slug);
+      const sub = await prisma.category.upsert({
+        where: { slug: child.slug },
+        update: {
+          name: child.name,
+          isMain: false,
+          isActive: true,
+          parentId: mainCategory.id,
+          sortOrder: Number(child.sortOrder || 0),
+        },
+        create: {
+          name: child.name,
+          slug: child.slug,
+          isMain: false,
+          isActive: true,
+          parentId: mainCategory.id,
+          sortOrder: Number(child.sortOrder || 0),
+        },
+      });
+      cats[child.slug] = sub;
+    }
+  }
+
+  // Legacy category set (kept active for existing content, hidden from main-picker)
   for (const cat of categoryData) {
+    if (curatedSlugs.has(cat.slug)) continue;
     const c = await prisma.category.upsert({
       where: { slug: cat.slug },
-      update: {},
-      create: cat,
+      update: {
+        name: cat.name,
+        isMain: false,
+        isActive: true,
+        sortOrder: 999,
+      },
+      create: {
+        ...cat,
+        isMain: false,
+        isActive: true,
+        sortOrder: 999,
+      },
     });
     cats[cat.slug] = c;
   }

@@ -1,51 +1,38 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import api from '@/lib/api';
+import { notFound } from 'next/navigation';
 import TopicCard from '@/components/shared/TopicCard';
 import SlideCard from '@/components/shared/SlideCard';
+import { getApiBaseUrl } from '@/lib/api-origin';
+
+const API_URL = getApiBaseUrl();
+export const dynamic = 'force-dynamic';
 
 type TagPayload = {
   tag: { slug: string; label: string };
   totals: { topics: number; slides: number; all: number };
+  seo?: { indexable?: boolean };
   topics: any[];
   slides: any[];
 };
 
-export default function TagPage() {
-  const params = useParams();
-  const slug = String((params as Record<string, string>)?.slug || '');
-  const [data, setData] = useState<TagPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const res = await api.get(`/tags/${encodeURIComponent(slug)}`);
-        if (!cancelled) setData(res.data);
-      } catch {
-        if (!cancelled) setData(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    if (slug) load();
-    return () => {
-      cancelled = true;
-    };
-  }, [slug]);
-
-  if (loading) {
-    return <div className="max-w-6xl mx-auto px-4 py-10 text-muted-foreground">Yukleniyor...</div>;
+async function fetchTag(slug: string): Promise<TagPayload | null> {
+  if (!API_URL || !slug) return null;
+  try {
+    const res = await fetch(`${API_URL}/tags/${encodeURIComponent(slug)}`, {
+      cache: 'no-store',
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) return null;
+    return (await res.json()) as TagPayload;
+  } catch {
+    return null;
   }
+}
 
-  if (!data) {
-    return <div className="max-w-6xl mx-auto px-4 py-10 text-muted-foreground">Etiket icerigi bulunamadi.</div>;
-  }
+export default async function TagPage({ params }: { params: { slug: string } }) {
+  const slug = String(params.slug || '');
+  const data = await fetchTag(slug);
+  if (!data || Number(data?.totals?.all || 0) <= 0) notFound();
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10 space-y-8">
@@ -53,7 +40,7 @@ export default function TagPage() {
         <p className="text-xs text-muted-foreground mb-2">Etiket</p>
         <h1 className="text-2xl font-extrabold mb-2">#{data.tag.label}</h1>
         <p className="text-sm text-muted-foreground">
-          {data.totals.all} sonuc • {data.totals.topics} konu • {data.totals.slides} slayt
+          {data.totals.all} sonuc - {data.totals.topics} konu - {data.totals.slides} slayt
         </p>
       </section>
 
@@ -81,7 +68,11 @@ export default function TagPage() {
 
       {data.totals.all === 0 && (
         <div className="text-sm text-muted-foreground">
-          Bu etiket icin icerik yok. <Link href="/kesfet" className="text-primary">Kesfet sayfasina don</Link>.
+          Bu etiket icin icerik yok.{' '}
+          <Link href="/kesfet" className="text-primary">
+            Kesfet sayfasina don
+          </Link>
+          .
         </div>
       )}
     </div>

@@ -7,6 +7,8 @@ const {
   getMine,
   create,
   update,
+  saveMetadata,
+  publishSlide,
   getPopular,
   incrementView,
   trackPageEvent,
@@ -72,6 +74,8 @@ router.post('/:id/comments', validateNumericParam('id'), authenticate, commentCr
 router.delete('/:id/comments/:commentId', validateNumericParam('id'), authenticate, removeSlideComment);
 router.post('/', authenticate, spamGuard, uploadIpLimiter, upload.single('file'), validateMagicBytes, create);
 router.patch('/:id', validateNumericParam('id'), authenticate, update);
+router.patch('/:id/metadata', validateNumericParam('id'), authenticate, saveMetadata);
+router.post('/:id/publish', validateNumericParam('id'), authenticate, publishSlide);
 router.patch('/:id/thumbnail', validateNumericParam('id'), authenticate, updateThumbnail);
 router.delete('/:id', validateNumericParam('id'), authenticate, remove);
 

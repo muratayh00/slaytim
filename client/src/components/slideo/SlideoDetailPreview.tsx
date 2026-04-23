@@ -72,8 +72,10 @@ export default function SlideoDetailPreview({ slideoId, slideId, slideTitle, tit
   // ?? Try image mode first (fast path) ??????????????????????????????????????????????
   useEffect(() => {
     if (!canPreview) return;
+    let cancelled = false;
     api.get(`/slides/${slideId}/preview-meta`)
       .then(({ data }) => {
+        if (cancelled) return;
         if (data?.previewMode === 'images' && Array.isArray(data.pages) && data.pages.length > 0) {
           const needed = new Set(pageIndices);
           const imgs = data.pages.filter((p: PageImage) => needed.has(p.pageNumber));
@@ -84,6 +86,7 @@ export default function SlideoDetailPreview({ slideoId, slideId, slideTitle, tit
         }
       })
       .catch(() => { /* fall through to PDF.js */ });
+    return () => { cancelled = true; };
   }, [canPreview, slideId, pageIndices]);
 
   // Reset img loaded state on page change
@@ -163,9 +166,44 @@ export default function SlideoDetailPreview({ slideoId, slideId, slideTitle, tit
   // ?? Share ???????????????????????????????????????????????????????????????????
   const handleShare = async () => {
     const url = `${window.location.origin}${buildSlideoPath({ id: slideoId, title })}`;
-    try { await navigator.clipboard.writeText(url); } catch {}
-    if (user) api.post(`/slideo/${slideoId}/share`).catch(() => {});
-    toast.success('Link kopyalandı');
+
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ title, url });
+        if (user) api.post(`/slideo/${slideoId}/share`).catch(() => {});
+        return;
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return;
+      }
+    }
+
+    let copied = false;
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(url);
+        copied = true;
+      } catch {}
+    }
+
+    if (!copied) {
+      try {
+        const el = document.createElement('textarea');
+        el.value = url;
+        el.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
+        document.body.appendChild(el);
+        el.focus();
+        el.select();
+        copied = document.execCommand('copy');
+        document.body.removeChild(el);
+      } catch {}
+    }
+
+    if (copied) {
+      if (user) api.post(`/slideo/${slideoId}/share`).catch(() => {});
+      toast.success('Link kopyalandı');
+    } else {
+      toast.error('Kopyalanamadı, linki elle kopyala:\n' + url, { duration: 6000 });
+    }
   };
 
   // ?? Derived ?????????????????????????????????????????????????????????????????

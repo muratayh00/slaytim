@@ -69,11 +69,20 @@ model Category {
   id        Int      @id @default(autoincrement())
   name      String   @unique
   slug      String   @unique
+  parentId  Int?     @map("parent_id")
+  isMain    Boolean  @default(true) @map("is_main")
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at")
 
-  topics             Topic[]
+  parent             Category? @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children           Category[] @relation("CategoryHierarchy")
+  topics             Topic[] @relation("TopicMainCategory")
+  topicSubcategories Topic[] @relation("TopicSubCategory")
   followedCategories FollowedCategory[]
 
+  @@index([parentId])
+  @@index([isMain, isActive, sortOrder])
   @@map("categories")
 }
 
@@ -81,6 +90,7 @@ model Topic {
   id          Int       @id @default(autoincrement())
   userId      Int       @map("user_id")
   categoryId  Int       @map("category_id")
+  subcategoryId Int?    @map("subcategory_id")
   roomId      Int?      @map("room_id")
   title       String
   description String?
@@ -101,7 +111,8 @@ model Topic {
   updatedAt     DateTime? @updatedAt @map("updated_at")
 
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category    Category @relation(fields: [categoryId], references: [id])
+  category    Category @relation("TopicMainCategory", fields: [categoryId], references: [id])
+  subcategory Category? @relation("TopicSubCategory", fields: [subcategoryId], references: [id], onDelete: SetNull)
   room        Room?    @relation(fields: [roomId], references: [id], onDelete: SetNull)
   pinnedSlide Slide?   @relation("pinnedSlide", fields: [pinnedSlideId], references: [id], onDelete: SetNull)
   slides      Slide[]
@@ -112,6 +123,7 @@ model Topic {
 
   @@index([userId])
   @@index([categoryId])
+  @@index([subcategoryId])
   @@index([roomId])
   @@index([viewsCount])
   @@index([isHidden])
@@ -163,12 +175,59 @@ model Slide {
   flashcardSets  FlashcardSet[]
   pinnedInTopics Topic[]          @relation("pinnedSlide")
   previewAssets  SlidePreviewAsset[]
+  tags         SlideTag[]
+  seoMeta      SlideSeoMeta?
 
   @@index([userId])
   @@index([topicId])
   @@index([likesCount])
   @@index([isHidden])
   @@map("slides")
+}
+
+model Tag {
+  id         Int       @id @default(autoincrement())
+  name       String    @unique
+  slug       String    @unique
+  usageCount Int       @default(0) @map("usage_count")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime? @updatedAt @map("updated_at")
+
+  slides     SlideTag[]
+
+  @@index([usageCount])
+  @@map("tags")
+}
+
+model SlideTag {
+  id         Int       @id @default(autoincrement())
+  slideId    Int       @map("slide_id")
+  tagId      Int       @map("tag_id")
+  source     String    @default("user")
+  confidence Float?
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  slide      Slide     @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  tag        Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([slideId, tagId])
+  @@index([tagId])
+  @@index([slideId, source])
+  @@map("slide_tags")
+}
+
+model SlideSeoMeta {
+  id              Int       @id @default(autoincrement())
+  slideId          Int      @unique @map("slide_id")
+  seoTitle         String?  @map("seo_title")
+  seoDescription   String?  @map("seo_description")
+  keywordSummary   String?  @map("keyword_summary")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime? @updatedAt @map("updated_at")
+
+  slide            Slide    @relation(fields: [slideId], references: [id], onDelete: Cascade)
+
+  @@map("slide_seo_meta")
 }
 
 model SlidePreviewAsset {
