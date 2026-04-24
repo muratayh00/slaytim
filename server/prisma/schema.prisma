@@ -64,6 +64,9 @@ model User {
   contentEvents      UserContentEvent[]
   feedImpressions    FeedImpressionLog[]
 
+  @@index([createdAt])
+  @@index([isBanned])
+  @@index([isMuted])
   @@map("users")
 }
 
@@ -130,6 +133,7 @@ model Topic {
   @@index([roomId])
   @@index([viewsCount])
   @@index([isHidden])
+  @@index([createdAt])
   @@map("topics")
 }
 
@@ -185,6 +189,8 @@ model Slide {
   @@index([topicId])
   @@index([likesCount])
   @@index([isHidden])
+  @@index([createdAt])
+  @@index([conversionStatus])
   @@map("slides")
 }
 
@@ -467,6 +473,7 @@ model Comment {
 
   @@index([topicId])
   @@index([userId])
+  @@index([createdAt])
   @@map("comments")
 }
 
@@ -535,6 +542,7 @@ model Report {
 
   @@index([status])
   @@index([priority])
+  @@index([status, priority])
   @@map("reports")
 }
 
@@ -865,6 +873,7 @@ model SlideoFeedEvent {
   @@index([subjectKey, createdAt])
   @@index([variant, eventType, createdAt])
   @@index([slideoId, createdAt])
+  @@index([createdAt])
   @@map("slideo_feed_events")
 }
 
