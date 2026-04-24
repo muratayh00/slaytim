@@ -18,6 +18,7 @@ const {
 } = require('../services/storage.service');
 const { notifyTopicSubscribers } = require('../services/topic-subscription.service');
 const logger = require('../lib/logger');
+const ttlCache = require('../lib/ttl-cache');
 const dedup = require('../lib/dedup');
 const { normalizeMediaUrls } = require('../lib/media-normalize');
 
@@ -1100,13 +1101,18 @@ const getPreviewMeta = async (req, res) => {
 // Algorithm 10 - quality score: saves count stronger than likes
 const getPopular = async (req, res) => {
   try {
+    const cached = ttlCache.get('slide-popular', 'default');
+    if (cached) return res.json(cached);
+
     const slides = await prisma.slide.findMany({
       where: { conversionStatus: 'done', isHidden: false },
       orderBy: [{ savesCount: 'desc' }, { likesCount: 'desc' }],
       take: 12,
       select: slideSelect,
     });
-    res.json(slides.map(normalizeSlideMedia));
+    const result = slides.map(normalizeSlideMedia);
+    ttlCache.set('slide-popular', 'default', result, 60_000); // 60 s cache
+    res.json(result);
   } catch (err) {
     logger.error('Failed to fetch popular slides', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch popular slides' });

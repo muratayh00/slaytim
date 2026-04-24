@@ -66,11 +66,11 @@ export default function HomeClient({
     (async () => {
       try {
         const [t, l, p, c, sl] = await Promise.all([
-          api.get('/topics/trending').catch(() => ({ data: [] })),
-          api.get('/topics?sort=latest&limit=12').catch(() => ({ data: { topics: [] } })),
-          api.get('/slides/popular').catch(() => ({ data: [] })),
-          api.get('/categories').catch(() => ({ data: [] })),
-          api.get('/slideo/feed?sort=popular&limit=8').catch(() => ({ data: { slideos: [] } })),
+          api.get('/topics/trending', { timeout: 10_000 }).catch(() => ({ data: [] })),
+          api.get('/topics?sort=latest&limit=12', { timeout: 10_000 }).catch(() => ({ data: { topics: [] } })),
+          api.get('/slides/popular', { timeout: 10_000 }).catch(() => ({ data: [] })),
+          api.get('/categories', { timeout: 10_000 }).catch(() => ({ data: [] })),
+          api.get('/slideo/feed?sort=popular&limit=8', { timeout: 10_000 }).catch(() => ({ data: { slideos: [] } })),
         ]);
         setTrending(t.data.slice ? t.data.slice(0, 6) : []);
         setLatest(l.data.topics || []);
@@ -91,7 +91,7 @@ export default function HomeClient({
     if (feed.length > 0) return;
     setFeedLoading(true);
     try {
-      const { data } = await api.get('/topics/feed');
+      const { data } = await api.get('/topics/feed', { timeout: 10_000 });
       setFeed(data.topics);
       setFeedEmpty(data.isEmpty || data.topics.length === 0);
     } catch {
@@ -111,7 +111,7 @@ export default function HomeClient({
     setLoading(true);
     setLatestPage(1);
     try {
-      const { data } = await api.get(slug ? `/topics?category=${slug}&limit=12` : '/topics?sort=latest&limit=12');
+      const { data } = await api.get(slug ? `/topics?category=${slug}&limit=12` : '/topics?sort=latest&limit=12', { timeout: 10_000 });
       setLatest(data.topics || []);
       setLatestHasMore((data.topics?.length || 0) >= 12);
     } catch {
@@ -130,7 +130,7 @@ export default function HomeClient({
       const url = activeCategory
         ? `/topics?category=${activeCategory}&limit=12&page=${nextPage}`
         : `/topics?sort=latest&limit=12&page=${nextPage}`;
-      const { data } = await api.get(url);
+      const { data } = await api.get(url, { timeout: 10_000 });
       const newTopics = data.topics || [];
       setLatest((prev) => [...prev, ...newTopics]);
       setLatestPage(nextPage);

@@ -1,4 +1,4 @@
--- Add missing indexes for admin stats endpoint performance.
+-- Add missing indexes for admin stats and home page endpoint performance.
 -- These queries were doing full table scans causing >10s timeouts.
 
 -- User: createdAt ranges (new users today/week/month) + banned/muted counts
@@ -21,3 +21,6 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS "reports_status_priority_idx" ON "report
 
 -- SlideoFeedEvent: createdAt filter for groupBy experiment stats
 CREATE INDEX CONCURRENTLY IF NOT EXISTS "slideo_feed_events_created_at_idx" ON "slideo_feed_events"("created_at");
+
+-- Slide: savesCount for popular slides ordering
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "slides_saves_count_idx" ON "slides"("saves_count");

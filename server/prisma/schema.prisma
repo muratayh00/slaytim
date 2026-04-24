@@ -188,6 +188,7 @@ model Slide {
   @@index([userId])
   @@index([topicId])
   @@index([likesCount])
+  @@index([savesCount])
   @@index([isHidden])
   @@index([createdAt])
   @@index([conversionStatus])
