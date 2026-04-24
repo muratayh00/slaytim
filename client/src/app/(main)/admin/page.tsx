@@ -150,8 +150,8 @@ function OverviewTab() {
 
   useEffect(() => {
     Promise.all([
-      api.get('/admin/stats').catch(() => ({ data: null })),
-      api.get('/slideo/feed/experiment-stats?days=7').catch(() => ({ data: null })),
+      api.get('/admin/stats', { timeout: 10_000 }).catch(() => ({ data: null })),
+      api.get('/slideo/feed/experiment-stats?days=7', { timeout: 10_000 }).catch(() => ({ data: null })),
     ])
       .then(([statsRes, feedRes]) => {
         setStats(statsRes?.data || null);
@@ -337,9 +337,9 @@ function AnalyticsTab() {
     setLoading(true);
     try {
       const [statsRes, feedRes, shadowRes] = await Promise.all([
-        api.get('/admin/stats').catch(() => ({ data: null })),
-        api.get('/slideo/feed/experiment-stats?days=7').catch(() => ({ data: null })),
-        api.get('/recommendation/shadow-stats?days=7').catch(() => ({ data: null })),
+        api.get('/admin/stats', { timeout: 10_000 }).catch(() => ({ data: null })),
+        api.get('/slideo/feed/experiment-stats?days=7', { timeout: 10_000 }).catch(() => ({ data: null })),
+        api.get('/recommendation/shadow-stats?days=7', { timeout: 10_000 }).catch(() => ({ data: null })),
       ]);
       setStats(statsRes.data || null);
       setFeedExperiment(feedRes?.data || null);
@@ -429,8 +429,8 @@ function ConversionTab() {
     setLoading(true);
     try {
       const [{ data }, healthRes] = await Promise.all([
-        api.get(`/admin/conversion-jobs?status=${status}&q=${encodeURIComponent(q)}&page=${page}`).catch(() => ({ data: null })),
-        api.get('/admin/conversion-jobs/health').catch(() => ({ data: null })),
+        api.get(`/admin/conversion-jobs?status=${status}&q=${encodeURIComponent(q)}&page=${page}`, { timeout: 10_000 }).catch(() => ({ data: null })),
+        api.get('/admin/conversion-jobs/health', { timeout: 10_000 }).catch(() => ({ data: null })),
       ]);
       setItems(Array.isArray(data?.items) ? data.items : []);
       setSummary(data?.summary || { pending: 0, processing: 0, failed: 0, done: 0, unsupported: 0 });
@@ -651,7 +651,7 @@ function ReportsTab() {
   const load = useCallback(async (s = statusFilter, p = page) => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/reports?status=${s}&page=${p}`);
+      const { data } = await api.get(`/reports?status=${s}&page=${p}`, { timeout: 10_000 });
       setReports(data.reports);
       setTotalPages(data.pages);
     } catch { toast.error('Raporlar yüklenemedi'); }
@@ -866,7 +866,7 @@ function ContentTab() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/admin/content?type=${type}&q=${q}&page=${page}`);
+      const { data } = await api.get(`/admin/content?type=${type}&q=${q}&page=${page}`, { timeout: 10_000 });
       setItems(data.items);
       setTotalPages(data.pages);
     } catch { toast.error('İçerik yüklenemedi'); }
@@ -1021,7 +1021,7 @@ function ContentIntelTab() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/admin/content-intel?type=${type}&sort=${sort}&page=${page}`);
+      const { data } = await api.get(`/admin/content-intel?type=${type}&sort=${sort}&page=${page}`, { timeout: 10_000 });
       setItems(data.items);
       setTotalPages(data.pages);
     } catch { toast.error('İçerik zekası yüklenemedi'); }
@@ -1145,7 +1145,7 @@ function UsersTab() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/admin/users?q=${q}&filter=${filter}&page=${page}`);
+      const { data } = await api.get(`/admin/users?q=${q}&filter=${filter}&page=${page}`, { timeout: 10_000 });
       setUsers(data.users);
       setTotalPages(data.pages);
     } catch { toast.error('Kullanıcılar yüklenemedi'); }
@@ -1346,7 +1346,7 @@ function SlideoTab() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/admin/slideos?sort=${sort}&q=${q}&status=${status}&page=${page}`);
+      const { data } = await api.get(`/admin/slideos?sort=${sort}&q=${q}&status=${status}&page=${page}`, { timeout: 10_000 });
       setItems(data.items);
       setTotalPages(data.pages);
       setTotal(data.total);
@@ -1524,7 +1524,7 @@ function AuditTab() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/admin/audit?page=${page}&action=${filterAction}`);
+      const { data } = await api.get(`/admin/audit?page=${page}&action=${filterAction}`, { timeout: 10_000 });
       setLogs(data.logs);
       setTotalPages(data.pages);
       setTotal(data.total);
@@ -1809,7 +1809,7 @@ function PreviewOpsTab() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get('/admin/preview-ops');
+      const res = await api.get('/admin/preview-ops', { timeout: 10_000 });
       setData(res.data);
     } catch {
       toast.error('Preview ops verisi yüklenemedi');

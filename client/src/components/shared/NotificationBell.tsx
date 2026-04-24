@@ -36,7 +36,8 @@ const TYPE_ICONS: Record<string, any> = {
 const POLL_ACTIVE = 30000;
 const POLL_HIDDEN = 90000;
 const SSE_RECONNECT_BASE_MS = 500;
-const SSE_RECONNECT_MAX_MS = 5000;
+const SSE_RECONNECT_MAX_MS = 30000;
+const SSE_RECONNECT_MAX_ATTEMPTS = 6; // After 6 failures (~2 min), stop SSE and stay in poll mode
 const API_ORIGIN = getApiOrigin();
 const logSoftError = (scope: string, err?: unknown) => {
   if (process.env.NODE_ENV !== 'production') {
@@ -179,7 +180,11 @@ export default function NotificationBell() {
 
       const attempt = reconnectAttemptRef.current + 1;
       reconnectAttemptRef.current = attempt;
-      const waitMs = Math.min(SSE_RECONNECT_MAX_MS, SSE_RECONNECT_BASE_MS * Math.pow(2, Math.min(4, attempt - 1)));
+
+      // Stop reconnecting SSE after too many failures — polling keeps notifications alive.
+      if (attempt >= SSE_RECONNECT_MAX_ATTEMPTS) return;
+
+      const waitMs = Math.min(SSE_RECONNECT_MAX_MS, SSE_RECONNECT_BASE_MS * Math.pow(2, Math.min(5, attempt - 1)));
 
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = setTimeout(() => {

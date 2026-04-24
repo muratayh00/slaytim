@@ -49,8 +49,11 @@ api.interceptors.response.use(
   (res) => res,
   async (err) => {
     const status = Number(err?.response?.status || 0);
-    const retryableHttp = status === 408 || status === 425 || status === 429 || status === 502 || status === 503 || status === 504;
-    if (!err.response || retryableHttp) {
+    const retryableHttp = status === 408 || status === 425 || status === 502 || status === 503 || status === 504;
+    // Timeout errors (code=ECONNABORTED or err.code='ETIMEDOUT') should NOT be retried —
+    // the server is clearly overloaded or unreachable; retrying × 3 wastes 90 seconds.
+    const isTimeout = err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT' || err.message?.includes('timeout');
+    if (!isTimeout && (!err.response || retryableHttp)) {
       const original: any = err.config || {};
       const method = String(original.method || 'get').toLowerCase();
       if (method === 'get' && (original.__networkRetryCount || 0) < 2) {
