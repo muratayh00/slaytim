@@ -174,17 +174,19 @@ export default function RoomsPage() {
           </div>
           {user && (
             <button
-              onClick={() => setCreateOpen((s) => !s)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors shrink-0"
+              onClick={() => ownedRoomsCount < 2 && setCreateOpen((s) => !s)}
+              disabled={ownedRoomsCount >= 2}
+              title={ownedRoomsCount >= 2 ? 'En fazla 2 oda açabilirsin' : undefined}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4" />
-              Oda Aç
+              Oda Aç {ownedRoomsCount > 0 && <span className="text-white/70 font-normal">({ownedRoomsCount}/2)</span>}
             </button>
           )}
         </div>
       </div>
 
-      {createOpen && user && (
+      {createOpen && user && ownedRoomsCount < 2 && (
         <div className="mb-6 border border-border rounded-2xl p-4 bg-card">
           <p className="text-xs text-muted-foreground mb-3">
             Oda limiti: <span className="font-semibold">{ownedRoomsCount}/2</span>
