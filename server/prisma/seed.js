@@ -7,6 +7,62 @@ const path = require('path');
 
 const prisma = new PrismaClient();
 
+async function upsertCategorySafe({
+  name,
+  slug,
+  parentId = null,
+  isMain = false,
+  isActive = true,
+  sortOrder = 0,
+}) {
+  const [existingBySlug, existingByName] = await Promise.all([
+    prisma.category.findUnique({ where: { slug } }),
+    prisma.category.findUnique({ where: { name } }),
+  ]);
+
+  // Category.name is globally unique in current schema; keep "name" authoritative.
+  // If slug is already occupied by another row, we preserve that row's slug and
+  // update hierarchy fields without forcing a slug collision.
+  const target = existingByName || existingBySlug;
+
+  if (existingByName && existingBySlug && existingByName.id !== existingBySlug.id) {
+    console.warn(
+      `[seed] category conflict: name="${name}" exists as id=${existingByName.id}, `
+      + `slug="${slug}" belongs to id=${existingBySlug.id}. Preserving existing name record.`
+    );
+  }
+
+  if (target) {
+    const safeSlug =
+      !existingBySlug || existingBySlug.id === target.id
+        ? slug
+        : target.slug;
+
+    return prisma.category.update({
+      where: { id: target.id },
+      data: {
+        name,
+        slug: safeSlug,
+        parentId,
+        isMain,
+        isActive,
+        sortOrder: Number(sortOrder || 0),
+      },
+    });
+  }
+
+  return prisma.category.create({
+    data: {
+      name,
+      slug,
+      parentId,
+      isMain,
+      isActive,
+      sortOrder: Number(sortOrder || 0),
+    },
+  });
+}
+
 async function main() {
   const uploadsSlidesDir = path.join(__dirname, '../uploads/slides');
   const seedDemoFileName = 'seed-demo.pptx';
@@ -34,69 +90,45 @@ async function main() {
   const curatedSlugs = new Set();
   for (const main of categoryTreeData) {
     curatedSlugs.add(main.slug);
-    const mainCategory = await prisma.category.upsert({
-      where: { slug: main.slug },
-      update: {
-        name: main.name,
-        isMain: true,
-        isActive: true,
-        parentId: null,
-        sortOrder: Number(main.sortOrder || 0),
-      },
-      create: {
-        name: main.name,
-        slug: main.slug,
-        isMain: true,
-        isActive: true,
-        parentId: null,
-        sortOrder: Number(main.sortOrder || 0),
-      },
+    const mainCategory = await upsertCategorySafe({
+      name: main.name,
+      slug: main.slug,
+      parentId: null,
+      isMain: true,
+      isActive: true,
+      sortOrder: Number(main.sortOrder || 0),
     });
     cats[main.slug] = mainCategory;
+    cats[mainCategory.slug] = mainCategory;
 
     for (const child of main.children || []) {
       curatedSlugs.add(child.slug);
-      const sub = await prisma.category.upsert({
-        where: { slug: child.slug },
-        update: {
-          name: child.name,
-          isMain: false,
-          isActive: true,
-          parentId: mainCategory.id,
-          sortOrder: Number(child.sortOrder || 0),
-        },
-        create: {
-          name: child.name,
-          slug: child.slug,
-          isMain: false,
-          isActive: true,
-          parentId: mainCategory.id,
-          sortOrder: Number(child.sortOrder || 0),
-        },
+      const sub = await upsertCategorySafe({
+        name: child.name,
+        slug: child.slug,
+        parentId: mainCategory.id,
+        isMain: false,
+        isActive: true,
+        sortOrder: Number(child.sortOrder || 0),
       });
       cats[child.slug] = sub;
+      cats[sub.slug] = sub;
     }
   }
 
   // Legacy category set (kept active for existing content, hidden from main-picker)
   for (const cat of categoryData) {
     if (curatedSlugs.has(cat.slug)) continue;
-    const c = await prisma.category.upsert({
-      where: { slug: cat.slug },
-      update: {
-        name: cat.name,
-        isMain: false,
-        isActive: true,
-        sortOrder: 999,
-      },
-      create: {
-        ...cat,
-        isMain: false,
-        isActive: true,
-        sortOrder: 999,
-      },
+    const c = await upsertCategorySafe({
+      name: cat.name,
+      slug: cat.slug,
+      parentId: null,
+      isMain: false,
+      isActive: true,
+      sortOrder: 999,
     });
     cats[cat.slug] = c;
+    cats[c.slug] = c;
   }
 
   // Kullanicilar
@@ -258,15 +290,15 @@ async function main() {
     const user = users[topicDef.user];
     if (!category) {
       // Backward-compatible seed fallback: auto-create missing legacy categories.
-      category = await prisma.category.upsert({
-        where: { slug: topicDef.categorySlug },
-        update: {},
-        create: {
-          slug: topicDef.categorySlug,
-          name: topicDef.categorySlug.replace(/-/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()),
-        },
+      category = await upsertCategorySafe({
+        slug: topicDef.categorySlug,
+        name: topicDef.categorySlug.replace(/-/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()),
+        isMain: false,
+        isActive: true,
+        sortOrder: 999,
       });
       cats[topicDef.categorySlug] = category;
+      cats[category.slug] = category;
     }
     if (!user) {
       console.warn(`[seed] missing user mapping for topic "${topicDef.title}" -> ${topicDef.user}, skipping`);

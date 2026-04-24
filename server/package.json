@@ -48,6 +48,7 @@
     "backup:check": "bash scripts/backup-check.sh",
     "smoke:prod": "node scripts/smoke-test-prod.mjs",
     "seo:check": "node scripts/seo-check.mjs",
+    "tags:recompute-quality": "node scripts/recompute-tag-quality.js",
     "ops:weekly": "bash scripts/weekly-ops.sh",
     "security:check": "bash scripts/security-check.sh"
   },

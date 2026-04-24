@@ -27,9 +27,9 @@ const categoryTreeData = [
     sortOrder: 30,
     children: [
       { name: 'Girisimcilik', slug: 'girisimcilik', sortOrder: 10 },
-      { name: 'Pazarlama', slug: 'pazarlama', sortOrder: 20 },
+      { name: 'Is Pazarlamasi', slug: 'is-pazarlamasi', sortOrder: 20 },
       { name: 'Urun ve Strateji', slug: 'urun-ve-strateji', sortOrder: 30 },
-      { name: 'Kariyer', slug: 'kariyer', sortOrder: 40 },
+      { name: 'Kariyer Planlama', slug: 'kariyer-planlama', sortOrder: 40 },
     ],
   },
   {

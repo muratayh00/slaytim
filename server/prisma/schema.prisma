@@ -60,6 +60,9 @@ model User {
   flashcardSets      FlashcardSet[]
   flashcardAttempts  FlashcardAttempt[]
   roomMessages       RoomMessage[]
+  tagProfiles        UserTagProfile[]
+  contentEvents      UserContentEvent[]
+  feedImpressions    FeedImpressionLog[]
 
   @@map("users")
 }
@@ -190,13 +193,116 @@ model Tag {
   name       String    @unique
   slug       String    @unique
   usageCount Int       @default(0) @map("usage_count")
+  isIndexable Boolean  @default(false) @map("is_indexable")
+  qualityScore Float   @default(0) @map("quality_score")
+  last90dActivity Int  @default(0) @map("last_90d_activity")
+  minIndexThreshold Int @default(5) @map("min_index_threshold")
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime? @updatedAt @map("updated_at")
 
   slides     SlideTag[]
+  userProfiles UserTagProfile[]
+  contentProfiles ContentTagProfile[]
+  dailyStats TagDailyStat[]
 
   @@index([usageCount])
   @@map("tags")
+}
+
+model UserTagProfile {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  tagId       Int      @map("tag_id")
+  affinity    Float    @default(0)
+  confidence  Float    @default(0) // 0..1
+  impressions Int      @default(0)
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tagId])
+  @@index([userId, affinity(sort: Desc)])
+  @@index([tagId])
+  @@map("user_tag_profiles")
+}
+
+model ContentTagProfile {
+  id          Int      @id @default(autoincrement())
+  contentType String   @map("content_type") // slide | slideo | topic
+  contentId   Int      @map("content_id")
+  tagId       Int      @map("tag_id")
+  weight      Float    @default(1)
+  source      String   @default("manual") // manual | system
+  quality     Float    @default(0)
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([contentType, contentId, tagId])
+  @@index([tagId, quality(sort: Desc)])
+  @@index([contentType, contentId])
+  @@map("content_tag_profiles")
+}
+
+model UserContentEvent {
+  id          Int      @id @default(autoincrement())
+  userId      Int?     @map("user_id")
+  sessionId   String   @map("session_id")
+  contentType String   @map("content_type") // slide | slideo | topic
+  contentId   Int      @map("content_id")
+  pageIndex   Int?     @map("page_index")
+  eventType   String   @map("event_type")
+  watchMs     Int?     @map("watch_ms")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([contentType, contentId, createdAt])
+  @@index([userId, createdAt])
+  @@index([sessionId, createdAt])
+  @@map("user_content_events")
+}
+
+model TagDailyStat {
+  id          Int      @id @default(autoincrement())
+  tagId       Int      @map("tag_id")
+  date        DateTime
+  impressions Int      @default(0)
+  watches     Int      @default(0)
+  completions Int      @default(0)
+  saves       Int      @default(0)
+  shares      Int      @default(0)
+  skipsFast   Int      @default(0) @map("skips_fast")
+  reports     Int      @default(0)
+  avgWatchMs  Int      @default(0) @map("avg_watch_ms")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([tagId, date])
+  @@index([date])
+  @@map("tag_daily_stats")
+}
+
+model FeedImpressionLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int?     @map("user_id")
+  sessionId   String   @map("session_id")
+  contentType String   @map("content_type")
+  contentId   Int      @map("content_id")
+  rank        Int
+  score       Float
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([contentType, contentId, createdAt])
+  @@map("feed_impression_logs")
 }
 
 model SlideTag {
