@@ -90,6 +90,12 @@ const auditLog = async (adminId, action, targetType, targetId, meta, ip) => {
 };
 
 // ?? Overview Stats ????????????????????????????????????????????????????????????
+
+// Resolves to `fallback` after `ms` ms instead of rejecting — lets slow queries
+// return empty data rather than blocking or crashing the whole stats response.
+const withQueryTimeout = (promise, ms, fallback) =>
+  Promise.race([promise, new Promise(resolve => setTimeout(() => resolve(fallback), ms))]);
+
 const getStats = async (req, res) => {
   if (!guard(req, res)) return;
   try {
@@ -98,16 +104,10 @@ const getStats = async (req, res) => {
     const week = new Date(now); week.setDate(week.getDate() - 7);
     const month = new Date(now); month.setDate(month.getDate() - 30);
 
-    const [
-      totalUsers, newUsersToday, newUsersWeek, newUsersMonth,
-      totalTopics, newTopicsToday, hiddenTopics,
-      totalSlides, newSlidesToday, hiddenSlides, failedConversions,
-      totalSlideos, newSlideosToday,
-      totalComments, newCommentsToday,
-      pendingReports, criticalReports, totalReports,
-      bannedUsers, mutedUsers,
-      topTopics, categoryStats,
-    ] = await Promise.all([
+    // The two heavy findMany queries (aggregated orderBy) get individual 5s
+    // timeouts and fall back to empty arrays so a slow table scan can't block
+    // the whole response. The overall query races against an 8s hard deadline.
+    const statsQuery = Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { createdAt: { gte: today } } }),
       prisma.user.count({ where: { createdAt: { gte: week } } }),
@@ -128,15 +128,37 @@ const getStats = async (req, res) => {
       prisma.report.count(),
       prisma.user.count({ where: { isBanned: true } }),
       prisma.user.count({ where: { isMuted: true } }),
-      prisma.topic.findMany({
-        orderBy: { viewsCount: 'desc' }, take: 10,
-        select: { id: true, title: true, viewsCount: true, likesCount: true, user: { select: { username: true } } },
-      }),
-      prisma.category.findMany({
-        include: { _count: { select: { topics: true } } },
-        orderBy: { topics: { _count: 'desc' } }, take: 8,
-      }),
+      withQueryTimeout(
+        prisma.topic.findMany({
+          orderBy: { viewsCount: 'desc' }, take: 10,
+          select: { id: true, title: true, viewsCount: true, likesCount: true, user: { select: { username: true } } },
+        }),
+        5000, []
+      ),
+      withQueryTimeout(
+        prisma.category.findMany({
+          include: { _count: { select: { topics: true } } },
+          orderBy: { topics: { _count: 'desc' } }, take: 8,
+        }),
+        5000, []
+      ),
     ]);
+
+    // Hard deadline: if the DB is unresponsive, return 503 instead of hanging.
+    const deadline = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('STATS_TIMEOUT')), 8000)
+    );
+
+    const [
+      totalUsers, newUsersToday, newUsersWeek, newUsersMonth,
+      totalTopics, newTopicsToday, hiddenTopics,
+      totalSlides, newSlidesToday, hiddenSlides, failedConversions,
+      totalSlideos, newSlideosToday,
+      totalComments, newCommentsToday,
+      pendingReports, criticalReports, totalReports,
+      bannedUsers, mutedUsers,
+      topTopics, categoryStats,
+    ] = await Promise.race([statsQuery, deadline]);
 
     res.json({
       users: { total: totalUsers, today: newUsersToday, week: newUsersWeek, month: newUsersMonth, banned: bannedUsers, muted: mutedUsers },
@@ -149,6 +171,10 @@ const getStats = async (req, res) => {
       categoryStats: categoryStats.map(c => ({ id: c.id, name: c.name, slug: c.slug, count: c._count.topics })),
     });
   } catch (err) {
+    if (err.message === 'STATS_TIMEOUT') {
+      logger.warn('Admin: Stats query hit 8s deadline — DB may be overloaded');
+      return res.status(503).json({ error: 'Stats query timed out — try again later' });
+    }
     logger.error('Admin: Failed to fetch stats', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch stats' });
   }

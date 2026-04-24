@@ -13,6 +13,9 @@ const logSoftError = (scope, err) => {
   logger.warn(`[slideo.controller] ${scope}`, { error: err?.message, stack: err?.stack });
 };
 
+const withQueryTimeout = (promise, ms, fallback) =>
+  Promise.race([promise, new Promise(resolve => setTimeout(() => resolve(fallback), ms))]);
+
 const slideoSelect = {
   id: true,
   title: true,
@@ -213,7 +216,8 @@ const evaluateFeed = async (req, res) => {
 const getFeedExperimentStats = async (req, res) => {
   try {
     const days = Number(req.query?.days || 7);
-    const data = await getFeedEvaluation({ days });
+    const EMPTY_RESULT = { experiment: 'feed_v2_ab', days, variants: {}, timedOut: true };
+    const data = await withQueryTimeout(getFeedEvaluation({ days }), 7000, EMPTY_RESULT);
     res.json(data);
   } catch (err) {
     logger.error('Failed to fetch feed experiment stats', { error: err.message, stack: err.stack });

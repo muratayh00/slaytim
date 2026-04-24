@@ -3,6 +3,9 @@ const prisma = require('../lib/prisma');
 const { getRecommendationFlags } = require('../services/feature-flag.service');
 const logger = require('../lib/logger');
 
+const withQueryTimeout = (promise, ms, fallback) =>
+  Promise.race([promise, new Promise(resolve => setTimeout(() => resolve(fallback), ms))]);
+
 const ALLOWED_REC_EVENT_TYPES = new Set([
   'impression',
   'open',
@@ -95,15 +98,19 @@ const getShadowEvaluationStats = async (req, res) => {
     const days = Math.max(1, Math.min(30, toInt(req.query?.days, 7)));
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-    const rows = await prisma.analyticsEvent.findMany({
-      where: {
-        eventType: 'rec_shadow_eval',
-        createdAt: { gte: since },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 2000,
-      select: { createdAt: true, payload: true },
-    });
+    const rows = await withQueryTimeout(
+      prisma.analyticsEvent.findMany({
+        where: {
+          eventType: 'rec_shadow_eval',
+          createdAt: { gte: since },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 2000,
+        select: { createdAt: true, payload: true },
+      }),
+      7000,
+      []
+    );
 
     let overlapTotal = 0;
     let overlapCount = 0;

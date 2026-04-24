@@ -150,8 +150,8 @@ function OverviewTab() {
 
   useEffect(() => {
     Promise.all([
-      api.get('/admin/stats', { timeout: 10_000 }).catch(() => ({ data: null })),
-      api.get('/slideo/feed/experiment-stats?days=7', { timeout: 10_000 }).catch(() => ({ data: null })),
+      api.get('/admin/stats', { timeout: 12_000 }).catch(() => ({ data: null })),
+      api.get('/slideo/feed/experiment-stats?days=7', { timeout: 12_000 }).catch(() => ({ data: null })),
     ])
       .then(([statsRes, feedRes]) => {
         setStats(statsRes?.data || null);
@@ -337,9 +337,9 @@ function AnalyticsTab() {
     setLoading(true);
     try {
       const [statsRes, feedRes, shadowRes] = await Promise.all([
-        api.get('/admin/stats', { timeout: 10_000 }).catch(() => ({ data: null })),
-        api.get('/slideo/feed/experiment-stats?days=7', { timeout: 10_000 }).catch(() => ({ data: null })),
-        api.get('/recommendation/shadow-stats?days=7', { timeout: 10_000 }).catch(() => ({ data: null })),
+        api.get('/admin/stats', { timeout: 12_000 }).catch(() => ({ data: null })),
+        api.get('/slideo/feed/experiment-stats?days=7', { timeout: 12_000 }).catch(() => ({ data: null })),
+        api.get('/recommendation/shadow-stats?days=7', { timeout: 12_000 }).catch(() => ({ data: null })),
       ]);
       setStats(statsRes.data || null);
       setFeedExperiment(feedRes?.data || null);
