@@ -7,6 +7,7 @@ const {
   getMine,
   create,
   update,
+  suggestMetadata,
   saveMetadata,
   publishSlide,
   getPopular,
@@ -55,6 +56,9 @@ const router = Router();
 
 router.get('/popular', getPopular);
 router.get('/my', authenticate, getMine);
+// /suggest-metadata must be registered before any /:id routes so Express does
+// not try to match the literal string "suggest-metadata" as a numeric slide id.
+router.post('/suggest-metadata', authenticate, suggestMetadata);
 router.get('/topic/:topicId', validateNumericParam('topicId'), getByTopic);
 router.get('/slug/:slug', getBySlug);
 router.get('/:id/page-stats', validateNumericParam('id'), getPageStats);

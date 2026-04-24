@@ -1321,6 +1321,122 @@ const applySlideMetadata = async ({ slideId, userId, isAdmin, body = {}, markPub
   });
 };
 
+// ── suggest-metadata ─────────────────────────────────────────────────────────
+// Deterministic, rule-based metadata suggestions.  No external AI/API.
+// Derives title, description, tags, and related topic matches from the slide's
+// filename / existing title using keyword extraction and a DB prefix search.
+
+const TR_STOP_WORDS = new Set([
+  // Turkish
+  've', 'ile', 'de', 'da', 'bir', 'bu', 'şu', 'şi', 'o', 'için', 'olan',
+  'gibi', 'kadar', 'sonra', 'önce', 'ama', 'veya', 'ya', 'hem', 'ki', 'mi',
+  'mı', 'mu', 'mü', 'ne', 'nasıl', 'neden', 'hangi', 'her', 'çok', 'az',
+  'en', 'daha', 'çok', 'pek', 'hiç', 'ile', 'ya', 'göre', 'üzere',
+  'olarak', 'olan', 'olan', 'ise', 'iken', 'diye', 'tek', 'tüm',
+  // English (common in Turkish slide filenames)
+  'the', 'and', 'or', 'for', 'of', 'in', 'on', 'at', 'to', 'a', 'an',
+  'by', 'as', 'is', 'are', 'was', 'be', 'with',
+]);
+
+// Remove file extension, normalise separators, collapse whitespace.
+function cleanFilenameToTitle(raw) {
+  return (raw || '')
+    .replace(/\.[a-zA-Z]{2,6}$/, '')   // strip extension
+    .replace(/[_\-]+/g, ' ')            // underscores / hyphens → space
+    .replace(/\s+/g, ' ')               // collapse runs
+    .trim()
+    .slice(0, 200);
+}
+
+// Extract non-trivial unique keywords, preserving original casing from source.
+function extractKeywords(text) {
+  const seen = new Set();
+  return (text || '')
+    .split(/[\s\-_.,;:!?()\[\]{}'"\\/]+/)
+    .filter((w) => {
+      const lo = w.toLowerCase();
+      if (w.length < 3) return false;
+      if (TR_STOP_WORDS.has(lo)) return false;
+      if (seen.has(lo)) return false;
+      seen.add(lo);
+      return true;
+    })
+    .slice(0, 12);
+}
+
+// Build a simple description sentence in Turkish.
+function buildDescription(title, keywords) {
+  if (!title) return '';
+  const kws = keywords.slice(0, 3);
+  if (kws.length === 0) return `${title} konusundaki sunum.`;
+  return `${title} konusundaki bu sunum ${kws.join(', ')} gibi konuları ele almaktadır.`;
+}
+
+const suggestMetadata = async (req, res) => {
+  try {
+    const { slideId, rawTitle, filename } = req.body || {};
+
+    let sourceText = '';
+
+    if (slideId !== undefined) {
+      const sid = Number(slideId);
+      if (!Number.isInteger(sid) || sid <= 0) {
+        return res.status(400).json({ error: 'Invalid slideId' });
+      }
+      const slide = await prisma.slide.findUnique({
+        where: { id: sid },
+        select: { id: true, userId: true, title: true },
+      });
+      if (!slide) return res.status(404).json({ error: 'Slide not found' });
+      if (slide.userId !== req.user.id && !req.user.isAdmin) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      sourceText = slide.title || '';
+    } else if (rawTitle) {
+      sourceText = String(rawTitle).slice(0, 500);
+    } else if (filename) {
+      sourceText = String(filename).slice(0, 500);
+    } else {
+      return res.status(400).json({ error: 'slideId, rawTitle, or filename is required' });
+    }
+
+    // If text came from a filename (no extension), clean it; otherwise keep as-is.
+    const suggestedTitle = sourceText.match(/\.[a-zA-Z]{2,6}$/)
+      ? cleanFilenameToTitle(sourceText)
+      : sourceText.trim().slice(0, 200) || cleanFilenameToTitle(sourceText);
+
+    const keywords = extractKeywords(suggestedTitle);
+    const suggestedTags = keywords.map((k) => k.toLowerCase()).slice(0, 8);
+    const suggestedDescription = buildDescription(suggestedTitle, keywords);
+
+    // Topic matches: find topics whose titles contain any extracted keyword.
+    let topicMatches = [];
+    if (keywords.length > 0) {
+      topicMatches = await prisma.topic.findMany({
+        where: {
+          isHidden: false,
+          OR: keywords.slice(0, 6).map((kw) => ({
+            title: { contains: kw, mode: 'insensitive' },
+          })),
+        },
+        select: { id: true, title: true, slug: true },
+        orderBy: { viewsCount: 'desc' },
+        take: 5,
+      });
+    }
+
+    return res.json({
+      suggestedTitle,
+      suggestedDescription,
+      suggestedTags,
+      topicMatches,
+    });
+  } catch (err) {
+    logger.error('suggest-metadata failed', { error: err.message, stack: err.stack });
+    return res.status(500).json({ error: 'Failed to suggest metadata' });
+  }
+};
+
 const saveMetadata = async (req, res) => {
   try {
     const slideId = Number(req.params.id);
@@ -1596,6 +1712,7 @@ module.exports = {
   getMine,
   create,
   update,
+  suggestMetadata,
   saveMetadata,
   publishSlide,
   updateThumbnail,
