@@ -73,6 +73,7 @@ export default async function CategoriesPage() {
               <Link
                 key={cat.id}
                 href={`/kategori/${cat.slug}`}
+                prefetch={false}
                 className="border border-border rounded-xl px-4 py-3 bg-card hover:border-primary/40 transition-colors"
               >
                 <p className="text-sm font-medium leading-snug">{cat.name}</p>

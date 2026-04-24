@@ -269,7 +269,7 @@ export default function ProfilePage({
         return details.followedCategories.length === 0 ? <Empty message="Takip edilen kategori yok" /> : (
           <div className="flex flex-wrap gap-2.5">
             {details.followedCategories.map((c: any) => (
-              <Link key={c.id} href={buildCategoryPath(c.slug)}
+              <Link key={c.id} href={buildCategoryPath(c.slug)} prefetch={false}
                 className="px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold text-sm hover:bg-primary/20 transition flex items-center gap-1.5">
                 <Tag className="w-3.5 h-3.5" />
                 {c.name}

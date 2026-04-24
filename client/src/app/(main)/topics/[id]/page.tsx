@@ -254,6 +254,7 @@ export default function TopicDetailPage({ initialTopic }: { initialTopic?: any }
           <div className="flex items-center gap-2 mb-3 flex-wrap">
             <Link
               href={topicCategory.slug ? buildCategoryPath(topicCategory.slug) : '/kategori'}
+              prefetch={false}
               className="text-xs px-3 py-1 rounded-full bg-primary/10 text-primary font-bold flex items-center gap-1.5 hover:bg-primary/20 transition-colors"
             >
               <Tag className="w-3 h-3" />
