@@ -14,18 +14,26 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { formatDate, cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import dynamic from 'next/dynamic';
 import ReportModal from '@/components/shared/ReportModal';
 import SlideCard from '@/components/shared/SlideCard';
-import SlideViewer from '@/components/shared/SlideViewer';
-import ImageSlideViewer, { type SlidePreviewPage } from '@/components/shared/ImageSlideViewer';
+import { type SlidePreviewPage } from '@/components/shared/ImageSlideViewer';
 import SlideAnalyticsPanel from '@/components/shared/SlideAnalyticsPanel';
 import SlideFlashcardsPanel from '@/components/shared/SlideFlashcardsPanel';
-import CreateSlideoModal from '@/components/slideo/CreateSlideoModal';
 import { analytics } from '@/lib/analytics';
 import { resolveFileUrl } from '@/lib/pdfRenderer';
 import { buildProfilePath, buildSlideoPath, buildTopicPath, splitIdSlug } from '@/lib/url';
 import { getApiOrigin } from '@/lib/api-origin';
 import AdUnit from '@/components/shared/AdUnit';
+
+// PDF/canvas-based viewers are client-only — skip SSR to prevent hydration mismatches (#422, #425)
+const SlideViewer = dynamic(() => import('@/components/shared/SlideViewer'), { ssr: false });
+const ImageSlideViewer = dynamic(
+  () => import('@/components/shared/ImageSlideViewer'),
+  { ssr: false }
+);
+const CreateSlideoModal = dynamic(() => import('@/components/slideo/CreateSlideoModal'), { ssr: false });
+
 
 const logSoftError = (scope: string, err?: unknown) => {
   if (process.env.NODE_ENV !== 'production') {
@@ -259,8 +267,13 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
 
 function EmbedModal({ slideId, onClose }: { slideId: number; onClose: () => void }) {
   const embedCode = `<iframe src="${SITE_URL}/embed/slides/${slideId}" width="640" height="420" style="border:none;border-radius:12px" allowfullscreen></iframe>`;
-  const previewOrigin = typeof window !== 'undefined' ? window.location.origin : SITE_URL;
+  // Use SITE_URL as SSR placeholder; update to window.location.origin after mount to avoid hydration mismatch
+  const [previewOrigin, setPreviewOrigin] = useState(SITE_URL);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setPreviewOrigin(window.location.origin);
+  }, []);
 
   const copy = () => {
     navigator.clipboard.writeText(embedCode).then(() => {
@@ -1288,7 +1301,7 @@ export default function SlideDetailPage({ initialSlide }: { initialSlide?: any }
               </div>
               <span className="text-sm font-semibold">{slide.user.username}</span>
             </Link>
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <span className="text-xs text-muted-foreground flex items-center gap-1" suppressHydrationWarning>
               <Calendar className="w-3.5 h-3.5" />
               {formatDate(slide.createdAt)}
             </span>

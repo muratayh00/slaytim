@@ -78,7 +78,7 @@ export default function TopicCard({ topic }: TopicCardProps) {
               )}
             </div>
             <span className="text-[12px] font-medium text-muted-foreground truncate">{topic.user.username}</span>
-            <span className="text-[11px] text-muted-foreground/70 ml-auto shrink-0">{formatRelative(topic.createdAt)}</span>
+            <span className="text-[11px] text-muted-foreground/70 ml-auto shrink-0" suppressHydrationWarning>{formatRelative(topic.createdAt)}</span>
           </div>
 
           <h3 className="font-semibold text-[15px] leading-snug mb-1.5 line-clamp-2 group-hover:text-primary transition-colors">

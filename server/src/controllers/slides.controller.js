@@ -1278,22 +1278,26 @@ const applySlideMetadata = async ({ slideId, userId, isAdmin, body = {}, markPub
         await tx.slideTag.deleteMany({ where: { slideId } });
       }
       if (tagNames.length) {
+        const seenSlugs = new Set();
+        const tagRows = [];
         for (const tagName of tagNames) {
           const tagSlug = toSlug(tagName);
-          if (!tagSlug) continue;
+          if (!tagSlug || seenSlugs.has(tagSlug)) continue;
+          seenSlugs.add(tagSlug);
           const tag = await tx.tag.upsert({
             where: { slug: tagSlug },
             update: { name: tagName },
             create: { name: tagName, slug: tagSlug },
           });
-          await tx.slideTag.create({
-            data: {
-              slideId,
-              tagId: tag.id,
-              source: body.tagSource ? String(body.tagSource).slice(0, 24) : 'user',
-              confidence: null,
-            },
+          tagRows.push({
+            slideId,
+            tagId: tag.id,
+            source: body.tagSource ? String(body.tagSource).slice(0, 24) : 'user',
+            confidence: null,
           });
+        }
+        if (tagRows.length > 0) {
+          await tx.slideTag.createMany({ data: tagRows, skipDuplicates: true });
         }
       }
     }
