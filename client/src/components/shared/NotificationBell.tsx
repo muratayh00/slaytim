@@ -60,6 +60,10 @@ export default function NotificationBell() {
   const reconnectAttemptRef = useRef(0);
   const manualCloseRef = useRef(false);
   const lastEventIdRef = useRef<string>('0');
+  // Guards: prevent concurrent /since requests and enforce 5s minimum interval.
+  const sinceInflightRef = useRef(false);
+  const sinceLastCallRef = useRef(0);
+  const SINCE_MIN_INTERVAL_MS = 5000;
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -81,9 +85,16 @@ export default function NotificationBell() {
 
   const syncMissedNotifications = useCallback(async () => {
     if (!user) return;
+    // Prevent concurrent requests and enforce minimum interval between calls.
+    if (sinceInflightRef.current) return;
+    const now = Date.now();
+    if (now - sinceLastCallRef.current < SINCE_MIN_INTERVAL_MS) return;
+    sinceInflightRef.current = true;
+    sinceLastCallRef.current = now;
     try {
       const { data } = await api.get('/notifications/since', {
         params: { lastEventId: lastEventIdRef.current || '0' },
+        timeout: 8000,
       });
       const events: RealtimeEnvelope[] = Array.isArray(data?.events) ? data.events : [];
       for (const evt of events) {
@@ -101,6 +112,8 @@ export default function NotificationBell() {
       if (data?.latestEventId) lastEventIdRef.current = String(data.latestEventId);
     } catch (err) {
       logSoftError('syncMissedNotifications failed', err);
+    } finally {
+      sinceInflightRef.current = false;
     }
   }, [user]);
 
@@ -199,7 +212,8 @@ export default function NotificationBell() {
 
     manualCloseRef.current = false;
     reconnectAttemptRef.current = 0;
-    fetchCount();
+    // syncMissedNotifications already returns unread count — no need for a
+    // separate fetchCount call here (avoids two simultaneous DB queries on mount).
     syncMissedNotifications();
     connectSse();
 
@@ -207,7 +221,7 @@ export default function NotificationBell() {
       closeRealtime();
       setRealtimeMode('off');
     };
-  }, [user, connectSse, closeRealtime, fetchCount, syncMissedNotifications]);
+  }, [user, connectSse, closeRealtime, syncMissedNotifications]);
 
   useEffect(() => {
     if (!user || realtimeConnected) return;

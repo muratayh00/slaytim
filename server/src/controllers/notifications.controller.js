@@ -2,6 +2,19 @@ const prisma = require('../lib/prisma');
 const { registerSseClient, unregisterSseClient, pushEvent } = require('../services/notification-stream.service');
 const logger = require('../lib/logger');
 
+// Per-user rate-limit for /since — max one real query every 5 seconds.
+// Returns an empty-events 200 (not 429) so the client handles it silently.
+const SINCE_MIN_INTERVAL_MS = 5_000;
+const sinceLastCall = new Map(); // userId -> lastCallMs
+
+// Periodically purge stale entries so the Map doesn't grow indefinitely.
+setInterval(() => {
+  const cutoff = Date.now() - 60_000;
+  for (const [k, v] of sinceLastCall) {
+    if (v < cutoff) sinceLastCall.delete(k);
+  }
+}, 60_000).unref();
+
 const getAll = async (req, res) => {
   try {
     const notifications = await prisma.notification.findMany({
@@ -30,6 +43,16 @@ const getUnreadCount = async (req, res) => {
 
 const getSince = async (req, res) => {
   try {
+    const userId = req.user.id;
+    const now = Date.now();
+    const last = sinceLastCall.get(userId) || 0;
+    if (now - last < SINCE_MIN_INTERVAL_MS) {
+      // Too soon — return a no-op response the client can handle gracefully.
+      const lastEventId = String(req.query?.lastEventId || '').trim();
+      return res.json({ events: [], unread: 0, latestEventId: lastEventId || null });
+    }
+    sinceLastCall.set(userId, now);
+
     const lastEventId = String(req.query?.lastEventId || '').trim();
     const lastNotificationId = Number(lastEventId);
     const where = {
