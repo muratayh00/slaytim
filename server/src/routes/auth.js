@@ -4,8 +4,20 @@ const { optionalAuth } = require('../middleware/auth');
 
 const router = Router();
 
-router.post('/register', register);
-router.post('/login', login);
+// Timeout guard for login/register — DB slowness should not cause 30s hangs.
+const authTimeout = (req, res, next) => {
+  const timer = setTimeout(() => {
+    if (!res.headersSent) {
+      res.status(503).json({ error: 'Sunucu meşgul, lütfen tekrar deneyin.' });
+    }
+  }, 9000);
+  res.on('finish', () => clearTimeout(timer));
+  res.on('close', () => clearTimeout(timer));
+  next();
+};
+
+router.post('/register', authTimeout, register);
+router.post('/login', authTimeout, login);
 router.post('/logout', logout);
 router.get('/me', optionalAuth, me);
 router.post('/forgot-password', forgotPassword);

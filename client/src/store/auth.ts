@@ -26,12 +26,12 @@ export const useAuthStore = create<AuthStore>((set) => ({
   isLoading: true,
 
   login: async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password });
+    const { data } = await api.post('/auth/login', { email, password }, { timeout: 10_000 });
     set({ user: data.user, token: null });
   },
 
   register: async (username, email, password) => {
-    const { data } = await api.post('/auth/register', { username, email, password });
+    const { data } = await api.post('/auth/register', { username, email, password }, { timeout: 10_000 });
     set({ user: data.user, token: null });
   },
 

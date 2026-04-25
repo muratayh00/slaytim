@@ -11,6 +11,7 @@ import {
   TrendingUp, ClipboardList, Star, Info, Zap, Activity,
   UserCheck, ArrowUpRight, CheckCheck, XCircle, Layers, Image as ImageIcon,
   HardDrive, Clock, AlertCircle, Pencil, ChevronDown, ChevronUp, StickyNote,
+  Server, Database, Cpu, Wifi, DoorOpen, Lock, MessageCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import api from '@/lib/api';
@@ -62,7 +63,9 @@ const ADMIN_TABS = [
   { id: 'intel',      label: 'İçerik Zekası',  icon: Star },
   { id: 'users',      label: 'Kullanıcılar',   icon: Users },
   { id: 'slideos',    label: 'Slideo',          icon: Play },
+  { id: 'rooms',      label: 'Odalar',          icon: DoorOpen },
   { id: 'audit',      label: 'Denetim Logu',   icon: ClipboardList },
+  { id: 'sistem',     label: 'Sistem',          icon: Server },
 ];
 
 // ?? Main Page ?????????????????????????????????????????????????????????????????
@@ -134,7 +137,9 @@ export default function AdminPage() {
           {activeTab === 'intel'       && <ContentIntelTab />}
           {activeTab === 'users'       && <UsersTab />}
           {activeTab === 'slideos'     && <SlideoTab />}
+          {activeTab === 'rooms'       && <RoomsTab />}
           {activeTab === 'audit'       && <AuditTab />}
+          {activeTab === 'sistem'      && <SistemTab />}
         </motion.div>
       </AnimatePresence>
     </div>
@@ -147,26 +152,45 @@ function OverviewTab() {
   const [stats, setStats] = useState<any>(null);
   const [feedExperiment, setFeedExperiment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    Promise.all([
-      api.get('/admin/stats', { timeout: 12_000 }).catch(() => ({ data: null })),
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const [statsRes, feedRes] = await Promise.all([
+      api.get('/admin/stats', { timeout: 12_000 }).catch((e: any) => ({ data: null, _err: e })),
       api.get('/slideo/feed/experiment-stats?days=7', { timeout: 12_000 }).catch(() => ({ data: null })),
-    ])
-      .then(([statsRes, feedRes]) => {
-        setStats(statsRes?.data || null);
-        setFeedExperiment(feedRes?.data || null);
-      })
-      .catch(() => toast.error('İstatistikler yüklenemedi'))
-      .finally(() => setLoading(false));
+    ]);
+    const statsData = (statsRes as any)?.data || null;
+    if (!statsData) {
+      const isTimeout = (statsRes as any)?._err?.code === 'ECONNABORTED';
+      setError(isTimeout ? 'timeout' : 'error');
+    }
+    setStats(statsData);
+    setFeedExperiment((feedRes as any)?.data || null);
+    setLoading(false);
   }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   if (loading) return <div className="space-y-4">{[...Array(4)].map((_, i) => <div key={i} className="skeleton h-28 rounded-2xl" />)}</div>;
   if (!stats) return (
     <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl text-center">
       <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-      <h3 className="text-lg font-bold text-red-600 mb-1">Sunucu Hatası (500)</h3>
-      <p className="text-sm text-red-600/80">Veriler yüklenemedi. Lütfen backend konsolundaki 500 hata loglarını kontrol edin.</p>
+      <h3 className="text-lg font-bold text-red-600 mb-1">
+        {error === 'timeout' ? 'Zaman Aşımı' : 'Sunucu Hatası'}
+      </h3>
+      <p className="text-sm text-red-600/80 mb-4">
+        {error === 'timeout'
+          ? 'İstatistik sorgusu 12s içinde yanıt vermedi. Veritabanı meşgul olabilir.'
+          : 'Veriler yüklenemedi. Backend konsolundaki hata loglarını kontrol edin.'}
+      </p>
+      <button
+        onClick={loadData}
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors"
+      >
+        <RefreshCw className="w-3.5 h-3.5" /> Tekrar Dene
+      </button>
     </div>
   );
 
@@ -215,6 +239,9 @@ function OverviewTab() {
           <StatCard label="Toplam Slideo" value={stats.slideos.total} color="violet" />
           <StatCard label="Bugün Slideo"  value={stats.slideos.today} color="pink" />
           <StatCard label="Toplam Yorum"  value={stats.comments.total} color="amber" />
+          <StatCard label="Toplam Oda"    value={stats.rooms?.total ?? 0} color="cyan" />
+          <StatCard label="Açık Oda"      value={stats.rooms?.public ?? 0} color="emerald" />
+          <StatCard label="Özel Oda"      value={stats.rooms?.private ?? 0} color="slate" />
         </div>
       </Section>
 
@@ -859,17 +886,19 @@ function ContentTab() {
   const [searchInput, setSearchInput] = useState('');
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [actingId, setActingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const { data } = await api.get(`/admin/content?type=${type}&q=${q}&page=${page}`, { timeout: 10_000 });
       setItems(data.items);
       setTotalPages(data.pages);
-    } catch { toast.error('İçerik yüklenemedi'); }
+    } catch { toast.error('İçerik yüklenemedi'); setLoadError(true); }
     finally { setLoading(false); }
   }, [type, q, page]);
 
@@ -937,6 +966,14 @@ function ContentTab() {
 
       {loading ? (
         <div className="space-y-2">{[...Array(8)].map((_, i) => <div key={i} className="skeleton h-16 rounded-xl" />)}</div>
+      ) : loadError ? (
+        <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl text-center">
+          <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-2" />
+          <p className="text-sm text-red-600 font-semibold mb-3">İçerik yüklenemedi</p>
+          <button onClick={load} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors">
+            <RefreshCw className="w-3.5 h-3.5" /> Tekrar Dene
+          </button>
+        </div>
       ) : items.length === 0 ? (
         <EmptyState icon={LayoutGrid} text="İçerik bulunamadı" />
       ) : (
@@ -1015,16 +1052,18 @@ function ContentIntelTab() {
   const [sort, setSort] = useState('quality');
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const { data } = await api.get(`/admin/content-intel?type=${type}&sort=${sort}&page=${page}`, { timeout: 10_000 });
       setItems(data.items);
       setTotalPages(data.pages);
-    } catch { toast.error('İçerik zekası yüklenemedi'); }
+    } catch { toast.error('İçerik zekası yüklenemedi'); setLoadError(true); }
     finally { setLoading(false); }
   }, [type, sort, page]);
 
@@ -1062,6 +1101,14 @@ function ContentIntelTab() {
 
       {loading ? (
         <div className="space-y-2">{[...Array(8)].map((_, i) => <div key={i} className="skeleton h-16 rounded-xl" />)}</div>
+      ) : loadError ? (
+        <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl text-center">
+          <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-2" />
+          <p className="text-sm text-red-600 font-semibold mb-3">İçerik zekası yüklenemedi</p>
+          <button onClick={load} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors">
+            <RefreshCw className="w-3.5 h-3.5" /> Tekrar Dene
+          </button>
+        </div>
       ) : items.length === 0 ? (
         <EmptyState icon={Star} text="İçerik bulunamadı" />
       ) : (
@@ -1132,6 +1179,7 @@ const USER_FILTERS = [
 function UsersTab() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [filter, setFilter] = useState('all');
   const [searchInput, setSearchInput] = useState('');
   const [q, setQ] = useState('');
@@ -1144,11 +1192,12 @@ function UsersTab() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const { data } = await api.get(`/admin/users?q=${q}&filter=${filter}&page=${page}`, { timeout: 10_000 });
       setUsers(data.users);
       setTotalPages(data.pages);
-    } catch { toast.error('Kullanıcılar yüklenemedi'); }
+    } catch { toast.error('Kullanıcılar yüklenemedi'); setLoadError(true); }
     finally { setLoading(false); }
   }, [q, filter, page]);
 
@@ -1220,6 +1269,14 @@ function UsersTab() {
 
       {loading ? (
         <div className="space-y-2">{[...Array(8)].map((_, i) => <div key={i} className="skeleton h-20 rounded-xl" />)}</div>
+      ) : loadError ? (
+        <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl text-center">
+          <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-2" />
+          <p className="text-sm text-red-600 font-semibold mb-3">Kullanıcılar yüklenemedi</p>
+          <button onClick={load} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors">
+            <RefreshCw className="w-3.5 h-3.5" /> Tekrar Dene
+          </button>
+        </div>
       ) : users.length === 0 ? (
         <EmptyState icon={Users} text="Kullanıcı bulunamadı" />
       ) : (
@@ -1333,6 +1390,7 @@ const SLIDEO_STATUS = [
 function SlideoTab() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [sort, setSort] = useState('views');
   const [searchInput, setSearchInput] = useState('');
   const [q, setQ] = useState('');
@@ -1345,12 +1403,13 @@ function SlideoTab() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const { data } = await api.get(`/admin/slideos?sort=${sort}&q=${q}&status=${status}&page=${page}`, { timeout: 10_000 });
       setItems(data.items);
       setTotalPages(data.pages);
       setTotal(data.total);
-    } catch { toast.error('Slideo verileri yüklenemedi'); }
+    } catch { toast.error('Slideo verileri yüklenemedi'); setLoadError(true); }
     finally { setLoading(false); }
   }, [sort, q, status, page]);
 
@@ -1426,6 +1485,14 @@ function SlideoTab() {
 
       {loading ? (
         <div className="space-y-2">{[...Array(8)].map((_, i) => <div key={i} className="skeleton h-20 rounded-xl" />)}</div>
+      ) : loadError ? (
+        <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl text-center">
+          <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-2" />
+          <p className="text-sm text-red-600 font-semibold mb-3">Slideo verileri yüklenemedi</p>
+          <button onClick={load} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors">
+            <RefreshCw className="w-3.5 h-3.5" /> Tekrar Dene
+          </button>
+        </div>
       ) : items.length === 0 ? (
         <EmptyState icon={Play} text="Slideo bulunamadı" />
       ) : (
@@ -1620,6 +1687,239 @@ function AuditTab() {
       )}
 
       <Pagination page={page} totalPages={totalPages} onPage={setPage} />
+    </div>
+  );
+}
+
+// ?? ROOMS TAB ?????????????????????????????????????????????????????????????????
+
+function RoomsTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const { data: d } = await api.get('/admin/rooms', { timeout: 10_000 });
+      setData(d);
+    } catch {
+      toast.error('Oda verileri yüklenemedi');
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <div className="space-y-4">{[...Array(4)].map((_, i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}</div>;
+
+  if (loadError || !data) return (
+    <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl text-center">
+      <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-2" />
+      <p className="text-sm text-red-600 font-semibold mb-3">Oda verileri yüklenemedi</p>
+      <button onClick={load} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors">
+        <RefreshCw className="w-3.5 h-3.5" /> Tekrar Dene
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-extrabold">Odalar</h2>
+        <button onClick={load} className="px-3 py-2 rounded-lg border border-border text-sm font-semibold hover:bg-muted"><RefreshCw className="w-4 h-4" /></button>
+      </div>
+
+      <Section title="Özet">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <StatCard label="Toplam Oda"    value={data.total}        color="primary" />
+          <StatCard label="Açık Oda"      value={data.publicCount}  color="emerald" />
+          <StatCard label="Özel Oda"      value={data.privateCount} color="slate" />
+          <StatCard label="Toplam Üye"    value={data.totalMembers} color="blue" />
+          <StatCard label="Toplam Mesaj"  value={data.totalMessages} color="violet" />
+        </div>
+      </Section>
+
+      <Section title="Son Oluşturulan Odalar">
+        {data.recent.length === 0 ? (
+          <EmptyState icon={DoorOpen} text="Oda bulunamadı" />
+        ) : (
+          <div className="space-y-2">
+            {data.recent.map((room: any) => (
+              <div key={room.id} className="flex items-center gap-3 p-4 bg-card border border-border rounded-xl flex-wrap text-sm">
+                <div className="flex items-center gap-2 shrink-0">
+                  {room.isPublic
+                    ? <Wifi className="w-4 h-4 text-emerald-500" />
+                    : <Lock className="w-4 h-4 text-slate-400" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm truncate">{room.name}</p>
+                  <p className="text-xs text-muted-foreground">@{room.owner.username} · /rooms/{room.slug}</p>
+                </div>
+                <div className="flex gap-3 text-xs text-muted-foreground shrink-0">
+                  <span className="flex items-center gap-1"><Users className="w-3 h-3" />{room._count.members}</span>
+                  <span className="flex items-center gap-1"><MessageCircle className="w-3 h-3" />{room._count.messages}</span>
+                  <span className="flex items-center gap-1"><FileText className="w-3 h-3" />{room._count.topics}</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground shrink-0">{formatDate(room.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+    </div>
+  );
+}
+
+// ?? SISTEM TAB ????????????????????????????????????????????????????????????????
+
+function SistemTab() {
+  const [health, setHealth] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const { data } = await api.get('/admin/health', { timeout: 10_000 });
+      setHealth(data);
+    } catch {
+      toast.error('Sistem sağlığı yüklenemedi');
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const statusBadge = (s: string) => {
+    if (s === 'ok') return 'bg-emerald-500/10 text-emerald-600';
+    if (s === 'warning') return 'bg-amber-500/10 text-amber-600';
+    if (s === 'critical' || s === 'error') return 'bg-red-500/10 text-red-600';
+    return 'bg-slate-500/10 text-slate-500';
+  };
+
+  const statusIcon = (s: string) => {
+    if (s === 'ok') return <CheckCircle className="w-4 h-4 text-emerald-500" />;
+    if (s === 'warning') return <AlertCircle className="w-4 h-4 text-amber-500" />;
+    if (s === 'critical' || s === 'error') return <XCircle className="w-4 h-4 text-red-500" />;
+    return <AlertCircle className="w-4 h-4 text-slate-400" />;
+  };
+
+  if (loading) return <div className="space-y-4">{[...Array(4)].map((_, i) => <div key={i} className="skeleton h-24 rounded-2xl" />)}</div>;
+
+  if (loadError || !health) return (
+    <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl text-center">
+      <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-2" />
+      <p className="text-sm text-red-600 font-semibold mb-3">Sistem bilgisi yüklenemedi</p>
+      <button onClick={load} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors">
+        <RefreshCw className="w-3.5 h-3.5" /> Tekrar Dene
+      </button>
+    </div>
+  );
+
+  const checks = health.checks || {};
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-lg font-extrabold">Sistem Sağlığı</h2>
+          <p className="text-sm text-muted-foreground">Gerçek zamanlı platform durumu</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={`px-3 py-1.5 rounded-xl text-sm font-bold ${statusBadge(health.status)}`}>
+            {health.status === 'ok' ? 'Tüm Sistemler Normal' : health.status === 'warning' ? 'Uyarı' : 'Kritik Sorun'}
+          </span>
+          <button onClick={load} className="px-3 py-2 rounded-lg border border-border text-sm font-semibold hover:bg-muted"><RefreshCw className="w-4 h-4" /></button>
+        </div>
+      </div>
+
+      {/* System checks grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* DB */}
+        <div className="p-4 bg-card border border-border rounded-2xl">
+          <div className="flex items-center gap-2 mb-2">
+            {statusIcon(checks.db?.status)}
+            <span className="text-sm font-bold">Veritabanı</span>
+          </div>
+          <p className={`text-xs font-semibold ${statusBadge(checks.db?.status)} px-2 py-1 rounded-lg w-fit`}>
+            {checks.db?.status === 'ok' ? `${checks.db?.latencyMs ?? '?'}ms` : checks.db?.error || 'Hata'}
+          </p>
+        </div>
+
+        {/* Redis */}
+        <div className="p-4 bg-card border border-border rounded-2xl">
+          <div className="flex items-center gap-2 mb-2">
+            {statusIcon(checks.redis?.status)}
+            <span className="text-sm font-bold">Redis / Kuyruk</span>
+          </div>
+          <p className={`text-xs font-semibold ${statusBadge(checks.redis?.status)} px-2 py-1 rounded-lg w-fit`}>
+            {checks.redis?.status === 'ok' ? 'Bağlı' : checks.redis?.error || 'Bağlanamadı'}
+          </p>
+          {checks.redis?.queue && (
+            <p className="text-[10px] text-muted-foreground mt-1">
+              waiting: {checks.redis.queue.waiting ?? 0} · active: {checks.redis.queue.active ?? 0}
+            </p>
+          )}
+        </div>
+
+        {/* Storage */}
+        <div className="p-4 bg-card border border-border rounded-2xl">
+          <div className="flex items-center gap-2 mb-2">
+            {statusIcon(checks.storage?.status)}
+            <span className="text-sm font-bold">Depolama</span>
+          </div>
+          <p className={`text-xs font-semibold ${statusBadge(checks.storage?.status)} px-2 py-1 rounded-lg w-fit`}>
+            {checks.storage?.driver || 'local'}
+          </p>
+        </div>
+
+        {/* Worker */}
+        <div className="p-4 bg-card border border-border rounded-2xl">
+          <div className="flex items-center gap-2 mb-2">
+            {statusIcon(checks.worker?.status)}
+            <span className="text-sm font-bold">Conversion Worker</span>
+          </div>
+          <p className={`text-xs font-semibold ${statusBadge(checks.worker?.status)} px-2 py-1 rounded-lg w-fit`}>
+            {checks.worker?.status === 'ok' ? 'Normal' : checks.worker?.status === 'warning' ? 'Uyarı' : checks.worker?.status === 'critical' ? 'Kritik' : 'Bilinmiyor'}
+          </p>
+          {checks.worker && (
+            <p className="text-[10px] text-muted-foreground mt-1">
+              queued: {checks.worker.queued ?? '?'} · failed: {checks.worker.failed ?? '?'} · active: {checks.worker.processing ?? '?'}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Server info */}
+      <Section title="Sunucu Bilgisi">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-4 bg-card border border-border rounded-2xl">
+            <div className="flex items-center gap-2 mb-1"><Clock className="w-4 h-4 text-muted-foreground" /><span className="text-xs font-bold text-muted-foreground">Uptime</span></div>
+            <p className="font-black text-lg">{Math.floor((health.uptimeSeconds || 0) / 3600)}h {Math.floor(((health.uptimeSeconds || 0) % 3600) / 60)}m</p>
+          </div>
+          <div className="p-4 bg-card border border-border rounded-2xl">
+            <div className="flex items-center gap-2 mb-1"><Cpu className="w-4 h-4 text-muted-foreground" /><span className="text-xs font-bold text-muted-foreground">Bellek (RSS)</span></div>
+            <p className="font-black text-lg">{health.memoryMB ?? '?'} MB</p>
+          </div>
+          <div className="p-4 bg-card border border-border rounded-2xl">
+            <div className="flex items-center gap-2 mb-1"><Server className="w-4 h-4 text-muted-foreground" /><span className="text-xs font-bold text-muted-foreground">Node.js</span></div>
+            <p className="font-black text-lg">{health.nodeVersion || '?'}</p>
+          </div>
+          <div className="p-4 bg-card border border-border rounded-2xl">
+            <div className="flex items-center gap-2 mb-1"><Database className="w-4 h-4 text-muted-foreground" /><span className="text-xs font-bold text-muted-foreground">DB Ping</span></div>
+            <p className="font-black text-lg">{checks.db?.latencyMs != null ? `${checks.db.latencyMs}ms` : '—'}</p>
+          </div>
+        </div>
+      </Section>
+
+      <p className="text-xs text-muted-foreground text-right">Son kontrol: {health.checkedAt ? new Date(health.checkedAt).toLocaleTimeString('tr-TR') : '—'}</p>
     </div>
   );
 }
@@ -1845,7 +2145,13 @@ function PreviewOpsTab() {
     return (
       <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl text-center">
         <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-2" />
-        <p className="text-sm text-red-600 font-semibold">Veri yüklenemedi</p>
+        <p className="text-sm text-red-600 font-semibold mb-3">Veri yüklenemedi</p>
+        <button
+          onClick={load}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors"
+        >
+          <RefreshCw className="w-3.5 h-3.5" /> Tekrar Dene
+        </button>
       </div>
     );
   }

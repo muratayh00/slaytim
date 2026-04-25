@@ -9,6 +9,7 @@ const {
   reclassifyInvalidFailedConversions,
 } = require('../services/conversion-maintenance.service');
 const logger = require('../lib/logger');
+const ttlCache = require('../lib/ttl-cache');
 
 const guard = (req, res) => {
   if (!hasAdminAccess(req.user)) { res.status(403).json({ error: 'Forbidden' }); return false; }
@@ -99,6 +100,11 @@ const withQueryTimeout = (promise, ms, fallback) =>
 const getStats = async (req, res) => {
   if (!guard(req, res)) return;
   try {
+    // Serve from cache for up to 30s — admin stats don't need to be real-time
+    // and this prevents repeated DB hammering when the overview tab re-renders.
+    const cached = ttlCache.get('admin-stats', 'v1');
+    if (cached) return res.json(cached);
+
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const week = new Date(now); week.setDate(week.getDate() - 7);
@@ -142,6 +148,9 @@ const getStats = async (req, res) => {
         }),
         5000, []
       ),
+      // Rooms (lightweight)
+      withQueryTimeout(prisma.room.count(), 3000, 0),
+      withQueryTimeout(prisma.room.count({ where: { isPublic: true } }), 3000, 0),
     ]);
 
     // Hard deadline: if the DB is unresponsive, return 503 instead of hanging.
@@ -158,18 +167,22 @@ const getStats = async (req, res) => {
       pendingReports, criticalReports, totalReports,
       bannedUsers, mutedUsers,
       topTopics, categoryStats,
+      totalRooms, publicRooms,
     ] = await Promise.race([statsQuery, deadline]);
 
-    res.json({
+    const payload = {
       users: { total: totalUsers, today: newUsersToday, week: newUsersWeek, month: newUsersMonth, banned: bannedUsers, muted: mutedUsers },
       topics: { total: totalTopics, today: newTopicsToday, hidden: hiddenTopics },
       slides: { total: totalSlides, today: newSlidesToday, hidden: hiddenSlides, failedConversions },
       slideos: { total: totalSlideos, today: newSlideosToday },
       comments: { total: totalComments, today: newCommentsToday },
       reports: { pending: pendingReports, critical: criticalReports, total: totalReports },
+      rooms: { total: totalRooms, public: publicRooms, private: Math.max(0, totalRooms - publicRooms) },
       topTopics,
       categoryStats: categoryStats.map(c => ({ id: c.id, name: c.name, slug: c.slug, count: c._count.topics })),
-    });
+    };
+    ttlCache.set('admin-stats', 'v1', payload, 30_000);
+    res.json(payload);
   } catch (err) {
     if (err.message === 'STATS_TIMEOUT') {
       logger.warn('Admin: Stats query hit 8s deadline — DB may be overloaded');
@@ -996,43 +1009,58 @@ const getPreviewOps = async (req, res) => {
 
     const [statusCounts, assetStats, stuckSlides, failedSlides, missingSlides] = await Promise.all([
       // Status distribution
-      prisma.slide.groupBy({
-        by: ['previewStatus'],
-        where: { conversionStatus: 'done', deletedAt: null },
-        _count: { _all: true },
-      }),
+      withQueryTimeout(
+        prisma.slide.groupBy({
+          by: ['previewStatus'],
+          where: { conversionStatus: 'done', deletedAt: null },
+          _count: { _all: true },
+        }),
+        6000, []
+      ),
       // Asset stats
-      prisma.slidePreviewAsset.aggregate({
-        _count: { _all: true },
-        _sum: { fileSizeBytes: true },
-        _avg: { fileSizeBytes: true },
-      }),
+      withQueryTimeout(
+        prisma.slidePreviewAsset.aggregate({
+          _count: { _all: true },
+          _sum: { fileSizeBytes: true },
+          _avg: { fileSizeBytes: true },
+        }),
+        6000, { _count: { _all: 0 }, _sum: { fileSizeBytes: 0 }, _avg: { fileSizeBytes: 0 } }
+      ),
       // Stuck processing (30+ min)
-      prisma.slide.findMany({
-        where: {
-          previewStatus: 'processing',
-          updatedAt: { lt: stuckThreshold },
-          deletedAt: null,
-        },
-        select: { id: true, title: true, updatedAt: true, viewsCount: true },
-        orderBy: { updatedAt: 'asc' },
-        take: 20,
-      }),
+      withQueryTimeout(
+        prisma.slide.findMany({
+          where: {
+            previewStatus: 'processing',
+            updatedAt: { lt: stuckThreshold },
+            deletedAt: null,
+          },
+          select: { id: true, title: true, updatedAt: true, viewsCount: true },
+          orderBy: { updatedAt: 'asc' },
+          take: 20,
+        }),
+        6000, []
+      ),
       // Failed slides
-      prisma.slide.findMany({
-        where: { previewStatus: 'failed', deletedAt: null },
-        select: { id: true, title: true, viewsCount: true, updatedAt: true },
-        orderBy: { viewsCount: 'desc' },
-        take: 20,
-      }),
+      withQueryTimeout(
+        prisma.slide.findMany({
+          where: { previewStatus: 'failed', deletedAt: null },
+          select: { id: true, title: true, viewsCount: true, updatedAt: true },
+          orderBy: { viewsCount: 'desc' },
+          take: 20,
+        }),
+        6000, []
+      ),
       // Missing (done but no preview)
-      prisma.slide.count({
-        where: {
-          conversionStatus: 'done',
-          previewStatus: { in: ['none', 'failed'] },
-          deletedAt: null,
-        },
-      }),
+      withQueryTimeout(
+        prisma.slide.count({
+          where: {
+            conversionStatus: 'done',
+            previewStatus: { in: ['none', 'failed'] },
+            deletedAt: null,
+          },
+        }),
+        6000, 0
+      ),
     ]);
 
     const distribution = {};
@@ -1157,6 +1185,100 @@ const retryPreview = async (req, res) => {
   }
 };
 
+// ?? System Health ???????????????????????????????????????????????????????????
+const getHealth = async (req, res) => {
+  if (!guard(req, res)) return;
+  const start = Date.now();
+
+  const checks = {};
+
+  // DB ping
+  try {
+    await Promise.race([
+      prisma.$queryRaw`SELECT 1`,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
+    ]);
+    checks.db = { status: 'ok', latencyMs: Date.now() - start };
+  } catch (err) {
+    checks.db = { status: 'error', error: err.message };
+  }
+
+  // Conversion queue / Redis
+  try {
+    const q = await Promise.race([
+      getConversionQueueState(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
+    ]);
+    checks.redis = { status: 'ok', queue: q };
+  } catch (err) {
+    checks.redis = { status: err.message === 'timeout' ? 'timeout' : 'error', error: err.message };
+  }
+
+  // Storage driver
+  const storageDriver = process.env.STORAGE_DRIVER || 'local';
+  checks.storage = { status: 'ok', driver: storageDriver || 'local' };
+
+  // Pending conversion jobs count (quick health indicator)
+  try {
+    const [queued, failed, processing] = await Promise.all([
+      withQueryTimeout(prisma.conversionJob.count({ where: { status: 'queued' } }), 3000, null),
+      withQueryTimeout(prisma.conversionJob.count({ where: { status: 'failed' } }), 3000, null),
+      withQueryTimeout(prisma.conversionJob.count({ where: { status: 'processing' } }), 3000, null),
+    ]);
+    checks.worker = {
+      status: failed >= 10 ? 'critical' : failed >= 3 ? 'warning' : 'ok',
+      queued, failed, processing,
+    };
+  } catch {
+    checks.worker = { status: 'unknown' };
+  }
+
+  // Overall status
+  const overallStatus =
+    checks.db.status !== 'ok' ? 'critical' :
+    checks.worker?.status === 'critical' ? 'critical' :
+    checks.worker?.status === 'warning' ? 'warning' : 'ok';
+
+  res.json({
+    status: overallStatus,
+    checks,
+    uptimeSeconds: Math.floor(process.uptime()),
+    memoryMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
+    nodeVersion: process.version,
+    checkedAt: new Date(),
+  });
+};
+
+// ?? Rooms Stats ??????????????????????????????????????????????????????????????
+const getRoomsStats = async (req, res) => {
+  if (!guard(req, res)) return;
+  try {
+    const [total, publicCount, privateCount, totalMembers, totalMessages, recent] = await Promise.all([
+      withQueryTimeout(prisma.room.count(), 4000, 0),
+      withQueryTimeout(prisma.room.count({ where: { isPublic: true } }), 4000, 0),
+      withQueryTimeout(prisma.room.count({ where: { isPublic: false } }), 4000, 0),
+      withQueryTimeout(prisma.roomMember.count(), 4000, 0),
+      withQueryTimeout(prisma.roomMessage.count(), 4000, 0),
+      withQueryTimeout(
+        prisma.room.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          select: {
+            id: true, name: true, slug: true, isPublic: true, createdAt: true,
+            owner: { select: { id: true, username: true } },
+            _count: { select: { members: true, messages: true, topics: true } },
+          },
+        }),
+        5000, []
+      ),
+    ]);
+    res.json({ total, publicCount, privateCount, totalMembers, totalMessages, recent });
+  } catch (err) {
+    logger.error('Admin: Failed to fetch rooms stats', { error: err.message });
+    res.status(500).json({ error: 'Failed to fetch rooms stats' });
+  }
+};
+
 module.exports = {
   getStats,
   getContent, hideContent, restoreContent, setContentSponsor, deleteContent,
@@ -1167,4 +1289,5 @@ module.exports = {
   getAuditLogs,
   getConversionJobs, retryConversionJob, retryFailedConversions, reclassifyInvalidConversions, getConversionHealth,
   getPreviewOps, retryPreview,
+  getHealth, getRoomsStats,
 };

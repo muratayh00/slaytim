@@ -11,11 +11,26 @@ const {
   getAuditLogs,
   getConversionJobs, retryConversionJob, retryFailedConversions, reclassifyInvalidConversions, getConversionHealth,
   getPreviewOps, retryPreview,
+  getHealth, getRoomsStats,
 } = require('../controllers/admin.controller');
 
 const router = Router();
 router.use(authenticate);
 router.use(adminGuard);
+
+// Safeguard: if any read query hangs (e.g. missing DB index), return 503 after
+// 9 seconds so the frontend timeout fires with a clean error instead of a 30s hang.
+router.use((req, res, next) => {
+  if (req.method !== 'GET') return next();
+  const timer = setTimeout(() => {
+    if (!res.headersSent) {
+      res.status(503).json({ error: 'Admin query timed out — DB may be slow. Try again.' });
+    }
+  }, 9000);
+  res.on('finish', () => clearTimeout(timer));
+  res.on('close', () => clearTimeout(timer));
+  next();
+});
 
 // Overview
 router.get('/stats', getStats);
@@ -60,5 +75,11 @@ router.get('/audit', getAuditLogs);
 // Preview Ops
 router.get('/preview-ops', getPreviewOps);
 router.post('/preview-ops/retry', retryPreview);
+
+// System health
+router.get('/health', getHealth);
+
+// Rooms stats
+router.get('/rooms', getRoomsStats);
 
 module.exports = router;

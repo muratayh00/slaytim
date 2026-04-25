@@ -145,6 +145,10 @@ const login = async (req, res) => {
       user: { id: user.id, username: user.username, email: user.email, avatarUrl: user.avatarUrl, isAdmin: user.isAdmin },
     });
   } catch (err) {
+    if (err.isPrismaTimeout) {
+      logger.warn('Login: DB query timed out');
+      return res.status(503).json({ error: 'Sunucu meşgul, lütfen tekrar deneyin.' });
+    }
     logger.error('Login failed', { error: err.message, stack: err.stack });
     return res.status(500).json({ error: 'Login failed' });
   }

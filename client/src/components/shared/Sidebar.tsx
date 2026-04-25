@@ -48,7 +48,7 @@ export default function Sidebar() {
 
     const fetchRecent = async () => {
       try {
-        const { data } = await api.get('/users/me/recent-topics');
+        const { data } = await api.get('/users/me/recent-topics', { timeout: 5_000 });
         if (cancelled) return;
         const topics = Array.isArray(data?.topics) ? data.topics : [];
         setRecentTopics(topics.map((t: any) => ({ id: t.id, title: t.title, slug: t.slug })));

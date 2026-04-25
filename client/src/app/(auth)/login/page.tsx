@@ -26,8 +26,13 @@ export default function LoginPage() {
       router.push('/');
     } catch (err: any) {
       const status = Number(err?.response?.status || 0);
+      const isTimeout = err?.code === 'ECONNABORTED' || err?.message?.includes('timeout');
       if (status === 400 || status === 401) {
         toast.error('E-posta veya şifre yanlış.');
+      } else if (isTimeout || status === 503) {
+        toast.error('Sunucu yanıt vermiyor. Lütfen birkaç saniye bekleyip tekrar dene.');
+      } else if (!status) {
+        toast.error('Bağlantı hatası. İnternet bağlantını ve sunucu durumunu kontrol et.');
       } else {
         toast.error('Giriş yapılamadı. Lütfen tekrar dene.');
       }
