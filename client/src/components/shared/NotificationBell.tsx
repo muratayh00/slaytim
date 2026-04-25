@@ -32,13 +32,19 @@ const TYPE_ICONS: Record<string, any> = {
   slide: Layers,
 };
 
-// Keep fallback polling conservative to avoid background network noise.
-const POLL_ACTIVE = 30000;
-const POLL_HIDDEN = 90000;
+// Conservative fallback polling — only active when SSE is completely down.
+const POLL_ACTIVE = 45_000;   // 45 s when tab is visible
+const POLL_HIDDEN = 120_000;  // 2 min when tab is hidden
+// Grace period before fallback polling kicks in — gives SSE time to connect.
+const POLL_STARTUP_DELAY_MS = 5_000;
+
 const SSE_RECONNECT_BASE_MS = 500;
-const SSE_RECONNECT_MAX_MS = 30000;
-const SSE_RECONNECT_MAX_ATTEMPTS = 6; // After 6 failures (~2 min), stop SSE and stay in poll mode
+const SSE_RECONNECT_MAX_MS = 30_000;
+// After 6 consecutive failures (~2 min total backoff), stop trying SSE and stay in poll mode.
+const SSE_RECONNECT_MAX_ATTEMPTS = 6;
+
 const API_ORIGIN = getApiOrigin();
+
 const logSoftError = (scope: string, err?: unknown) => {
   if (process.env.NODE_ENV !== 'production') {
     console.warn(`[NotificationBell] ${scope}`, err);
@@ -46,30 +52,51 @@ const logSoftError = (scope: string, err?: unknown) => {
 };
 
 // ── Module-level singleton guards ─────────────────────────────────────────────
-// NotificationBell is rendered in BOTH Navbar and TopBar simultaneously.
-// useRef is per-component-instance, so two instances each see their own
-// sinceInflightRef.current = false and both fire. Moving the lock to module
-// scope ensures ALL instances share one mutex — only one /since request at a time.
+// NotificationBell renders in BOTH Navbar and TopBar simultaneously.
+// All state below is shared across every instance — one mutex for the whole app.
+//
+// Why this works and useRef does NOT:
+//   useRef is per-component-instance. Two mounts → two independent refs → two
+//   parallel requests. Module-level `let` variables are the JS-module singleton
+//   and are shared by every instance rendered in the same page.
+//
 let _sinceInflight = false;
 let _sinceLastCall = 0;
-const SINCE_MIN_INTERVAL_MS = 5_000;
+
+// Hard minimum between any two /since calls, regardless of source or instance.
+// 10 s is enough to absorb: mount + SSE-onopen (both instances) + auth re-render.
+const SINCE_MIN_INTERVAL_MS = 10_000;
+
+// Counts how many SSE connections are currently OPEN across all instances.
+// Polling must not run while this is > 0.
+let _sseConnectedCount = 0;
 
 export default function NotificationBell() {
   const { user } = useAuthStore();
+
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(false);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [realtimeMode, setRealtimeMode] = useState<'sse' | 'poll' | 'off'>('off');
+
   const ref = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sseRef = useRef<EventSource | null>(null);
   const reconnectAttemptRef = useRef(0);
   const manualCloseRef = useRef(false);
   const lastEventIdRef = useRef<string>('0');
 
+  // Keep a ref to `user` so stable callbacks can read the latest value without
+  // being listed as a dependency (prevents cascading effect re-runs on auth
+  // re-renders, which was a primary driver of sequential /since floods).
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
+
+  // ── Click-outside handler ────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -78,30 +105,38 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // ── fetchCount ───────────────────────────────────────────────────────────────
+  // Lightweight badge update. No dedup needed — it's a tiny read-only query.
   const fetchCount = useCallback(async () => {
-    if (!user) return;
+    if (!userRef.current) return;
     try {
       const { data } = await api.get('/notifications/unread-count');
       setUnread(data.count);
     } catch (err) {
       logSoftError('fetchCount failed', err);
     }
-  }, [user]);
+  }, []); // stable — reads userRef
 
+  // ── syncMissedNotifications ──────────────────────────────────────────────────
+  // Fetches events that arrived while SSE was down / connecting.
+  // Single global mutex + 10 s hard floor ensure at most one call per 10 s
+  // regardless of how many instances are mounted or how often effects re-run.
   const syncMissedNotifications = useCallback(async () => {
-    if (!user) return;
-    // Module-level lock: shared across ALL instances (Navbar + TopBar mount
-    // NotificationBell simultaneously — per-instance useRef doesn't work here).
+    if (!userRef.current) return;
     if (_sinceInflight) return;
+
     const now = Date.now();
     if (now - _sinceLastCall < SINCE_MIN_INTERVAL_MS) return;
+
     _sinceInflight = true;
     _sinceLastCall = now;
+
     try {
       const { data } = await api.get('/notifications/since', {
         params: { lastEventId: lastEventIdRef.current || '0' },
-        timeout: 8000,
+        timeout: 8_000,
       });
+
       const events: RealtimeEnvelope[] = Array.isArray(data?.events) ? data.events : [];
       for (const evt of events) {
         if (!evt) continue;
@@ -114,22 +149,23 @@ export default function NotificationBell() {
           });
         }
       }
+
       if (typeof data?.unread === 'number') setUnread(data.unread);
       if (data?.latestEventId) lastEventIdRef.current = String(data.latestEventId);
     } catch (err) {
       logSoftError('syncMissedNotifications failed', err);
     } finally {
-      // Always release the lock so future calls can proceed.
       _sinceInflight = false;
     }
-  }, [user]);
+  }, []); // stable — reads userRef, _sinceInflight, _sinceLastCall via closure/module
 
+  // ── handleRealtimeEnvelope ───────────────────────────────────────────────────
   const handleRealtimeEnvelope = useCallback((envelope: RealtimeEnvelope) => {
     const event = String(envelope?.type || '');
     const payload = envelope?.data || {};
-    if (envelope?.id) {
-      lastEventIdRef.current = String(envelope.id);
-    }
+
+    if (envelope?.id) lastEventIdRef.current = String(envelope.id);
+
     if (event === 'unread_count') {
       setUnread(Number(payload?.count || 0));
       return;
@@ -144,55 +180,71 @@ export default function NotificationBell() {
         });
       }
     }
-  }, []);
+  }, []); // stable
 
+  // ── closeRealtime ────────────────────────────────────────────────────────────
   const closeRealtime = useCallback(() => {
     manualCloseRef.current = true;
+
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
     }
     if (sseRef.current) {
+      // Only decrement if this SSE was actually open
+      if (sseRef.current.readyState === EventSource.OPEN) {
+        _sseConnectedCount = Math.max(0, _sseConnectedCount - 1);
+      }
       try { sseRef.current.close(); } catch {}
       sseRef.current = null;
     }
-    setRealtimeConnected(false);
-  }, []);
 
+    setRealtimeConnected(false);
+  }, []); // stable
+
+  // ── connectSse ───────────────────────────────────────────────────────────────
   const connectSse = useCallback(() => {
-    if (!user || manualCloseRef.current) return;
+    if (!userRef.current || manualCloseRef.current) return;
+
     if (sseRef.current) {
       try { sseRef.current.close(); } catch {}
       sseRef.current = null;
     }
 
-    const stream = new EventSource(`${API_ORIGIN}/api/notifications/stream`, { withCredentials: true });
+    const stream = new EventSource(
+      `${API_ORIGIN}/api/notifications/stream`,
+      { withCredentials: true },
+    );
     sseRef.current = stream;
 
     stream.addEventListener('unread_count', (ev: MessageEvent) => {
-      try {
-        handleRealtimeEnvelope(JSON.parse(ev.data || '{}'));
-      } catch (err) {
-        logSoftError('failed to parse unread_count event', err);
-      }
+      try { handleRealtimeEnvelope(JSON.parse(ev.data || '{}')); }
+      catch (err) { logSoftError('failed to parse unread_count event', err); }
     });
+
     stream.addEventListener('notification', (ev: MessageEvent) => {
-      try {
-        handleRealtimeEnvelope(JSON.parse(ev.data || '{}'));
-      } catch (err) {
-        logSoftError('failed to parse notification event', err);
-      }
+      try { handleRealtimeEnvelope(JSON.parse(ev.data || '{}')); }
+      catch (err) { logSoftError('failed to parse notification event', err); }
     });
 
     stream.onopen = () => {
       reconnectAttemptRef.current = 0;
+      _sseConnectedCount++;
       setRealtimeConnected(true);
       setRealtimeMode('sse');
+      // Sync missed notifications once on connect. The 10 s cooldown prevents
+      // double-firing when the second instance's SSE also opens shortly after.
       void syncMissedNotifications();
     };
 
     stream.onerror = () => {
       if (manualCloseRef.current) return;
+
+      // Decrement only if this stream was open before the error
+      if (stream.readyState !== EventSource.CONNECTING) {
+        _sseConnectedCount = Math.max(0, _sseConnectedCount - 1);
+      }
+
       try { stream.close(); } catch {}
       sseRef.current = null;
       setRealtimeConnected(false);
@@ -201,10 +253,13 @@ export default function NotificationBell() {
       const attempt = reconnectAttemptRef.current + 1;
       reconnectAttemptRef.current = attempt;
 
-      // Stop reconnecting SSE after too many failures — polling keeps notifications alive.
+      // After too many failures, stop SSE entirely — polling keeps notifications alive.
       if (attempt >= SSE_RECONNECT_MAX_ATTEMPTS) return;
 
-      const waitMs = Math.min(SSE_RECONNECT_MAX_MS, SSE_RECONNECT_BASE_MS * Math.pow(2, Math.min(5, attempt - 1)));
+      const waitMs = Math.min(
+        SSE_RECONNECT_MAX_MS,
+        SSE_RECONNECT_BASE_MS * Math.pow(2, Math.min(5, attempt - 1)),
+      );
 
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = setTimeout(() => {
@@ -212,55 +267,78 @@ export default function NotificationBell() {
         connectSse();
       }, waitMs);
     };
-  }, [handleRealtimeEnvelope, syncMissedNotifications, user]);
+  }, [handleRealtimeEnvelope, syncMissedNotifications]); // stable deps
 
+  // ── Main lifecycle effect ────────────────────────────────────────────────────
+  // Runs only when `user` identity changes (login / logout / account switch).
+  // syncMissedNotifications is stable → connectSse is stable → only `user` drives re-runs.
   useEffect(() => {
     if (!user) return;
 
     manualCloseRef.current = false;
     reconnectAttemptRef.current = 0;
-    // syncMissedNotifications already returns unread count — no need for a
-    // separate fetchCount call here (avoids two simultaneous DB queries on mount).
-    syncMissedNotifications();
+
+    // SSE onopen will call syncMissedNotifications once it connects.
+    // We do NOT call it here to avoid the mount-then-onopen double-fire that
+    // was producing requests #1 and #2 within the old 5 s window.
     connectSse();
 
     return () => {
       closeRealtime();
       setRealtimeMode('off');
     };
-  }, [user, connectSse, closeRealtime, syncMissedNotifications]);
+  }, [user, connectSse, closeRealtime]);
 
+  // ── Fallback polling ─────────────────────────────────────────────────────────
+  // Only activates when SSE is down. A startup delay prevents it from racing
+  // with the SSE connection attempt on mount.
   useEffect(() => {
     if (!user || realtimeConnected) return;
+
+    let cancelled = false;
+
     const schedule = () => {
+      if (cancelled || _sseConnectedCount > 0) return;
       const hidden = document.visibilityState === 'hidden';
       timerRef.current = setTimeout(() => {
+        if (cancelled || _sseConnectedCount > 0) return;
         fetchCount();
         syncMissedNotifications();
         schedule();
       }, hidden ? POLL_HIDDEN : POLL_ACTIVE);
     };
-    schedule();
+
+    // Delay startup to let SSE connect first.
+    // If SSE connects during this window, realtimeConnected flips to true,
+    // this effect re-runs, and the early return above fires — so the timer
+    // never starts.
+    startupTimerRef.current = setTimeout(() => {
+      startupTimerRef.current = null;
+      if (cancelled || _sseConnectedCount > 0) return;
+      schedule();
+    }, POLL_STARTUP_DELAY_MS);
+
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        fetchCount();
-        syncMissedNotifications();
-        schedule();
-      }
+      if (document.visibilityState !== 'visible') return;
+      if (cancelled || _sseConnectedCount > 0) return;
+      if (timerRef.current) clearTimeout(timerRef.current);
+      // visibilitychange goes through the same 10 s cooldown via syncMissedNotifications
+      syncMissedNotifications();
+      schedule();
     };
     document.addEventListener('visibilitychange', onVisibility);
+
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      cancelled = true;
+      if (startupTimerRef.current) { clearTimeout(startupTimerRef.current); startupTimerRef.current = null; }
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [user, realtimeConnected, fetchCount, syncMissedNotifications]);
 
+  // ── Panel open / mark read ───────────────────────────────────────────────────
   const openPanel = async () => {
-    if (open) {
-      setOpen(false);
-      return;
-    }
+    if (open) { setOpen(false); return; }
     setOpen(true);
     setLoading(true);
     try {
