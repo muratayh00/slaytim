@@ -7,13 +7,21 @@ import {
   Home, Compass, LayoutGrid, Play, FolderOpen,
   Plus, Moon, Sun, LogOut, User, Presentation, ChevronUp, Clock, Users, Shield,
 } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '@/store/auth';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
 import { buildProfilePath, buildTopicCreatePath, buildTopicPath } from '@/lib/url';
 import { resolveMediaUrl } from '@/lib/media';
+
+// ── Module-level guards ───────────────────────────────────────────────────────
+// Prevent /me/recent-topics spam: one request at a time, 30s minimum interval.
+// Module-scope (not useRef) so multiple Sidebar instances share the same lock.
+let _recentInflight = false;
+let _recentLastCall = 0;
+let _recentUserId: number | null = null;
+const RECENT_THROTTLE_MS = 30_000;
 
 const BASE_NAV = [
   { href: '/', label: 'Ana Sayfa', icon: Home },
@@ -38,36 +46,57 @@ export default function Sidebar() {
     setDark(document.documentElement.classList.contains('dark'));
   }, []);
 
+  // fetchRecent: module-level guard ensures at most one in-flight request across
+  // all instances, and no more than one call per 30 seconds.
+  // `bypass=true` skips the 30s throttle (used on first load / user change).
+  const fetchRecent = useCallback(async (bypass = false) => {
+    if (!user) return;
+    if (_recentInflight) return;
+
+    // Reset throttle when user changes (login / account switch).
+    if (_recentUserId !== user.id) {
+      _recentUserId = user.id;
+      _recentLastCall = 0;
+    }
+
+    const now = Date.now();
+    if (!bypass && now - _recentLastCall < RECENT_THROTTLE_MS) return;
+
+    _recentInflight = true;
+    _recentLastCall = now;
+    try {
+      const { data } = await api.get('/users/me/recent-topics', { timeout: 5_000 });
+      const topics = Array.isArray(data?.topics) ? data.topics : [];
+      setRecentTopics(topics.map((t: any) => ({ id: t.id, title: t.title, slug: t.slug })));
+    } catch {
+      // Silently fail — stale list is acceptable.
+    } finally {
+      _recentInflight = false;
+    }
+  }, [user]);
+
+  // Initial fetch on mount and whenever user changes.
+  // `pathname` intentionally excluded — fetching on every navigation was the spam source.
   useEffect(() => {
-    let cancelled = false;
-    let delayedRefresh: ReturnType<typeof setTimeout> | null = null;
     if (!user) {
       setRecentTopics([]);
+      _recentUserId = null;
+      _recentLastCall = 0;
       return;
     }
+    fetchRecent(true); // bypass throttle on first load
+  }, [user, fetchRecent]);
 
-    const fetchRecent = async () => {
-      try {
-        const { data } = await api.get('/users/me/recent-topics', { timeout: 5_000 });
-        if (cancelled) return;
-        const topics = Array.isArray(data?.topics) ? data.topics : [];
-        setRecentTopics(topics.map((t: any) => ({ id: t.id, title: t.title, slug: t.slug })));
-      } catch {
-        if (cancelled) return;
-        setRecentTopics([]);
-      }
+  // Event-driven refresh: addRecentTopic() dispatches 'recent-topics-updated'
+  // when the user visits a topic. Reset the throttle so the list stays fresh.
+  useEffect(() => {
+    const handler = () => {
+      _recentLastCall = 0; // allow one immediate refresh after visiting a topic
+      fetchRecent(false);
     };
-
-    fetchRecent();
-    if (pathname.startsWith('/konu/') || pathname.startsWith('/topics/')) {
-      delayedRefresh = setTimeout(fetchRecent, 900);
-    }
-
-    return () => {
-      cancelled = true;
-      if (delayedRefresh) clearTimeout(delayedRefresh);
-    };
-  }, [user, pathname]);
+    window.addEventListener('recent-topics-updated', handler);
+    return () => window.removeEventListener('recent-topics-updated', handler);
+  }, [fetchRecent]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {

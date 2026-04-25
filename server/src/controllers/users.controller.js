@@ -4,6 +4,17 @@ const { hasAdminAccess } = require('../lib/rbac');
 const logger = require('../lib/logger');
 const { normalizeMediaUrls } = require('../lib/media-normalize');
 
+// Per-user rate-limit for GET /me/recent-topics — max one DB query per 10s.
+// Returns a 200 with empty topics so the client degrades silently.
+const RECENT_TOPICS_MIN_INTERVAL_MS = 10_000;
+const recentTopicsLastCall = new Map(); // userId -> lastCallMs
+setInterval(() => {
+  const cutoff = Date.now() - 60_000;
+  for (const [k, v] of recentTopicsLastCall) {
+    if (v < cutoff) recentTopicsLastCall.delete(k);
+  }
+}, 60_000).unref();
+
 const getProfile = async (req, res) => {
   try {
     const { username } = req.params;
@@ -292,6 +303,15 @@ const deleteAccount = async (req, res) => {
 
 const getMyRecentTopics = async (req, res) => {
   try {
+    const userId = req.user.id;
+    const now = Date.now();
+    const last = recentTopicsLastCall.get(userId) || 0;
+    if (now - last < RECENT_TOPICS_MIN_INTERVAL_MS) {
+      // Called too soon — return empty payload silently (frontend handles gracefully).
+      return res.json({ topics: [] });
+    }
+    recentTopicsLastCall.set(userId, now);
+
     const rows = await prisma.visitedTopic.findMany({
       where: { userId: req.user.id },
       orderBy: { visitedAt: 'desc' },
