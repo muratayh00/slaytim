@@ -35,7 +35,7 @@ export default function CommentSection({ topicId }: { topicId: number }) {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    api.get(`/comments/topic/${topicId}`)
+    api.get(`/comments/topic/${topicId}`, { timeout: 8_000 })
       .then((r) => setComments(r.data))
       .catch((err) => { console.error('[CommentSection] fetch failed:', err); })
       .finally(() => setLoading(false));

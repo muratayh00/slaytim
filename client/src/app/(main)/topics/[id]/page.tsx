@@ -92,7 +92,8 @@ export default function TopicDetailPage({ initialTopic }: { initialTopic?: any }
         const topicRes = await api.get(
           isNumericTopicKey
             ? `/topics/${topicId}`
-            : `/topics/slug/${encodeURIComponent(topicKey)}`
+            : `/topics/slug/${encodeURIComponent(topicKey)}`,
+          { timeout: 10_000 }
         );
 
         if (cancelled) return;
@@ -100,7 +101,7 @@ export default function TopicDetailPage({ initialTopic }: { initialTopic?: any }
         const loadedTopic = topicRes?.data || null;
         const resolvedTopicId = Number(loadedTopic?.id || 0);
         const slidesRes = resolvedTopicId
-          ? await api.get(`/slides/topic/${resolvedTopicId}`)
+          ? await api.get(`/slides/topic/${resolvedTopicId}`, { timeout: 10_000 })
           : { data: [] };
         const loadedSlides = toSlidesArray(slidesRes?.data);
 
@@ -163,7 +164,7 @@ export default function TopicDetailPage({ initialTopic }: { initialTopic?: any }
 
     setSort(newSort);
     try {
-      const { data } = await api.get(`/slides/topic/${resolvedTopicId}?sort=${newSort}`);
+      const { data } = await api.get(`/slides/topic/${resolvedTopicId}?sort=${newSort}`, { timeout: 10_000 });
       setSlideItemsState(toSlidesArray(data));
     } catch {
       setSlideItemsState([]);
