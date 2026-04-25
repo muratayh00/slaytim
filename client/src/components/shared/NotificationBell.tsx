@@ -45,6 +45,15 @@ const logSoftError = (scope: string, err?: unknown) => {
   }
 };
 
+// ── Module-level singleton guards ─────────────────────────────────────────────
+// NotificationBell is rendered in BOTH Navbar and TopBar simultaneously.
+// useRef is per-component-instance, so two instances each see their own
+// sinceInflightRef.current = false and both fire. Moving the lock to module
+// scope ensures ALL instances share one mutex — only one /since request at a time.
+let _sinceInflight = false;
+let _sinceLastCall = 0;
+const SINCE_MIN_INTERVAL_MS = 5_000;
+
 export default function NotificationBell() {
   const { user } = useAuthStore();
   const [open, setOpen] = useState(false);
@@ -60,10 +69,6 @@ export default function NotificationBell() {
   const reconnectAttemptRef = useRef(0);
   const manualCloseRef = useRef(false);
   const lastEventIdRef = useRef<string>('0');
-  // Guards: prevent concurrent /since requests and enforce 5s minimum interval.
-  const sinceInflightRef = useRef(false);
-  const sinceLastCallRef = useRef(0);
-  const SINCE_MIN_INTERVAL_MS = 5000;
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -85,12 +90,13 @@ export default function NotificationBell() {
 
   const syncMissedNotifications = useCallback(async () => {
     if (!user) return;
-    // Prevent concurrent requests and enforce minimum interval between calls.
-    if (sinceInflightRef.current) return;
+    // Module-level lock: shared across ALL instances (Navbar + TopBar mount
+    // NotificationBell simultaneously — per-instance useRef doesn't work here).
+    if (_sinceInflight) return;
     const now = Date.now();
-    if (now - sinceLastCallRef.current < SINCE_MIN_INTERVAL_MS) return;
-    sinceInflightRef.current = true;
-    sinceLastCallRef.current = now;
+    if (now - _sinceLastCall < SINCE_MIN_INTERVAL_MS) return;
+    _sinceInflight = true;
+    _sinceLastCall = now;
     try {
       const { data } = await api.get('/notifications/since', {
         params: { lastEventId: lastEventIdRef.current || '0' },
@@ -113,7 +119,8 @@ export default function NotificationBell() {
     } catch (err) {
       logSoftError('syncMissedNotifications failed', err);
     } finally {
-      sinceInflightRef.current = false;
+      // Always release the lock so future calls can proceed.
+      _sinceInflight = false;
     }
   }, [user]);
 
