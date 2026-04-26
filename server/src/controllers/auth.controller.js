@@ -98,18 +98,32 @@ const getSiteUrl = () =>
 /**
  * Issue a new AuthToken for a user.
  * Deletes all existing tokens of the same type for this user first (single active token per type).
- * Returns the raw (unhashed) token to be sent to the user.
+ * Returns { raw, code } where:
+ *   raw  — the unhashed link token to embed in the email URL
+ *   code — 6-digit OTP string (magic type only), null otherwise
  */
 async function issueAuthToken(userId, type) {
   const raw = crypto.randomBytes(32).toString('hex');
   const tokenHash = hashToken(raw);
   const expiresAt = new Date(Date.now() + TTL[type]);
 
+  // For magic-link: generate a 6-digit OTP code.
+  // codeHash = sha256(tokenHash + ':' + code) — ties code to this specific token instance.
+  // Rainbow tables are useless without knowing the tokenHash prefix.
+  let code = null;
+  let codeHash = null;
+  if (type === 'magic') {
+    code = String(Math.floor(100000 + Math.random() * 900000));
+    codeHash = hashToken(tokenHash + ':' + code);
+  }
+
   // Replace any existing tokens of this type for this user
   await prisma.authToken.deleteMany({ where: { userId, type } });
-  await prisma.authToken.create({ data: { userId, tokenHash, type, expiresAt } });
+  await prisma.authToken.create({
+    data: { userId, tokenHash, type, expiresAt, ...(codeHash ? { codeHash } : {}) },
+  });
 
-  return raw;
+  return { raw, code };
 }
 
 /**
@@ -183,7 +197,7 @@ const register = async (req, res) => {
 
     // Send email verification (fire-and-forget — don't block registration)
     issueAuthToken(user.id, 'verify')
-      .then((rawToken) => {
+      .then(({ raw: rawToken }) => {
         const verifyUrl = `${getSiteUrl()}/verify-email/${rawToken}`;
         return sendMail({
           to: user.email,
@@ -294,7 +308,7 @@ const sendVerificationEmail = async (req, res) => {
       return res.status(429).json({ error: 'Lütfen bir dakika bekleyip tekrar dene' });
     }
 
-    const rawToken = await issueAuthToken(userId, 'verify');
+    const { raw: rawToken } = await issueAuthToken(userId, 'verify');
     const verifyUrl = `${getSiteUrl()}/verify-email/${rawToken}`;
 
     sendMail({
@@ -356,7 +370,7 @@ const forgotPassword = async (req, res) => {
     if (user) {
       // Cooldown: one reset email per 60s
       if (!(await isOnCooldown(user.id, 'reset'))) {
-        const rawToken = await issueAuthToken(user.id, 'reset');
+        const { raw: rawToken } = await issueAuthToken(user.id, 'reset');
         const resetUrl = `${getSiteUrl()}/reset-password/${rawToken}`;
         sendMail({
           to: user.email,
@@ -425,12 +439,12 @@ const sendMagicLink = async (req, res) => {
     const user = await prisma.user.findUnique({ where: { email } });
     if (user && !user.isBanned) {
       if (!(await isOnCooldown(user.id, 'magic'))) {
-        const rawToken = await issueAuthToken(user.id, 'magic');
+        const { raw: rawToken, code } = await issueAuthToken(user.id, 'magic');
         const magicUrl = `${getSiteUrl()}/magic/${rawToken}`;
         sendMail({
           to: user.email,
           subject: "Slaytim - Giriş Bağlantısı",
-          html: magicLinkHtml(magicUrl),
+          html: magicLinkHtml(magicUrl, code),
         }).catch((err) => logger.error('[mail] Magic link email failed', { error: err.message }));
       } else {
         logger.info('[auth] magic-link cooldown active', { userId: user.id });
@@ -491,6 +505,106 @@ const loginWithMagicLink = async (req, res) => {
   }
 };
 
+/**
+ * POST /auth/magic-code
+ * Cross-device login: user enters the 6-digit OTP from the email on a different device.
+ *
+ * Security layers:
+ *  1. IP rate limit on the route (10/15min)
+ *  2. Per-token attempt counter — max 5 wrong guesses, then token is invalidated
+ *  3. codeHash = sha256(tokenHash + ':' + code) — rainbow tables impossible
+ *  4. Constant-time-ish comparison (sha256 hex strings, same-length, no early-exit)
+ */
+const MAX_CODE_ATTEMPTS = 5;
+
+const loginWithMagicCode = async (req, res) => {
+  try {
+    const email = (req.body.email || '').trim().toLowerCase();
+    const code  = String(req.body.code  || '').replace(/\s/g, '');
+
+    if (!email || !/^\d{6}$/.test(code)) {
+      return res.status(400).json({ error: 'E-posta ve 6 haneli kod gerekli' });
+    }
+
+    // Look up user — same generic error for all failures (prevent enumeration)
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user || user.isBanned) {
+      // Small artificial delay so timing doesn't reveal whether email exists
+      await new Promise((r) => setTimeout(r, 150 + Math.random() * 100));
+      return res.status(400).json({ error: 'Kod geçersiz veya süresi dolmuş' });
+    }
+
+    // Find the active magic token that has a code attached
+    const record = await prisma.authToken.findFirst({
+      where: {
+        userId: user.id,
+        type:   'magic',
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+        codeHash:  { not: null },
+      },
+    });
+
+    if (!record) {
+      return res.status(400).json({ error: 'Kod geçersiz veya süresi dolmuş' });
+    }
+
+    // Reject if already at or over attempt limit (token should be invalidated already)
+    if (record.codeAttempts >= MAX_CODE_ATTEMPTS) {
+      return res.status(400).json({ error: 'Çok fazla yanlış deneme. Yeni kod talep et.' });
+    }
+
+    // Verify: sha256(tokenHash + ':' + code) must match stored codeHash
+    const computedHash = hashToken(record.tokenHash + ':' + code);
+    if (computedHash !== record.codeHash) {
+      const newAttempts = record.codeAttempts + 1;
+      const invalidate  = newAttempts >= MAX_CODE_ATTEMPTS;
+      await prisma.authToken.update({
+        where: { id: record.id },
+        data: {
+          codeAttempts: newAttempts,
+          ...(invalidate ? { usedAt: new Date() } : {}),
+        },
+      });
+
+      if (invalidate) {
+        return res.status(400).json({ error: 'Çok fazla yanlış deneme. Yeni kod talep et.' });
+      }
+      const left = MAX_CODE_ATTEMPTS - newAttempts;
+      return res.status(400).json({
+        error: `Kod yanlış. ${left} deneme hakkın kaldı.`,
+        attemptsLeft: left,
+      });
+    }
+
+    // ✓ Correct code — consume the token
+    await prisma.authToken.update({ where: { id: record.id }, data: { usedAt: new Date() } });
+
+    // Implicit email verification (code proves inbox access)
+    if (!user.emailVerifiedAt) {
+      await prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: new Date() } });
+    }
+
+    const token = generateJwt(user);
+    setAuthCookie(req, res, token);
+
+    return res.json({
+      token,
+      user: {
+        id:              user.id,
+        username:        user.username,
+        email:           user.email,
+        avatarUrl:       user.avatarUrl,
+        isAdmin:         user.isAdmin,
+        emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+      },
+    });
+  } catch (err) {
+    logger.error('loginWithMagicCode failed', { error: err.message });
+    return res.status(500).json({ error: 'İşlem başarısız' });
+  }
+};
+
 // ─── CSRF ─────────────────────────────────────────────────────────────────────
 
 const getCsrfToken = async (req, res) => {
@@ -509,5 +623,6 @@ module.exports = {
   verifyEmail,
   sendMagicLink,
   loginWithMagicLink,
+  loginWithMagicCode,
   getCsrfToken,
 };

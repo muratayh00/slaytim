@@ -152,16 +152,52 @@ function resetPasswordHtml(resetUrl) {
 
 // ─── Magic Link ────────────────────────────────────────────────────────────────
 
-function magicLinkHtml(magicUrl) {
+/**
+ * @param {string} magicUrl  - One-click login URL
+ * @param {string|null} code - 6-digit OTP for cross-device login (null = omit section)
+ */
+function magicLinkHtml(magicUrl, code) {
+  // Format code as "123 456" for readability
+  const formattedCode = code
+    ? `${code.slice(0, 3)}&thinsp;${code.slice(3)}`
+    : null;
+
+  const codeSection = formattedCode
+    ? `
+      <table width="100%" cellpadding="0" cellspacing="0"
+             style="margin-top:28px;border-top:1px solid #2a2a2a;">
+        <tr>
+          <td style="padding-top:24px;">
+            <p style="margin:0 0 6px;color:#aaa;font-size:13px;font-weight:600;
+                      text-transform:uppercase;letter-spacing:0.5px;">
+              Başka bir cihazda mısın?
+            </p>
+            <p style="margin:0 0 14px;color:#888;font-size:13px;line-height:1.5;">
+              Kodu giriş sayfasındaki &ldquo;Magic Link&rdquo; sekmesine gir.
+              15 dakika geçerli, tek kullanımlık.
+            </p>
+            <div style="display:inline-block;background:#111;border:1px solid #333;
+                        border-radius:12px;padding:14px 28px;text-align:center;">
+              <span style="font-size:32px;font-weight:800;color:#fff;
+                           letter-spacing:6px;font-variant-numeric:tabular-nums;">
+                ${formattedCode}
+              </span>
+            </div>
+          </td>
+        </tr>
+      </table>`
+    : '';
+
   return emailWrapper(`
     <h2 style="margin:0 0 8px;color:#fff;font-size:22px;font-weight:800;">Giriş Bağlantısı</h2>
     <p style="margin:0;color:#aaa;font-size:14px;line-height:1.6;">
-      Slaytim'e şifresiz giriş yapmak için aşağıdaki butona tıkla.<br />
-      Bu link yalnızca bir kez kullanılabilir.
+      <strong style="color:#ddd;">Bu cihazda</strong> giriş yapmak için butona tıkla.<br />
+      Bağlantı yalnızca bir kez kullanılabilir.
     </p>
     ${primaryButton(magicUrl, "Slaytim'e Giriş Yap")}
     ${fallbackLink(magicUrl)}
-    <p style="margin:24px 0 0;color:#555;font-size:12px;">Bu link 15 dakika geçerlidir.</p>
+    <p style="margin:20px 0 0;color:#555;font-size:12px;">Bu link 15 dakika geçerlidir.</p>
+    ${codeSection}
   `);
 }
 

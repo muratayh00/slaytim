@@ -3,7 +3,7 @@ const rateLimit = require('express-rate-limit');
 const {
   register, login, logout, me, forgotPassword, resetPassword,
   sendVerificationEmail, verifyEmail, sendMagicLink, loginWithMagicLink,
-  getCsrfToken,
+  loginWithMagicCode, getCsrfToken,
 } = require('../controllers/auth.controller');
 const { authenticate, optionalAuth } = require('../middleware/auth');
 
@@ -45,6 +45,16 @@ const tokenConsumeLimiter = rateLimit({
   message: { error: 'Çok fazla istek. Lütfen bekle.' },
 });
 
+// OTP code endpoint — tightest limiter (10 wrong guesses per 15 min per IP).
+// Per-token attempt counter (MAX_CODE_ATTEMPTS=5) provides secondary layer.
+const magicCodeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Çok fazla yanlış deneme. Lütfen bekle.' },
+});
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 // Standard auth
@@ -65,5 +75,6 @@ router.get('/verify-email/:token', tokenConsumeLimiter, verifyEmail);
 // Magic-link login
 router.post('/magic-link', emailSendLimiter, sendMagicLink);
 router.post('/magic/:token', tokenConsumeLimiter, loginWithMagicLink);
+router.post('/magic-code',  magicCodeLimiter,  loginWithMagicCode);
 
 module.exports = router;

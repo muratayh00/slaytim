@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, Zap, CheckCircle2 } from 'lucide-react';
+import {
+  Mail, Lock, Eye, EyeOff, Loader2, ArrowRight,
+  Zap, CheckCircle2, RotateCcw,
+} from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import toast from 'react-hot-toast';
 import { analytics } from '@/lib/analytics';
@@ -12,8 +15,70 @@ import api from '@/lib/api';
 
 type Tab = 'password' | 'magic';
 
+// ─── 6-digit OTP input ────────────────────────────────────────────────────────
+
+function OtpInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const refs = Array.from({ length: 6 }, () => useRef<HTMLInputElement>(null)); // eslint-disable-line react-hooks/rules-of-hooks
+
+  const handleKey = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !value[i] && i > 0) {
+      refs[i - 1].current?.focus();
+    }
+  };
+
+  const handleChange = (i: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const char = e.target.value.replace(/\D/g, '').slice(-1);
+    const arr = value.split('');
+    arr[i] = char;
+    const next = arr.join('').slice(0, 6);
+    onChange(next);
+    if (char && i < 5) {
+      refs[i + 1].current?.focus();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pasted) {
+      onChange(pasted);
+      const focusIdx = Math.min(pasted.length, 5);
+      refs[focusIdx].current?.focus();
+    }
+    e.preventDefault();
+  };
+
+  return (
+    <div className="flex gap-2 justify-center" onPaste={handlePaste}>
+      {Array.from({ length: 6 }, (_, i) => (
+        <input
+          key={i}
+          ref={refs[i]}
+          type="text"
+          inputMode="numeric"
+          maxLength={1}
+          value={value[i] ?? ''}
+          onChange={(e) => handleChange(i, e)}
+          onKeyDown={(e) => handleKey(i, e)}
+          className={`w-11 h-14 text-center text-xl font-bold rounded-xl border
+            bg-muted/40 focus:outline-none focus:ring-2 focus:ring-primary/30
+            focus:border-primary/60 focus:bg-card transition-all
+            ${value[i] ? 'border-primary/50 text-foreground' : 'border-border text-muted-foreground'}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function LoginPage() {
-  const { login } = useAuthStore();
+  const { login, hydrate } = useAuthStore();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('password');
 
@@ -26,6 +91,11 @@ export default function LoginPage() {
   const [magicEmail, setMagicEmail] = useState('');
   const [magicLoading, setMagicLoading] = useState(false);
   const [magicSent, setMagicSent] = useState(false);
+
+  // OTP code
+  const [code, setCode] = useState('');
+  const [codeLoading, setCodeLoading] = useState(false);
+  const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +128,8 @@ export default function LoginPage() {
     try {
       await api.post('/auth/magic-link', { email: magicEmail });
       setMagicSent(true);
+      setCode('');
+      setAttemptsLeft(null);
     } catch (err: any) {
       const status = Number(err?.response?.status || 0);
       if (status === 429) {
@@ -68,6 +140,49 @@ export default function LoginPage() {
     } finally {
       setMagicLoading(false);
     }
+  };
+
+  const handleCodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code.length !== 6) return;
+    setCodeLoading(true);
+    try {
+      const { data } = await api.post('/auth/magic-code', { email: magicEmail, code });
+      if (data?.token) {
+        await hydrate().catch(() => {});
+      }
+      analytics.login();
+      toast.success('Hoş geldin!');
+      router.push('/');
+    } catch (err: any) {
+      const status = Number(err?.response?.status || 0);
+      const serverErr: string = err?.response?.data?.error || '';
+      const left: number | undefined = err?.response?.data?.attemptsLeft;
+
+      if (status === 429) {
+        toast.error('Çok fazla deneme. Lütfen bekle.');
+      } else if (left !== undefined) {
+        setAttemptsLeft(left);
+        setCode('');
+        toast.error(serverErr || `Kod yanlış. ${left} deneme hakkın kaldı.`);
+      } else if (serverErr.includes('Yeni kod')) {
+        // Token fully invalidated — force resend
+        setMagicSent(false);
+        setCode('');
+        setAttemptsLeft(null);
+        toast.error('Çok fazla yanlış deneme. Lütfen yeni kod talep et.');
+      } else {
+        toast.error(serverErr || 'Kod geçersiz veya süresi dolmuş.');
+      }
+    } finally {
+      setCodeLoading(false);
+    }
+  };
+
+  const resetMagic = () => {
+    setMagicSent(false);
+    setCode('');
+    setAttemptsLeft(null);
   };
 
   const tabClass = (t: Tab) =>
@@ -167,27 +282,8 @@ export default function LoginPage() {
         {/* ── Magic link tab ── */}
         {tab === 'magic' && (
           <>
-            {magicSent ? (
-              <div className="text-center">
-                <div className="w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle2 className="w-7 h-7 text-emerald-500" />
-                </div>
-                <p className="font-bold mb-2">E-posta gönderildi</p>
-                <p className="text-sm text-muted-foreground mb-4">
-                  <strong>{magicEmail}</strong> adresine giriş bağlantısı gönderdik.
-                  Linke tıkladığında otomatik giriş yapılır.
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  E-posta gelmedi mi?{' '}
-                  <button
-                    onClick={() => setMagicSent(false)}
-                    className="text-primary font-semibold hover:underline"
-                  >
-                    Tekrar gönder
-                  </button>
-                </p>
-              </div>
-            ) : (
+            {/* ── Step 1: email form ── */}
+            {!magicSent && (
               <form onSubmit={handleMagicSubmit} className="space-y-4">
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   E-posta adresini gir, şifre gerekmeden tek kullanımlık bir giriş
@@ -212,14 +308,72 @@ export default function LoginPage() {
                   disabled={magicLoading}
                   className="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm flex items-center justify-center gap-2 shadow-button hover:opacity-90 transition-all disabled:opacity-60"
                 >
-                  {magicLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Zap className="w-4 h-4" />
-                  )}
+                  {magicLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
                   {magicLoading ? 'Gönderiliyor…' : 'Giriş Bağlantısı Gönder'}
                 </button>
               </form>
+            )}
+
+            {/* ── Step 2: sent state + OTP entry ── */}
+            {magicSent && (
+              <div className="space-y-6">
+                {/* Sent confirmation */}
+                <div className="flex items-start gap-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-3">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-400">E-posta gönderildi</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      <strong className="text-foreground/70">{magicEmail}</strong> adresine
+                      giriş bağlantısı ve 6 haneli kod gönderdik.
+                    </p>
+                  </div>
+                </div>
+
+                {/* OTP entry */}
+                <form onSubmit={handleCodeSubmit} className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="text-center">
+                      <p className="text-sm font-semibold text-foreground/90 mb-0.5">
+                        Bu cihazda giriş yapmak için kodu gir
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        E-postadaki 6 haneli kodu gir
+                        {attemptsLeft !== null && (
+                          <span className="text-amber-400 font-semibold ml-1">
+                            · {attemptsLeft} deneme hakkın kaldı
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    <OtpInput value={code} onChange={setCode} />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={codeLoading || code.length !== 6}
+                    className="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm flex items-center justify-center gap-2 shadow-button hover:opacity-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {codeLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                    {codeLoading ? 'Doğrulanıyor…' : 'Kodu Onayla ve Giriş Yap'}
+                  </button>
+                </form>
+
+                {/* Resend / back */}
+                <div className="border-t border-border pt-4 text-center">
+                  <p className="text-xs text-muted-foreground">
+                    E-posta gelmedi mi veya link&apos;i başka cihazda kullandın mı?{' '}
+                    <button
+                      type="button"
+                      onClick={resetMagic}
+                      className="text-primary font-semibold hover:underline inline-flex items-center gap-1"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      Yeni kod gönder
+                    </button>
+                  </p>
+                </div>
+              </div>
             )}
           </>
         )}
