@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
-import SlideoDetailPreview from '@/components/slideo/SlideoDetailPreview';
+import SlideoDetailPreview from '@/components/slideo/SlideoDetailPreviewNoSSR';
 import { buildSlidePath, buildSlideoPath, buildTopicPath, splitIdSlug } from '@/lib/url';
 import { getApiBaseUrl, getApiOrigin } from '@/lib/api-origin';
 

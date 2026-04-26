@@ -73,7 +73,7 @@ export default function SlideoDetailPreview({ slideoId, slideId, slideTitle, tit
   useEffect(() => {
     if (!canPreview) return;
     let cancelled = false;
-    api.get(`/slides/${slideId}/preview-meta`)
+    api.get(`/slides/${slideId}/preview-meta`, { timeout: 8_000 })
       .then(({ data }) => {
         if (cancelled) return;
         if (data?.previewMode === 'images' && Array.isArray(data.pages) && data.pages.length > 0) {

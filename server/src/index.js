@@ -493,7 +493,10 @@ async function runConversionQueueReconciler() {
       }),
     ]);
     if ((result?.reEnqueued || 0) > 0) {
-      logger.warn('[conversion] Reconciler re-enqueued missing jobs', result);
+      // Small counts (1–4, no failures) are normal operation — log at info.
+      // Only escalate to warn when something genuinely unexpected happened.
+      const logFn = (result.reEnqueued >= 5 || (result.failed || 0) > 0) ? 'warn' : 'info';
+      logger[logFn]('[conversion] Reconciler re-enqueued missing jobs', result);
     }
     if ((recovered?.recovered || 0) > 0) {
       logger.warn('[conversion] Auto recovered stuck processing jobs', recovered);
@@ -516,15 +519,20 @@ async function startServer() {
 
       dedup.init()
         .catch((err) => logger.error('[dedup] Init failed:', { error: err.message }));
-      queuePendingConversions()
-        .catch((err) => logger.error('[conversion] Queue warmup failed:', { error: err.message }));
-      runConversionQueueReconciler()
-        .catch((err) => logger.error('[conversion] Initial reconcile failed:', { error: err.message }));
+      // Run warmup first, then start the reconciler only after warmup settles.
+      // Running both concurrently caused a race: reconciler found slides that
+      // queuePendingConversions() hadn't enqueued yet → false "missing jobs" warn.
       const reconcileEveryMs = Math.max(10_000, Number(process.env.CONVERSION_RECONCILE_INTERVAL_MS || 60_000));
-      setInterval(() => {
-        runConversionQueueReconciler()
-          .catch((err) => logger.error('[conversion] Scheduled reconcile failed:', { error: err.message }));
-      }, reconcileEveryMs);
+      queuePendingConversions()
+        .catch((err) => logger.error('[conversion] Queue warmup failed:', { error: err.message }))
+        .finally(() => {
+          runConversionQueueReconciler()
+            .catch((err) => logger.error('[conversion] Initial reconcile failed:', { error: err.message }));
+          setInterval(() => {
+            runConversionQueueReconciler()
+              .catch((err) => logger.error('[conversion] Scheduled reconcile failed:', { error: err.message }));
+          }, reconcileEveryMs);
+        });
 
       // Signal PM2 that the app is ready (used with wait_ready: true in ecosystem.config.js)
       if (process.send) process.send('ready');
