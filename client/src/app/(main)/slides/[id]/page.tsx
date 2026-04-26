@@ -23,7 +23,7 @@ import SlideFlashcardsPanel from '@/components/shared/SlideFlashcardsPanel';
 import { analytics } from '@/lib/analytics';
 import { resolveFileUrl } from '@/lib/pdfRenderer';
 import { buildProfilePath, buildSlideoPath, buildTopicPath, splitIdSlug } from '@/lib/url';
-import { getApiOrigin } from '@/lib/api-origin';
+import { getApiOrigin, API_BASE_URL } from '@/lib/api-origin';
 import AdUnit from '@/components/shared/AdUnit';
 
 // PDF/canvas-based viewers are client-only — skip SSR to prevent hydration mismatches (#422, #425)
@@ -713,7 +713,7 @@ export default function SlideDetailPage({ initialSlide }: { initialSlide?: any }
           await new Promise<void>((resolve, reject) => {
             img.onload = () => resolve();
             img.onerror = reject;
-            img.src = `/api/slides/${id}/page-image/1`;
+            img.src = `${API_BASE_URL}/slides/${id}/page-image/1`;
           });
           const targetW = Math.min(720, img.naturalWidth);
           const targetH = Math.max(1, Math.round((targetW / img.naturalWidth) * img.naturalHeight));
@@ -959,7 +959,7 @@ export default function SlideDetailPage({ initialSlide }: { initialSlide?: any }
           img.onload = () => resolve();
           img.onerror = reject;
           // Use same-origin proxy so canvas drawImage() never taints the canvas
-          img.src = `/api/slides/${id}/page-image/${currentPage}`;
+          img.src = `${API_BASE_URL}/slides/${id}/page-image/${currentPage}`;
         });
         const targetW = Math.min(720, img.naturalWidth);
         const targetH = Math.max(1, Math.round((targetW / img.naturalWidth) * img.naturalHeight));
