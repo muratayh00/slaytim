@@ -52,7 +52,7 @@ export default function ForgotPasswordPage() {
             </div>
             <p className="font-bold mb-2">Kontrol et</p>
             <p className="text-sm text-muted-foreground mb-6">
-              Eğer <strong>{email}</strong> kayıtlıysa, sıfırlama bağlantısı 1 saat içinde geçerlidir.
+              Eğer <strong>{email}</strong> kayıtlıysa, sıfırlama bağlantısı 30 dakika geçerlidir.
             </p>
             <p className="text-xs text-muted-foreground">
               E-posta gelmediyse spam klasörünü kontrol et veya{' '}

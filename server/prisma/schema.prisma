@@ -22,6 +22,7 @@ model User {
   notifyOnLike    Boolean @default(true) @map("notify_on_like")
   notifyOnComment Boolean @default(true) @map("notify_on_comment")
   notifyOnFollow  Boolean @default(true) @map("notify_on_follow")
+  emailVerifiedAt DateTime? @map("email_verified_at")
   createdAt    DateTime @default(now()) @map("created_at")
 
   topics             Topic[]
@@ -46,6 +47,7 @@ model User {
   warnings           UserWarning[]
   userBadges         UserBadge[]
   resetTokens        PasswordResetToken[]
+  authTokens         AuthToken[]
   slideos            Slideo[]
   slideoLikes        SlideoLike[]
   slideoSaves        SlideoSave[]
@@ -719,6 +721,25 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("password_reset_tokens")
+}
+
+// Unified token table for email verification, password reset, and magic-link login.
+// Raw token is NEVER stored — only sha256(token) is persisted.
+// type: 'verify' (24h) | 'reset' (30m) | 'magic' (15m)
+model AuthToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  type      String    // verify | reset | magic
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@index([expiresAt])
+  @@map("auth_tokens")
 }
 
 model SlideoSeries {

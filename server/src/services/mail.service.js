@@ -50,24 +50,119 @@ async function sendMail({ to, subject, html }) {
   });
 }
 
-function resetPasswordHtml(resetUrl) {
-  return `
-    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #111;">
-      <h2 style="margin-bottom: 8px;">Şifre Sıfırlama</h2>
-      <p style="color: #555; margin-bottom: 24px;">
-        Slaytim hesabınız için şifre sıfırlama talebinde bulundunuz.<br>
-        Aşağıdaki butona tıklayarak yeni şifrenizi belirleyin.
-      </p>
-      <a href="${resetUrl}"
-        style="display: inline-block; background: #6366f1; color: #fff; font-weight: 700;
-               padding: 12px 28px; border-radius: 12px; text-decoration: none; font-size: 14px;">
-        Şifremi Sıfırla
-      </a>
-      <p style="color: #999; font-size: 12px; margin-top: 24px;">
-        Bu link 1 saat geçerlidir. Eğer bu talebi siz yapmadıysanız bu e-postayı görmezden gelin.
-      </p>
-    </div>
-  `;
+// ─── Shared layout wrapper ─────────────────────────────────────────────────────
+
+function emailWrapper(content) {
+  return `<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slaytim</title>
+</head>
+<body style="margin:0;padding:0;background:#0f0f0f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f0f0f;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" style="max-width:480px;background:#1a1a1a;border-radius:16px;border:1px solid #2a2a2a;overflow:hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="padding:28px 32px 20px;border-bottom:1px solid #2a2a2a;">
+              <table cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <div style="width:32px;height:32px;background:#6366f1;border-radius:8px;display:inline-block;text-align:center;line-height:32px;vertical-align:middle;">
+                      <span style="color:#fff;font-size:16px;font-weight:800;">S</span>
+                    </div>
+                  </td>
+                  <td style="padding-left:10px;vertical-align:middle;">
+                    <span style="font-size:17px;font-weight:800;color:#fff;letter-spacing:-0.3px;">slaytim</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Content -->
+          <tr>
+            <td style="padding:32px;">
+              ${content}
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding:20px 32px;border-top:1px solid #2a2a2a;text-align:center;">
+              <p style="margin:0;color:#555;font-size:12px;line-height:1.5;">
+                Bu e-posta Slaytim tarafından gönderilmiştir.<br />
+                Eğer bu işlemi siz yapmadıysanız bu e-postayı görmezden gelin.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 }
 
-module.exports = { sendMail, resetPasswordHtml };
+function primaryButton(href, label) {
+  return `<a href="${href}"
+    style="display:inline-block;background:#6366f1;color:#fff;font-weight:700;
+           padding:14px 32px;border-radius:12px;text-decoration:none;font-size:14px;
+           margin-top:24px;margin-bottom:8px;">
+    ${label}
+  </a>`;
+}
+
+function fallbackLink(href) {
+  return `<p style="margin:20px 0 0;word-break:break-all;">
+    <span style="color:#555;font-size:12px;">Buton çalışmıyorsa şu adresi kopyala:</span><br />
+    <a href="${href}" style="color:#6366f1;font-size:12px;word-break:break-all;">${href}</a>
+  </p>`;
+}
+
+// ─── Email Verification ────────────────────────────────────────────────────────
+
+function verifyEmailHtml(verifyUrl) {
+  return emailWrapper(`
+    <h2 style="margin:0 0 8px;color:#fff;font-size:22px;font-weight:800;">E-posta adresini doğrula</h2>
+    <p style="margin:0;color:#aaa;font-size:14px;line-height:1.6;">
+      Slaytim'e hoş geldin! Hesabını aktifleştirmek için aşağıdaki butona tıkla.
+    </p>
+    ${primaryButton(verifyUrl, 'E-posta Adresimi Doğrula')}
+    ${fallbackLink(verifyUrl)}
+    <p style="margin:24px 0 0;color:#555;font-size:12px;">Bu link 24 saat geçerlidir.</p>
+  `);
+}
+
+// ─── Password Reset ────────────────────────────────────────────────────────────
+
+function resetPasswordHtml(resetUrl) {
+  return emailWrapper(`
+    <h2 style="margin:0 0 8px;color:#fff;font-size:22px;font-weight:800;">Şifre Sıfırlama</h2>
+    <p style="margin:0;color:#aaa;font-size:14px;line-height:1.6;">
+      Slaytim hesabın için şifre sıfırlama talebinde bulundun.<br />
+      Aşağıdaki butona tıklayarak yeni şifreni belirle.
+    </p>
+    ${primaryButton(resetUrl, 'Şifremi Sıfırla')}
+    ${fallbackLink(resetUrl)}
+    <p style="margin:24px 0 0;color:#555;font-size:12px;">Bu link 30 dakika geçerlidir.</p>
+  `);
+}
+
+// ─── Magic Link ────────────────────────────────────────────────────────────────
+
+function magicLinkHtml(magicUrl) {
+  return emailWrapper(`
+    <h2 style="margin:0 0 8px;color:#fff;font-size:22px;font-weight:800;">Giriş Bağlantısı</h2>
+    <p style="margin:0;color:#aaa;font-size:14px;line-height:1.6;">
+      Slaytim'e şifresiz giriş yapmak için aşağıdaki butona tıkla.<br />
+      Bu link yalnızca bir kez kullanılabilir.
+    </p>
+    ${primaryButton(magicUrl, "Slaytim'e Giriş Yap")}
+    ${fallbackLink(magicUrl)}
+    <p style="margin:24px 0 0;color:#555;font-size:12px;">Bu link 15 dakika geçerlidir.</p>
+  `);
+}
+
+module.exports = { sendMail, verifyEmailHtml, resetPasswordHtml, magicLinkHtml };

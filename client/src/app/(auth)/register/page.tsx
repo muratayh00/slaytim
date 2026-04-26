@@ -1,10 +1,10 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, Eye, EyeOff, Loader2, ArrowRight, Sparkles } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Loader2, ArrowRight, Sparkles, MailCheck } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import toast from 'react-hot-toast';
 import { analytics } from '@/lib/analytics';
@@ -15,18 +15,20 @@ export default function RegisterPage() {
   const [form, setForm] = useState({ username: '', email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (form.password.length < 8) return toast.error('Sifre en az 8 karakter olmali');
+    if (form.password.length < 8) return toast.error('Şifre en az 8 karakter olmalı');
     setLoading(true);
     try {
       await register(form.username, form.email, form.password);
       analytics.signUp();
-      toast.success('Hesabin olusturuldu!');
-      router.push('/');
+      setRegisteredEmail(form.email);
+      // Redirect after brief delay so user sees the success notice
+      setTimeout(() => router.push('/'), 3500);
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Kayit basarisiz');
+      toast.error(err?.response?.data?.error || 'Kayıt başarısız');
     } finally {
       setLoading(false);
     }
@@ -34,6 +36,36 @@ export default function RegisterPage() {
 
   const inputClass =
     'w-full pl-10 pr-4 py-3 text-sm rounded-xl border border-border bg-muted/40 focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/50 focus:bg-card transition-all';
+
+  if (registeredEmail) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+        className="w-full max-w-[420px]"
+      >
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-extrabold mb-2.5 tracking-tight">Hesabın oluşturuldu!</h1>
+          <p className="text-muted-foreground text-[15px]">Bir adım kaldı</p>
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl p-8 shadow-card text-center">
+          <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <MailCheck className="w-7 h-7 text-primary" />
+          </div>
+          <p className="font-bold text-lg mb-2">E-postanı kontrol et</p>
+          <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+            <strong>{registeredEmail}</strong> adresine bir doğrulama bağlantısı gönderdik.
+            Bağlantıya tıklayarak hesabını aktifleştir.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Şimdi doğrulama zorunlu değil — ana sayfaya yönlendiriliyorsun…
+          </p>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -45,16 +77,16 @@ export default function RegisterPage() {
       <div className="text-center mb-8">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-bold mb-4">
           <Sparkles className="w-3.5 h-3.5" />
-          Ucretsiz, Reklamsiz
+          Ücretsiz, Reklamsız
         </div>
-        <h1 className="text-3xl font-extrabold mb-2.5 tracking-tight">Slaytim'e katil</h1>
-        <p className="text-muted-foreground text-[15px]">Slayt paylas, toplulugu buyut</p>
+        <h1 className="text-3xl font-extrabold mb-2.5 tracking-tight">Slaytim&apos;e katıl</h1>
+        <p className="text-muted-foreground text-[15px]">Slayt paylaş, topluluğu büyüt</p>
       </div>
 
       <div className="bg-card border border-border rounded-2xl p-8 shadow-card">
         <form onSubmit={handleSubmit} className="space-y-4">
           {[
-            { label: 'Kullanici adi', type: 'text', icon: User, key: 'username', placeholder: 'kullaniciadiniz' },
+            { label: 'Kullanıcı adı', type: 'text', icon: User, key: 'username', placeholder: 'kullaniciadiniz' },
             { label: 'E-posta', type: 'email', icon: Mail, key: 'email', placeholder: 'ornek@email.com' },
           ].map((field) => (
             <div key={field.key} className="space-y-1.5">
@@ -81,7 +113,7 @@ export default function RegisterPage() {
           ))}
 
           <div className="space-y-1.5">
-            <label className="text-sm font-semibold text-foreground/90">Sifre</label>
+            <label className="text-sm font-semibold text-foreground/90">Şifre</label>
             <div className="relative">
               <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <input
@@ -110,7 +142,7 @@ export default function RegisterPage() {
             className="w-full mt-2 py-3 rounded-xl bg-primary text-white font-bold text-sm flex items-center justify-center gap-2 shadow-button hover:opacity-90 hover:shadow-button-hover transition-all disabled:opacity-60"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-            {loading ? 'Hesap olusturuluyor...' : 'Ucretsiz Basla'}
+            {loading ? 'Hesap oluşturuluyor…' : 'Ücretsiz Başla'}
           </button>
         </form>
 
@@ -121,9 +153,9 @@ export default function RegisterPage() {
         </div>
 
         <p className="text-center text-sm text-muted-foreground">
-          Zaten uye misin?{' '}
+          Zaten üye misin?{' '}
           <Link href="/login" className="text-primary font-bold hover:underline underline-offset-2">
-            Giris yap
+            Giriş yap
           </Link>
         </p>
       </div>
