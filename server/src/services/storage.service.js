@@ -69,6 +69,24 @@ async function signStorageKey(key) {
   );
 }
 
+/**
+ * Stream an object directly from R2/S3 via the AWS SDK (server-to-server).
+ * Returns { body: Readable, contentType: string, contentLength: number|null }
+ * or null if remote storage is not configured.
+ * Used by the page-image proxy endpoint so the browser never contacts R2 directly.
+ */
+async function streamObject(key) {
+  const c = getClient();
+  if (!c) return null;
+  if (!key || typeof key !== 'string') return null;
+  const result = await c.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+  return {
+    body: result.Body,
+    contentType: result.ContentType || 'image/webp',
+    contentLength: result.ContentLength ?? null,
+  };
+}
+
 async function putLocalFile(filePath, key, contentType) {
   const c = getClient();
   if (!c) {
@@ -260,4 +278,5 @@ module.exports = {
   toUploadsUrl,
   extractStorageKeyFromUrl,
   deleteStoredObject,
+  streamObject,
 };

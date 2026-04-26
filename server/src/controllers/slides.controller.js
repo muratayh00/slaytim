@@ -15,6 +15,8 @@ const {
   deleteStoredObject,
   resolveStorageReadUrl,
   toCanonicalMediaUrl,
+  extractStorageKeyFromUrl,
+  streamObject,
 } = require('../services/storage.service');
 const { notifyTopicSubscribers } = require('../services/topic-subscription.service');
 const logger = require('../lib/logger');
@@ -1715,6 +1717,60 @@ const getMyReactions = async (req, res) => {
   }
 };
 
+/**
+ * GET /slides/:id/page-image/:page
+ *
+ * Proxy a single WebP preview page from R2 / local storage with CORS headers
+ * so the browser can draw it onto a <canvas> without tainting it.
+ * This avoids having the browser hit R2 directly (which has no CORS config).
+ */
+const getPageImage = async (req, res) => {
+  try {
+    const slideId = Number(req.params.id);
+    const pageNum  = Number(req.params.page);
+    if (!Number.isInteger(slideId) || slideId <= 0 ||
+        !Number.isInteger(pageNum)  || pageNum  <= 0) {
+      return res.status(400).end();
+    }
+
+    const asset = await prisma.slidePreviewAsset.findFirst({
+      where:  { slideId, pageNumber: pageNum },
+      select: { url: true },
+    });
+    if (!asset) return res.status(404).end();
+
+    // Allow any origin so canvas drawImage() never taints the canvas.
+    // Preview images are not private — they are already served to anonymous users.
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=300');
+
+    if (!isRemoteEnabled()) {
+      // Local disk mode
+      const uploadsRoot = path.resolve(__dirname, '../../uploads');
+      const relKey = asset.url.replace(/^\/uploads\//, '');
+      const localPath = path.resolve(uploadsRoot, relKey);
+      if (!localPath.startsWith(uploadsRoot + path.sep) && localPath !== uploadsRoot) {
+        return res.status(400).end();
+      }
+      if (!fs.existsSync(localPath)) return res.status(404).end();
+      res.setHeader('Content-Type', 'image/webp');
+      return fs.createReadStream(localPath).pipe(res);
+    }
+
+    // Remote (R2 / S3): stream via AWS SDK — server-to-server, no CORS restriction
+    const key = extractStorageKeyFromUrl(asset.url);
+    if (!key) return res.status(404).end();
+    const stream = await streamObject(key);
+    if (!stream) return res.status(404).end();
+    res.setHeader('Content-Type', stream.contentType);
+    if (stream.contentLength != null) res.setHeader('Content-Length', String(stream.contentLength));
+    stream.body.pipe(res);
+  } catch (err) {
+    logger.error('[slides] getPageImage error:', { error: err?.message });
+    if (!res.headersSent) res.status(502).end();
+  }
+};
+
 module.exports = {
   getByTopic,
   getOne,
@@ -1739,6 +1795,7 @@ module.exports = {
   trackDownload,
   getPreviewMeta,
   getPdfForPreview,
+  getPageImage,
   remove,
   getRelated,
   retryConversion,

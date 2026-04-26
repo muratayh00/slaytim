@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { X, Loader2, Play, AlertTriangle } from 'lucide-react';
+import { X, Loader2, Play, AlertTriangle, CheckCircle2, ExternalLink } from 'lucide-react';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { loadPdfDocument, renderPageToCanvas } from '@/lib/pdfRenderer';
+import { buildSlideoPath } from '@/lib/url';
 
 interface Slide {
   id: number;
@@ -56,6 +57,7 @@ export default function CreateSlideoModal({ slide, onClose, onCreated }: Props) 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [createdSlideo, setCreatedSlideo] = useState<{ id: number; title: string } | null>(null);
 
   // Determine whether to use image or PDF.js mode
   const useImageMode = pageImages.length > 0;
@@ -189,16 +191,19 @@ export default function CreateSlideoModal({ slide, onClose, onCreated }: Props) 
 
     setSubmitting(true);
     try {
-      await api.post('/slideo-v3/from-slide', {
+      const { data } = await api.post('/slideo-v3/from-slide', {
         slideId: slide.id,
         title: title.trim(),
         description: description.trim() || null,
         pageIndices: selectedPages,
         coverPage: selectedPages[0],
       });
-      toast.success('Slideo oluşturuldu');
       onCreated?.();
-      onClose();
+      // Show success screen — user can navigate or close explicitly
+      setCreatedSlideo({
+        id: data.slideoId ?? data.slideo?.id,
+        title: data.slideo?.title || title.trim(),
+      });
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Oluşturulamadı');
     } finally {
@@ -239,6 +244,37 @@ export default function CreateSlideoModal({ slide, onClose, onCreated }: Props) 
         onClick={(e) => e.stopPropagation()}
         className="bg-card border border-border rounded-lg shadow-card w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden"
       >
+        {/* ── Success screen ── shown after API call succeeds */}
+        {createdSlideo && (
+          <div className="flex flex-col items-center justify-center gap-6 px-8 py-16 text-center">
+            <CheckCircle2 className="w-14 h-14 text-emerald-500" />
+            <div>
+              <p className="text-xl font-extrabold mb-1">Slideo oluşturuldu!</p>
+              <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                "{createdSlideo.title}" başarıyla kaydedildi.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
+              <a
+                href={buildSlideoPath({ id: createdSlideo.id, title: createdSlideo.title })}
+                className="flex items-center justify-center gap-2 flex-1 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:opacity-90 transition-opacity"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Slideo&apos;ya git
+              </a>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-accent transition-colors"
+              >
+                Kapat
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Main form — hidden after success ── */}
+        {!createdSlideo && (<>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <div>
             <h2 className="font-semibold text-base flex items-center gap-2">
@@ -510,6 +546,7 @@ export default function CreateSlideoModal({ slide, onClose, onCreated }: Props) 
             </button>
           </div>
         )}
+        </>)}
       </motion.div>
     </motion.div>
   );

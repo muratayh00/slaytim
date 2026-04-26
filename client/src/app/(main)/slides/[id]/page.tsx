@@ -704,7 +704,8 @@ export default function SlideDetailPage({ initialSlide }: { initialSlide?: any }
       try {
         let imageDataUrl = '';
 
-        // Prefer ImageSlideViewer page-1 URL (available immediately, no canvas needed)
+        // Prefer ImageSlideViewer page-1 — load via same-origin proxy so canvas
+        // drawImage() never taints the canvas (avoids direct browser→R2 CORS).
         const page1 = previewMeta?.pages?.find((p) => p.pageNumber === 1);
         if (page1?.url) {
           const img = new window.Image();
@@ -712,7 +713,7 @@ export default function SlideDetailPage({ initialSlide }: { initialSlide?: any }
           await new Promise<void>((resolve, reject) => {
             img.onload = () => resolve();
             img.onerror = reject;
-            img.src = page1.url;
+            img.src = `/api/slides/${id}/page-image/1`;
           });
           const targetW = Math.min(720, img.naturalWidth);
           const targetH = Math.max(1, Math.round((targetW / img.naturalWidth) * img.naturalHeight));
@@ -957,7 +958,8 @@ export default function SlideDetailPage({ initialSlide }: { initialSlide?: any }
         await new Promise<void>((resolve, reject) => {
           img.onload = () => resolve();
           img.onerror = reject;
-          img.src = pageData.url;
+          // Use same-origin proxy so canvas drawImage() never taints the canvas
+          img.src = `/api/slides/${id}/page-image/${currentPage}`;
         });
         const targetW = Math.min(720, img.naturalWidth);
         const targetH = Math.max(1, Math.round((targetW / img.naturalWidth) * img.naturalHeight));
