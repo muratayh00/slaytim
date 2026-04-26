@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { X, Loader2, Play, AlertTriangle } from 'lucide-react';
@@ -435,7 +434,14 @@ export default function CreateSlideoModal({ slide, onClose, onCreated }: Props) 
                           title={`Sayfa ${p}`}
                         >
                           {img ? (
-                            <Image src={img.url} alt={`Sayfa ${p}`} fill className="object-cover" />
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={img.url}
+                              alt={`Sayfa ${p}`}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                              decoding="async"
+                            />
                           ) : (
                             <div className="w-full h-full bg-muted flex items-center justify-center">
                               <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />

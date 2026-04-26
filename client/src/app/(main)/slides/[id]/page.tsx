@@ -1073,6 +1073,7 @@ export default function SlideDetailPage({ initialSlide }: { initialSlide?: any }
         href={slide.topic?.id
           ? buildTopicPath({ id: slide.topic.id, slug: slide.topic.slug, title: slide.topic.title })
           : '/kesfet'}
+        prefetch={false}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors group"
       >
         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
@@ -1312,6 +1313,7 @@ export default function SlideDetailPage({ initialSlide }: { initialSlide?: any }
             {slide.topic && (
               <Link
                 href={buildTopicPath({ id: slide.topic.id, slug: slide.topic.slug, title: slide.topic.title })}
+                prefetch={false}
                 className="text-xs text-primary hover:underline flex items-center gap-1 font-medium ml-auto"
               >
                 <ExternalLink className="w-3 h-3" />
@@ -1409,6 +1411,7 @@ export default function SlideDetailPage({ initialSlide }: { initialSlide?: any }
                   <Link
                     key={s.id}
                     href={buildSlideoPath({ id: s.id, title: s.title })}
+                    prefetch={false}
                     className="group rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-card transition-all overflow-hidden"
                   >
                     <div className="aspect-video bg-black/80 relative flex items-center justify-center overflow-hidden">
