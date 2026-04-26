@@ -84,9 +84,9 @@ export default function Navbar() {
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
   };
 
-  const handleLogout = () => {
-    logout();
-    toast.success('Çıkış Yapildi');
+  const handleLogout = async () => {
+    await logout();
+    toast.success('Çıkış Yapıldı');
     router.push('/');
   };
 

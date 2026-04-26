@@ -132,10 +132,15 @@ export default function LoginPage() {
       setAttemptsLeft(null);
     } catch (err: any) {
       const status = Number(err?.response?.status || 0);
-      if (status === 429) {
+      const msg: string = err?.response?.data?.error || '';
+      if (status === 404) {
+        toast.error('Bu e-posta Slaytim\'de kayıtlı değil. Önce kayıt ol.');
+      } else if (status === 429) {
         toast.error('Lütfen bir dakika bekleyip tekrar dene.');
+      } else if (status === 403) {
+        toast.error('Hesabın askıya alınmış.');
       } else {
-        toast.error('Bir hata oluştu, tekrar dene.');
+        toast.error(msg || 'Bir hata oluştu, tekrar dene.');
       }
     } finally {
       setMagicLoading(false);

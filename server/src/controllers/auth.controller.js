@@ -437,22 +437,29 @@ const sendMagicLink = async (req, res) => {
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (user && !user.isBanned) {
-      if (!(await isOnCooldown(user.id, 'magic'))) {
-        const { raw: rawToken, code } = await issueAuthToken(user.id, 'magic');
-        const magicUrl = `${getSiteUrl()}/magic/${rawToken}`;
-        sendMail({
-          to: user.email,
-          subject: "Slaytim - Giriş Bağlantısı",
-          html: magicLinkHtml(magicUrl, code),
-        }).catch((err) => logger.error('[mail] Magic link email failed', { error: err.message }));
-      } else {
-        logger.info('[auth] magic-link cooldown active', { userId: user.id });
-      }
+
+    // Explicitly inform the user if the email is not registered.
+    // (Trade-off: email enumeration possible, but required UX per product decision.)
+    if (!user) {
+      return res.status(404).json({ error: 'Bu e-posta adresi Slaytim\'de kayıtlı değil.' });
+    }
+    if (user.isBanned) {
+      return res.status(403).json({ error: 'Hesabınız askıya alındı.' });
     }
 
-    // Always return same message (prevent email enumeration)
-    return res.json({ message: 'Eğer bu e-posta kayıtlıysa, giriş bağlantısı gönderildi.' });
+    if (await isOnCooldown(user.id, 'magic')) {
+      return res.status(429).json({ error: 'Lütfen bir dakika bekleyip tekrar dene.' });
+    }
+
+    const { raw: rawToken, code } = await issueAuthToken(user.id, 'magic');
+    const magicUrl = `${getSiteUrl()}/magic/${rawToken}`;
+    sendMail({
+      to: user.email,
+      subject: 'Slaytim - Giriş Bağlantısı',
+      html: magicLinkHtml(magicUrl, code),
+    }).catch((err) => logger.error('[mail] Magic link email failed', { error: err.message }));
+
+    return res.json({ message: 'Giriş bağlantısı gönderildi.' });
   } catch (err) {
     logger.error('sendMagicLink failed', { error: err.message });
     return res.status(500).json({ error: 'İşlem başarısız' });
