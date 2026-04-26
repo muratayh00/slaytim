@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import {
   Heart, Bookmark, Share2, ExternalLink, Loader2, Play, ChevronRight,
-  RefreshCw,
+  RefreshCw, Copy, Check, X,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,7 @@ import { trackSlideoViewWithRetry } from '@/lib/trackSlideoView';
 import { useAuthStore } from '@/store/auth';
 import toast from 'react-hot-toast';
 import { buildSlideoPath, buildSlidePath, buildTopicPath } from '@/lib/url';
+import { shareUrl } from '@/lib/shareUrl';
 
 export interface SlideoItem {
   id: number;
@@ -98,6 +99,11 @@ export default function SlideoViewer({
 
   // Heart double-tap animation
   const [heartAnim, setHeartAnim] = useState<{ id: number; x: number; y: number } | null>(null);
+
+  // Share fallback (shown when clipboard is blocked)
+  const [showShareFallback, setShowShareFallback] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const shareInputRef = useRef<HTMLInputElement>(null);
 
   // Related slideos
   const [related, setRelated] = useState<{ sameCreator: SlideoItem[]; sameTopic: SlideoItem[] } | null>(null);
@@ -362,44 +368,25 @@ export default function SlideoViewer({
 
   const handleShare = useCallback(async () => {
     const url = `${window.location.origin}${buildSlideoPath({ id: slideo.id, title: slideo.title })}`;
-
-    // Mobile: Web Share API (native share sheet)
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        await navigator.share({ title: slideo.title, url });
-        if (user) api.post(`/slideo/${slideo.id}/share`, { variant: feedVariant, subjectKey: feedSubjectKey }).catch(() => {});
-        return;
-      } catch (e: any) {
-        // User cancelled — don't fall through to clipboard
-        if (e?.name === 'AbortError') return;
-      }
-    }
-
-    // Desktop: Clipboard API with execCommand fallback
-    let copied = false;
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      try { await navigator.clipboard.writeText(url); copied = true; } catch {}
-    }
-    if (!copied) {
-      // execCommand fallback for browsers that block Clipboard API
-      try {
-        const el = document.createElement('textarea');
-        el.value = url;
-        el.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
-        document.body.appendChild(el);
-        el.focus();
-        el.select();
-        copied = document.execCommand('copy');
-        document.body.removeChild(el);
-      } catch {}
-    }
-
-    if (copied) {
+    const result = await shareUrl(url, slideo.title);
+    if (result.userCancelled) return;
+    if (result.ok) {
       if (user) api.post(`/slideo/${slideo.id}/share`, { variant: feedVariant, subjectKey: feedSubjectKey }).catch(() => {});
       toast.success('Link kopyalandı');
     } else {
-      toast.error('Kopyalanamadı, linki elle kopyala:\n' + url, { duration: 6000 });
+      // All clipboard methods failed — show visible URL input
+      setShowShareFallback(true);
+      setTimeout(() => shareInputRef.current?.select(), 50);
     }
+  }, [slideo.id, slideo.title, user, feedVariant, feedSubjectKey]);
+
+  const handleManualShareCopy = useCallback(async () => {
+    const url = `${window.location.origin}${buildSlideoPath({ id: slideo.id, title: slideo.title })}`;
+    try { await navigator.clipboard.writeText(url); } catch { shareInputRef.current?.select(); }
+    setShareCopied(true);
+    if (user) api.post(`/slideo/${slideo.id}/share`, { variant: feedVariant, subjectKey: feedSubjectKey }).catch(() => {});
+    toast.success('Link kopyalandı');
+    setTimeout(() => setShareCopied(false), 2000);
   }, [slideo.id, slideo.title, user, feedVariant, feedSubjectKey]);
 
   // ?? Keyboard shortcuts ??????????????????????????????????????????????????????
@@ -715,6 +702,50 @@ export default function SlideoViewer({
           </div>
         </div>
       </div>
+
+      {/* ?? Share fallback — shown when clipboard is blocked ?? */}
+      <AnimatePresence>
+        {showShareFallback && (
+          <motion.div
+            key="share-fallback"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.18 }}
+            className="absolute bottom-[calc(5rem+env(safe-area-inset-bottom))] inset-x-3 z-30 rounded-2xl bg-black/90 border border-white/15 backdrop-blur-md p-3"
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] font-semibold text-white/60">Linki kopyalayın</p>
+              <button
+                type="button"
+                onClick={() => setShowShareFallback(false)}
+                className="w-5 h-5 flex items-center justify-center rounded-md hover:bg-white/10 transition-colors"
+              >
+                <X className="w-3 h-3 text-white/60" />
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <input
+                ref={shareInputRef}
+                readOnly
+                value={`${typeof window !== 'undefined' ? window.location.origin : ''}${buildSlideoPath({ id: slideo.id, title: slideo.title })}`}
+                onFocus={(e) => e.target.select()}
+                className="flex-1 min-w-0 px-3 py-1.5 text-[11px] rounded-lg border border-white/15 bg-white/10 text-white font-mono truncate focus:outline-none focus:ring-1 focus:ring-white/30"
+              />
+              <button
+                type="button"
+                onClick={handleManualShareCopy}
+                className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg border border-white/15 bg-white/10 hover:bg-white/20 transition-colors"
+                title="Kopyala"
+              >
+                {shareCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-white/70" />}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ?? End-of-slideo overlay ?? */}
       <AnimatePresence>

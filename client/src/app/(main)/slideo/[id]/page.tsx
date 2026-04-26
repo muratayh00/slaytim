@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import SlideoDetailPreview from '@/components/slideo/SlideoDetailPreviewNoSSR';
+import SlideoShareButtonNoSSR from '@/components/slideo/SlideoShareButtonNoSSR';
 import { buildSlidePath, buildSlideoPath, buildTopicPath, splitIdSlug } from '@/lib/url';
 import { getApiBaseUrl, getApiOrigin } from '@/lib/api-origin';
 
@@ -162,6 +163,10 @@ export default async function SlideoDetailPage({
               Konuya git
             </Link>
           )}
+          <SlideoShareButtonNoSSR
+            url={`${BASE_URL}${buildSlideoPath({ id: slideo.id, title: slideo.title })}`}
+            title={slideo.title}
+          />
         </div>
       </div>
     </main>

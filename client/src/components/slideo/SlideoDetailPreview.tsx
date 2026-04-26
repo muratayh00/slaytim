@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight, Loader2, Share2, RefreshCw, ExternalLink, Play } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Share2, RefreshCw, ExternalLink, Play, Copy, Check, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
@@ -11,6 +11,7 @@ import { useAuthStore } from '@/store/auth';
 import { trackSlideoViewWithRetry } from '@/lib/trackSlideoView';
 import { cn } from '@/lib/utils';
 import { buildSlidePath, buildSlideoPath } from '@/lib/url';
+import { shareUrl } from '@/lib/shareUrl';
 
 const VIEW_DEDUP_MS = 30_000;
 
@@ -43,6 +44,9 @@ export default function SlideoDetailPreview({ slideoId, slideId, slideTitle, tit
 
   const [idx, setIdx] = useState(0);
   const [showControls, setShowControls] = useState(true);
+  const [showShareFallback, setShowShareFallback] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const shareInputRef = useRef<HTMLInputElement>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -166,44 +170,25 @@ export default function SlideoDetailPreview({ slideoId, slideId, slideTitle, tit
   // ?? Share ???????????????????????????????????????????????????????????????????
   const handleShare = async () => {
     const url = `${window.location.origin}${buildSlideoPath({ id: slideoId, title })}`;
-
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        await navigator.share({ title, url });
-        if (user) api.post(`/slideo/${slideoId}/share`).catch(() => {});
-        return;
-      } catch (err: any) {
-        if (err?.name === 'AbortError') return;
-      }
-    }
-
-    let copied = false;
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      try {
-        await navigator.clipboard.writeText(url);
-        copied = true;
-      } catch {}
-    }
-
-    if (!copied) {
-      try {
-        const el = document.createElement('textarea');
-        el.value = url;
-        el.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
-        document.body.appendChild(el);
-        el.focus();
-        el.select();
-        copied = document.execCommand('copy');
-        document.body.removeChild(el);
-      } catch {}
-    }
-
-    if (copied) {
+    const result = await shareUrl(url, title);
+    if (result.userCancelled) return;
+    if (result.ok) {
       if (user) api.post(`/slideo/${slideoId}/share`).catch(() => {});
       toast.success('Link kopyalandı');
     } else {
-      toast.error('Kopyalanamadı, linki elle kopyala:\n' + url, { duration: 6000 });
+      // All clipboard methods failed — show the URL in a visible input
+      setShowShareFallback(true);
+      setTimeout(() => shareInputRef.current?.select(), 50);
     }
+  };
+
+  const handleManualCopy = async () => {
+    const url = `${window.location.origin}${buildSlideoPath({ id: slideoId, title })}`;
+    try { await navigator.clipboard.writeText(url); } catch { shareInputRef.current?.select(); }
+    setShareCopied(true);
+    if (user) api.post(`/slideo/${slideoId}/share`).catch(() => {});
+    toast.success('Link kopyalandı');
+    setTimeout(() => setShareCopied(false), 2000);
   };
 
   // ?? Derived ?????????????????????????????????????????????????????????????????
@@ -385,6 +370,39 @@ export default function SlideoDetailPreview({ slideoId, slideId, slideTitle, tit
           )}
         </AnimatePresence>
       </div>
+
+      {/* Share fallback — shown when clipboard API is blocked */}
+      {showShareFallback && (
+        <div className="border-t border-white/10 bg-black/80 px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] font-semibold text-white/60">Linki kopyalayın</p>
+            <button
+              type="button"
+              onClick={() => setShowShareFallback(false)}
+              className="w-5 h-5 flex items-center justify-center rounded-md hover:bg-white/10 transition-colors"
+            >
+              <X className="w-3 h-3 text-white/60" />
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <input
+              ref={shareInputRef}
+              readOnly
+              value={`${typeof window !== 'undefined' ? window.location.origin : ''}${buildSlideoPath({ id: slideoId, title })}`}
+              onFocus={(e) => e.target.select()}
+              className="flex-1 min-w-0 px-3 py-1.5 text-[11px] rounded-lg border border-white/15 bg-white/10 text-white font-mono truncate focus:outline-none focus:ring-1 focus:ring-white/30"
+            />
+            <button
+              type="button"
+              onClick={handleManualCopy}
+              className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg border border-white/15 bg-white/10 hover:bg-white/20 transition-colors"
+              title="Kopyala"
+            >
+              {shareCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-white/70" />}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Bottom mini-toolbar */}
       <div className="flex items-center justify-between px-4 py-2.5 border-t border-white/8 bg-black/60">
