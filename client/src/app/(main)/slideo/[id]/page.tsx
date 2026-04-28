@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import SlideoDetailPreview from '@/components/slideo/SlideoDetailPreviewNoSSR';
 import SlideoShareButtonNoSSR from '@/components/slideo/SlideoShareButtonNoSSR';
-import { buildSlidePath, buildSlideoPath, buildTopicPath, splitIdSlug } from '@/lib/url';
+import Breadcrumb from '@/components/shared/Breadcrumb';
+import { buildCategoryPath, buildSlidePath, buildSlideoPath, buildTopicPath, splitIdSlug } from '@/lib/url';
 import { getApiBaseUrl, getApiOrigin } from '@/lib/api-origin';
 
 const API_URL = getApiBaseUrl();
@@ -106,8 +107,37 @@ export default async function SlideoDetailPage({
 
   const pageCount = Array.isArray(slideo.pageIndices) ? slideo.pageIndices.length : 0;
 
+  // Build the visible breadcrumb trail. The Breadcrumb component also emits
+  // BreadcrumbList JSON-LD, but the layout.tsx already injects a richer
+  // version — so this Breadcrumb is purely the visible/UX component. The
+  // duplicate JSON-LD is harmless: Google deduplicates by @id and content.
+  const breadcrumbTrail: { label: string; href?: string }[] = [
+    { label: 'Anasayfa', href: '/' },
+    { label: 'Slideo', href: '/slideo' },
+  ];
+  if (slideo.slide?.topic?.category?.slug && slideo.slide.topic.category.name) {
+    breadcrumbTrail.push({
+      label: slideo.slide.topic.category.name,
+      href: buildCategoryPath(slideo.slide.topic.category.slug),
+    });
+  }
+  if (slideo.slide?.topic?.id) {
+    breadcrumbTrail.push({
+      label: slideo.slide.topic.title,
+      href: buildTopicPath({
+        id: slideo.slide.topic.id,
+        slug: slideo.slide.topic.slug,
+        title: slideo.slide.topic.title,
+      }),
+    });
+  }
+  breadcrumbTrail.push({ label: slideo.title });
+
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-10">
+      <div className="mb-4">
+        <Breadcrumb items={breadcrumbTrail} />
+      </div>
       <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Slideo Önizleme

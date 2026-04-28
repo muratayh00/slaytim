@@ -47,9 +47,46 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
-    googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
+    // AI Overview / Perplexity / Bing answer-engine snippet sizing.
+    // -1 = unlimited; lets answer engines quote longer machine-readable summaries.
+    'max-snippet': -1,
+    'max-image-preview': 'large',
+    'max-video-preview': -1,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-snippet': -1,
+      'max-image-preview': 'large',
+      'max-video-preview': -1,
+    },
   },
   alternates: { canonical: '/' },
+};
+
+// ── Organization entity ─────────────────────────────────────────────────────
+// Brand identity for Knowledge Graph + AI citation. Rendered once at root so
+// every Slaytim page advertises the same Organization. logo, sameAs, and
+// contactPoint are critical for E-E-A-T signaling.
+const organizationJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Slaytim',
+  alternateName: 'slaytim.com',
+  url: BASE_URL,
+  logo: `${BASE_URL}/icon.png`,
+  description: "Türkiye'nin slayt keşif platformu — kısa slaytlar oluştur, paylaş, keşfet.",
+  sameAs: [
+    'https://twitter.com/slaytim',
+    'https://x.com/slaytim',
+  ],
+  contactPoint: [
+    {
+      '@type': 'ContactPoint',
+      contactType: 'customer support',
+      email: 'iletisim@slaytim.com',
+      availableLanguage: ['Turkish'],
+    },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -58,24 +95,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <meta charSet="utf-8" />
         {/*
-          Pre-download PDF.js files so they are browser-cached before the user
-          navigates to any slide.  Without this, /pdf.min.mjs (2-5 MB) must be
-          fetched cold on first slide open, adding 5-30 s on slow connections.
-          modulepreload parses and compiles the ES module, not just downloads it.
-        */}
-        {/*
-          Pre-download the PDF.js main module so it is browser-cached before
-          the user navigates to any slide.  Without this, the 2-5 MB module
-          must be fetched cold, adding 5-30 s on slow connections.
-          modulepreload also parses + compiles the ES module ahead of time.
+          Organization JSON-LD: emitted once site-wide so search engines and
+          AI answer engines (ChatGPT, Perplexity, Gemini) can resolve
+          "Slaytim" as a single entity. logo, sameAs, contactPoint feed the
+          Knowledge Graph.
 
-          The worker file (pdf.worker.min.mjs) is NOT preloaded here: PDF.js
-          may spawn it via a Blob URL or module Worker, which never matches a
-          preload hint — the browser would just emit a "preloaded but not used"
-          warning and waste the bandwidth.  The worker loads fast enough once
-          the main module is warm.
+          PDF.js modulepreload was removed from the root layout — it shipped
+          a 2-5 MB module on every page (homepage, profiles, search, settings)
+          where PDF.js is never used. It is now preloaded only inside slide
+          and slideo route layouts, where the viewer actually mounts.
         */}
-        <link rel="modulepreload" href="/pdf.min.mjs" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
       </head>
       <body className={`${font.variable} font-sans`}>
         <Providers>

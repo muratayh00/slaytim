@@ -86,19 +86,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.75,
   }));
 
-  const topicsData = await fetchJson<{ topics: { id: number; slug?: string; title?: string; createdAt: string }[] }>(
+  const topicsData = await fetchJson<{ topics: { id: number; slug?: string; title?: string; createdAt: string; updatedAt?: string }[] }>(
     '/topics?sort=latest&limit=200&page=1',
   );
   const topicPages: MetadataRoute.Sitemap = (topicsData?.topics || [])
     .filter((topic) => isValidEntityId(topic?.id))
     .map((topic) => ({
       url: `${BASE_URL}${buildTopicPath({ id: topic.id, slug: topic.slug, title: topic.title })}`,
-      lastModified: toSafeDate(topic.createdAt),
+      // Prefer updatedAt so Google sees fresh content as fresh (new comments,
+      // edits, added slides). Falls back to createdAt for older rows.
+      lastModified: toSafeDate(topic.updatedAt || topic.createdAt),
       changeFrequency: 'weekly',
       priority: 0.7,
     }));
 
-  const slidesData = await fetchJson<{ id: number; slug?: string; title?: string; createdAt: string; conversionStatus?: string }[]>(
+  const slidesData = await fetchJson<{ id: number; slug?: string; title?: string; createdAt: string; updatedAt?: string; conversionStatus?: string }[]>(
     '/slides/popular?limit=300',
   );
   const slidePages: MetadataRoute.Sitemap = (slidesData || [])
@@ -106,19 +108,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     .filter((slide) => !slide?.conversionStatus || slide.conversionStatus === 'done')
     .map((slide) => ({
       url: `${BASE_URL}${buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title })}`,
-      lastModified: toSafeDate(slide.createdAt),
+      lastModified: toSafeDate(slide.updatedAt || slide.createdAt),
       changeFrequency: 'monthly',
       priority: 0.65,
     }));
 
-  const slideoData = await fetchJson<{ slideos: { id: number; title?: string; createdAt: string }[] }>(
+  const slideoData = await fetchJson<{ slideos: { id: number; title?: string; createdAt: string; updatedAt?: string }[] }>(
     '/slideo/feed?sort=new&limit=200&page=1',
   );
   const slideoPages: MetadataRoute.Sitemap = (slideoData?.slideos || [])
     .filter((slideo) => isValidEntityId(slideo?.id))
     .map((slideo) => ({
       url: `${BASE_URL}${buildSlideoPath({ id: slideo.id, title: slideo.title })}`,
-      lastModified: toSafeDate(slideo.createdAt),
+      lastModified: toSafeDate(slideo.updatedAt || slideo.createdAt),
       changeFrequency: 'weekly',
       priority: 0.7,
     }));

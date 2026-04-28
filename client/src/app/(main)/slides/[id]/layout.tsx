@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from 'next';
 import Script from 'next/script';
 import { Suspense } from 'react';
-import { buildProfilePath, buildSlidePath, buildTopicPath, splitIdSlug } from '@/lib/url';
+import { buildCategoryPath, buildProfilePath, buildSlidePath, buildTopicPath, splitIdSlug } from '@/lib/url';
 import { getApiBaseUrl, getApiOrigin } from '@/lib/api-origin';
 
 const API_URL = getApiBaseUrl();
@@ -85,6 +85,8 @@ function SlideSkeleton() {
   );
 }
 
+type BreadcrumbItem = { name: string; href: string };
+
 export default async function SlideLayout({
   children,
   params,
@@ -92,17 +94,20 @@ export default async function SlideLayout({
   children: React.ReactNode;
   params: { id?: string; slug?: string };
 }) {
-  let jsonLd: object | null = null;
+  let presentationJsonLd: object | null = null;
+  let breadcrumbJsonLd: object | null = null;
+  let breadcrumbTrail: BreadcrumbItem[] = [];
   try {
     const slide = await fetchSlide(getParamId(params));
     if (slide) {
       const url = `${BASE_URL}${buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title })}`;
-      jsonLd = {
+      presentationJsonLd = {
         '@context': 'https://schema.org',
         '@type': 'PresentationDigitalDocument',
         name: slide.title,
         description: slide.description || `"${slide.title}" sunumu.`,
         url,
+        inLanguage: 'tr-TR',
         author: {
           '@type': 'Person',
           name: slide.user?.username || 'Slaytim Kullanicisi',
@@ -110,6 +115,7 @@ export default async function SlideLayout({
         },
         publisher: { '@type': 'Organization', name: 'Slaytim', url: BASE_URL },
         datePublished: slide.createdAt,
+        dateModified: slide.updatedAt || slide.createdAt,
         thumbnailUrl: resolveUrl(slide.thumbnailUrl),
         interactionStatistic: [
           { '@type': 'InteractionCounter', interactionType: 'https://schema.org/LikeAction', userInteractionCount: slide.likesCount },
@@ -125,6 +131,41 @@ export default async function SlideLayout({
           })}`,
         } : undefined,
       };
+
+      // BreadcrumbList: Home → Category → Topic → Slide. Each level is omitted
+      // gracefully if the entity is missing (e.g. slide without topic).
+      // Stored as relative hrefs for the visible nav, absolute URLs for JSON-LD.
+      const trail: BreadcrumbItem[] = [
+        { name: 'Anasayfa', href: '/' },
+      ];
+      if (slide.topic?.category?.slug && slide.topic.category.name) {
+        trail.push({
+          name: slide.topic.category.name,
+          href: buildCategoryPath(slide.topic.category.slug),
+        });
+      }
+      if (slide.topic?.id) {
+        trail.push({
+          name: slide.topic.title,
+          href: buildTopicPath({
+            id: slide.topic.id,
+            slug: slide.topic.slug,
+            title: slide.topic.title,
+          }),
+        });
+      }
+      trail.push({ name: slide.title, href: buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title }) });
+      breadcrumbTrail = trail;
+      breadcrumbJsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: trail.map((item, idx) => ({
+          '@type': 'ListItem',
+          position: idx + 1,
+          name: item.name,
+          item: `${BASE_URL}${item.href === '/' ? '' : item.href}`,
+        })),
+      };
     }
   } catch {
     // silently skip
@@ -132,12 +173,56 @@ export default async function SlideLayout({
 
   return (
     <>
-      {jsonLd && (
+      {/*
+        Route-scoped PDF.js preload: emitted only when the slide layout mounts,
+        so non-slide pages (homepage, profiles, search) never pay the 2-5 MB cost.
+        Worker file is intentionally not preloaded — PDF.js spawns it via Blob URL
+        which never matches a preload hint.
+      */}
+      <link rel="modulepreload" href="/pdf.min.mjs" />
+      {presentationJsonLd && (
         <Script
           id="slide-jsonld"
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(presentationJsonLd) }}
         />
+      )}
+      {breadcrumbJsonLd && (
+        <Script
+          id="slide-breadcrumb-jsonld"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        />
+      )}
+      {breadcrumbTrail.length > 0 && (
+        // Visible breadcrumb: rendered server-side so it appears in initial HTML
+        // (good for crawl depth and SEO). The accompanying BreadcrumbList JSON-LD
+        // is emitted above; this nav is purely for users + non-script crawlers.
+        <nav
+          aria-label="Breadcrumb"
+          className="max-w-4xl mx-auto px-4 pt-6 -mb-2 text-sm text-muted-foreground flex flex-wrap items-center gap-1.5"
+        >
+          {breadcrumbTrail.map((item, idx) => {
+            const isLast = idx === breadcrumbTrail.length - 1;
+            return (
+              <span key={item.href} className="flex items-center gap-1.5 min-w-0">
+                {idx > 0 && <span aria-hidden="true" className="text-muted-foreground/50">/</span>}
+                {isLast ? (
+                  <span className="text-foreground font-medium truncate max-w-[60vw] sm:max-w-none">
+                    {item.name}
+                  </span>
+                ) : (
+                  <a
+                    href={item.href}
+                    className="hover:text-foreground transition-colors truncate max-w-[40vw] sm:max-w-none"
+                  >
+                    {item.name}
+                  </a>
+                )}
+              </span>
+            );
+          })}
+        </nav>
       )}
       {/* Suspense is required here because the page component uses useSearchParams() */}
       <Suspense fallback={<SlideSkeleton />}>
