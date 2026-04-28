@@ -1,4 +1,3 @@
-import Script from 'next/script';
 import { buildCategoryPath, buildSlideoPath, buildTopicPath, splitIdSlug } from '@/lib/url';
 import { getApiBaseUrl, getApiOrigin } from '@/lib/api-origin';
 
@@ -119,16 +118,19 @@ export default async function SlideoLayout({
     <>
       {/* Slideo also renders the PDF viewer for previews — preload here too. */}
       <link rel="modulepreload" href="/pdf.min.mjs" />
+      {/*
+        Plain <script> tags — see comment in slides/[id]/layout.tsx. next/script
+        with type="application/ld+json" injects post-hydration which is invisible
+        to crawlers. This emits JSON-LD directly into the SSR HTML response.
+      */}
       {videoJsonLd && (
-        <Script
-          id="slideo-jsonld"
+        <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(videoJsonLd) }}
         />
       )}
       {breadcrumbJsonLd && (
-        <Script
-          id="slideo-breadcrumb-jsonld"
+        <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
         />

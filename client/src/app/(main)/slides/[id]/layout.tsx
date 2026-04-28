@@ -1,5 +1,4 @@
 ﻿import type { Metadata } from 'next';
-import Script from 'next/script';
 import { Suspense } from 'react';
 import { buildCategoryPath, buildProfilePath, buildSlidePath, buildTopicPath, splitIdSlug } from '@/lib/url';
 import { getApiBaseUrl, getApiOrigin } from '@/lib/api-origin';
@@ -180,16 +179,22 @@ export default async function SlideLayout({
         which never matches a preload hint.
       */}
       <link rel="modulepreload" href="/pdf.min.mjs" />
+      {/*
+        Plain <script type="application/ld+json"> — NOT next/script. The
+        next/script component defaults to afterInteractive strategy, which
+        injects via DOM after hydration. That means crawlers see empty HTML
+        on initial response (curl returns nothing). Plain <script> is
+        rendered by React directly into the SSR output, which is what
+        Google/Bing/AI bots actually read.
+      */}
       {presentationJsonLd && (
-        <Script
-          id="slide-jsonld"
+        <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(presentationJsonLd) }}
         />
       )}
       {breadcrumbJsonLd && (
-        <Script
-          id="slide-breadcrumb-jsonld"
+        <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
         />

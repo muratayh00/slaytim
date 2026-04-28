@@ -1,5 +1,4 @@
 ﻿import type { Metadata } from 'next';
-import Script from 'next/script';
 import { getApiBaseUrl } from '@/lib/api-origin';
 import { buildProfilePath, buildTopicPath, splitIdSlug } from '@/lib/url';
 
@@ -109,9 +108,10 @@ export default async function TopicLayout({
 
   return (
     <>
+      {/* Plain <script>: next/script defers ld+json injection to post-hydration,
+          invisible to crawlers. See slides/[id]/layout.tsx for full rationale. */}
       {jsonLd && (
-        <Script
-          id="topic-jsonld"
+        <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
