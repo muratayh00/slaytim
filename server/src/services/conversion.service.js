@@ -13,6 +13,7 @@ const {
 const { enqueueFirstPagePreview, REDIS_ENABLED: PREVIEW_REDIS_ENABLED } = require('../queues/preview.queue');
 const { generateAllPagesLocal, PREVIEW_ENABLED } = require('./preview-generator.service');
 const { scanFile, hasClamAv, getClamScanBinary, isScanRequired } = require('./file-scan.service');
+const { dispatchSummaryGeneration } = require('./aiSummary.service');
 const logger = require('../lib/logger');
 const {
   enqueueSlideConversion: enqueueWithRedis,
@@ -686,6 +687,10 @@ async function convertSlide(slideId) {
 
       // Fire-and-forget: generate per-page image previews in the background
       void dispatchPreviewGeneration(slideId, resolvedPdfUrl);
+      // Fire-and-forget: queue AI summary generation (BLUF for slide page +
+      // PresentationDigitalDocument JSON-LD `abstract`). Never blocks the
+      // conversion pipeline; aiSummary.service handles its own errors.
+      dispatchSummaryGeneration(slideId);
 
       return;
     }
@@ -783,6 +788,8 @@ async function convertSlide(slideId) {
 
     // Fire-and-forget: enqueue per-page image preview generation
     void dispatchPreviewGeneration(slideId, finalPdfUrl);
+    // Fire-and-forget: AI summary generation. See PDF-direct branch above.
+    dispatchSummaryGeneration(slideId);
   } catch (err) {
     if (uploadedThumbUrl) {
       await deleteStoredObject(uploadedThumbUrl).catch((cleanupErr) => {

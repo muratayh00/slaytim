@@ -86,6 +86,24 @@ function SlideSkeleton() {
 
 type BreadcrumbItem = { name: string; href: string };
 
+type AiSummary = {
+  what?: string;
+  audience?: string;
+  highlights?: string[];
+  useCase?: string;
+};
+
+function isAiSummary(value: unknown): value is AiSummary {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.what === 'string'
+    && typeof v.audience === 'string'
+    && typeof v.useCase === 'string'
+    && Array.isArray(v.highlights)
+  );
+}
+
 export default async function SlideLayout({
   children,
   params,
@@ -96,15 +114,32 @@ export default async function SlideLayout({
   let presentationJsonLd: object | null = null;
   let breadcrumbJsonLd: object | null = null;
   let breadcrumbTrail: BreadcrumbItem[] = [];
+  let aiSummary: AiSummary | null = null;
   try {
     const slide = await fetchSlide(getParamId(params));
     if (slide) {
       const url = `${BASE_URL}${buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title })}`;
+      aiSummary = isAiSummary(slide.aiSummary) ? slide.aiSummary : null;
+
+      // PresentationDigitalDocument JSON-LD enriched with AI summary fields.
+      // `abstract` is the schema.org-recommended field for short standalone
+      // summaries — it's what AI Overview / Perplexity / ChatGPT actually quote.
+      // We compose it from "what" + "useCase" so the citation reads naturally.
+      const abstract = aiSummary
+        ? [aiSummary.what, aiSummary.useCase].filter(Boolean).join(' ')
+        : null;
+      const keywords = aiSummary?.highlights?.length
+        ? aiSummary.highlights.join(', ')
+        : undefined;
+
       presentationJsonLd = {
         '@context': 'https://schema.org',
         '@type': 'PresentationDigitalDocument',
         name: slide.title,
-        description: slide.description || `"${slide.title}" sunumu.`,
+        description: slide.description || abstract || `"${slide.title}" sunumu.`,
+        ...(abstract ? { abstract } : {}),
+        ...(keywords ? { keywords } : {}),
+        ...(aiSummary?.audience ? { audience: { '@type': 'Audience', audienceType: aiSummary.audience } } : {}),
         url,
         inLanguage: 'tr-TR',
         author: {
@@ -228,6 +263,63 @@ export default async function SlideLayout({
             );
           })}
         </nav>
+      )}
+      {aiSummary && (
+        // BLUF block — server-rendered so AI engines + crawlers see it without
+        // executing JS. Structured as a <dl> so screen readers + LLMs read it
+        // as labeled key-value pairs (better than a plain <h3>+<p> stack).
+        // The data-ai-summary attribute is a hint for downstream parsers
+        // (e.g. our own /api/seo/llm-context endpoint) to extract this block.
+        <section
+          aria-labelledby="ai-summary-heading"
+          data-ai-summary="true"
+          className="max-w-4xl mx-auto px-4 pt-6"
+        >
+          <div className="rounded-2xl border border-border bg-card/50 p-5 sm:p-6">
+            <h2
+              id="ai-summary-heading"
+              className="text-xs font-semibold uppercase tracking-wide text-primary mb-4 flex items-center gap-2"
+            >
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary" aria-hidden="true" />
+              Hızlı Özet
+            </h2>
+            <dl className="space-y-3.5 text-sm">
+              {aiSummary.what && (
+                <div>
+                  <dt className="font-semibold text-foreground mb-0.5">Bu sunum ne hakkında?</dt>
+                  <dd className="text-muted-foreground leading-relaxed">{aiSummary.what}</dd>
+                </div>
+              )}
+              {aiSummary.audience && (
+                <div>
+                  <dt className="font-semibold text-foreground mb-0.5">Kimler için?</dt>
+                  <dd className="text-muted-foreground leading-relaxed">{aiSummary.audience}</dd>
+                </div>
+              )}
+              {Array.isArray(aiSummary.highlights) && aiSummary.highlights.length > 0 && (
+                <div>
+                  <dt className="font-semibold text-foreground mb-1">Öne çıkan başlıklar</dt>
+                  <dd>
+                    <ul className="list-disc pl-5 text-muted-foreground space-y-0.5">
+                      {aiSummary.highlights.map((h, i) => (
+                        <li key={i} className="leading-relaxed">{h}</li>
+                      ))}
+                    </ul>
+                  </dd>
+                </div>
+              )}
+              {aiSummary.useCase && (
+                <div>
+                  <dt className="font-semibold text-foreground mb-0.5">Kullanım alanı</dt>
+                  <dd className="text-muted-foreground leading-relaxed">{aiSummary.useCase}</dd>
+                </div>
+              )}
+            </dl>
+            <p className="mt-4 text-[11px] text-muted-foreground/60">
+              Bu özet yapay zeka tarafından otomatik üretilmiştir.
+            </p>
+          </div>
+        </section>
       )}
       {/* Suspense is required here because the page component uses useSearchParams() */}
       <Suspense fallback={<SlideSkeleton />}>

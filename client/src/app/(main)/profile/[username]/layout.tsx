@@ -61,6 +61,60 @@ export async function generateMetadata({ params }: { params: { username: string 
   }
 }
 
-export default function ProfileLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+export default async function ProfileLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: { username: string };
+}) {
+  // Person JSON-LD: lets Google + AI engines resolve "@<username>" as a real
+  // creator entity (Knowledge Graph). worksFor links the creator back to the
+  // Slaytim Organization entity emitted in the root layout.
+  let personJsonLd: object | null = null;
+  try {
+    const profile = await fetchProfile(params.username);
+    if (profile) {
+      const url = `${BASE_URL}${buildProfilePath(profile.username)}`;
+      const topicCount = Number(profile?._count?.topics || 0);
+      const slideCount = Number(profile?._count?.slides || 0);
+
+      personJsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'Person',
+        name: profile.username,
+        alternateName: `@${profile.username}`,
+        url,
+        ...(profile.avatarUrl ? { image: profile.avatarUrl } : {}),
+        ...(profile.bio ? { description: String(profile.bio).slice(0, 300) } : {}),
+        worksFor: { '@type': 'Organization', name: 'Slaytim', url: BASE_URL },
+        // mainEntityOfPage signals to search engines that this Person is the
+        // primary entity of /@username (vs. e.g. WebPage being primary).
+        mainEntityOfPage: { '@type': 'ProfilePage', '@id': url },
+        // interactionStatistic exposes content volume — surfaces well in AI
+        // citations ("@username has 47 slides on Slaytim").
+        interactionStatistic: [
+          {
+            '@type': 'InteractionCounter',
+            interactionType: 'https://schema.org/CreateAction',
+            userInteractionCount: topicCount + slideCount,
+          },
+        ],
+      };
+    }
+  } catch {
+    // ignore JSON-LD failures
+  }
+
+  return (
+    <>
+      {personJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
+        />
+      )}
+      {children}
+    </>
+  );
 }

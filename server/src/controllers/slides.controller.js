@@ -44,6 +44,11 @@ const slideSelect = {
   sponsorCampaignId: true,
   sponsoredFrom: true,
   sponsoredTo: true,
+  // AI summary: 4-section BLUF used by the slide detail page +
+  // PresentationDigitalDocument JSON-LD `abstract`. Null until generated.
+  aiSummary: true,
+  aiSummaryStatus: true,
+  aiSummaryGeneratedAt: true,
   createdAt: true,
   updatedAt: true,
   user: { select: { id: true, username: true, avatarUrl: true } },

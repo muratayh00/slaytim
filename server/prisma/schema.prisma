@@ -169,6 +169,13 @@ model Slide {
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime? @updatedAt @map("updated_at")
 
+  // AI summary / BLUF: 4-section structured summary used on detail page +
+  // PresentationDigitalDocument JSON-LD `abstract`. Populated by
+  // aiSummary.service.js after conversion completes.
+  aiSummary             Json?     @map("ai_summary")
+  aiSummaryStatus       String?   @map("ai_summary_status")
+  aiSummaryGeneratedAt  DateTime? @map("ai_summary_generated_at")
+
   topic       Topic             @relation(fields: [topicId], references: [id], onDelete: Cascade)
   user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   likes       SlideLike[]
