@@ -131,6 +131,22 @@ async function main() {
     cats[c.slug] = c;
   }
 
+  // Safety sweep: any category currently flagged isMain:true that is NOT in the
+  // curated tree gets demoted. Catches the case where the tree shrinks (e.g.
+  // 13 mains → 8 mains) — without this sweep, previously-main categories
+  // would linger in the homepage picker. Re-running seed becomes safe.
+  const lingeringMains = await prisma.category.findMany({
+    where: { isMain: true, slug: { notIn: Array.from(curatedSlugs) } },
+    select: { id: true, slug: true },
+  });
+  for (const m of lingeringMains) {
+    await prisma.category.update({
+      where: { id: m.id },
+      data: { isMain: false, sortOrder: 999 },
+    });
+    console.warn(`[seed] demoted lingering main "${m.slug}" → isMain:false`);
+  }
+
   // Kullanicilar
   const passwordHash = await bcrypt.hash('password123', 10);
   const users = {};
