@@ -1,6 +1,14 @@
-import { Suspense } from 'react';
+/**
+ * /slayt/[slug] — legacy Turkish URL alias.
+ *
+ * The Next.js config-level redirect (`next.config.js`) fires first for all
+ * /slayt/* requests and sends a 308 to /slides/*. This page component exists
+ * as a belt-and-suspenders fallback for any edge case where the config-level
+ * redirect is bypassed (e.g. internal client-side navigation that skips the
+ * edge). It always issues a permanent redirect to the canonical /slides/...
+ * URL and never renders any UI.
+ */
 import { notFound, permanentRedirect } from 'next/navigation';
-import SlideDetailClientPage from '../../slides/[id]/page';
 import { buildSlidePath, splitIdSlug } from '@/lib/url';
 import { getApiBaseUrl } from '@/lib/api-origin';
 
@@ -41,7 +49,7 @@ function toQueryString(searchParams?: Record<string, string | string[] | undefin
   return str ? `?${str}` : '';
 }
 
-export default async function SlideCanonicalPage({
+export default async function SlaytLegacyRedirectPage({
   params,
   searchParams,
 }: {
@@ -51,27 +59,7 @@ export default async function SlideCanonicalPage({
   const slide = await fetchSlide(params.slug);
   if (!slide) notFound();
 
+  // Always redirect to canonical /slides/... — never render.
   const canonicalPath = buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title });
-  const currentPath = `/slayt/${decodeURIComponent(params.slug)}`;
-  if (currentPath !== canonicalPath) {
-    permanentRedirect(`${canonicalPath}${toQueryString(searchParams)}`);
-  }
-
-  // SlideDetailClientPage calls useSearchParams() — in Next.js 14, any client
-  // component that uses useSearchParams() must be wrapped in <Suspense> when
-  // rendered from a server component, otherwise Next.js bails out of SSR for
-  // the entire subtree and the page returns no <h1> in the initial HTML.
-  return (
-    <Suspense fallback={
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="skeleton h-8 w-48 mb-6 rounded-xl" />
-        <div className="skeleton aspect-video rounded-2xl mb-6" />
-        <div className="skeleton h-10 w-2/3 rounded-xl mb-4" />
-        <div className="skeleton h-5 w-full rounded-xl mb-2" />
-        <div className="skeleton h-5 w-3/4 rounded-xl" />
-      </div>
-    }>
-      <SlideDetailClientPage initialSlide={slide} />
-    </Suspense>
-  );
+  permanentRedirect(`${canonicalPath}${toQueryString(searchParams)}`);
 }

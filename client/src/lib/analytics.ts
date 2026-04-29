@@ -67,6 +67,36 @@ export const analytics = {
   adClick: (params: { slot_id: string; placement: string }) =>
     track('ad_click', params),
 
+  adViewable: (params: { slot_id: string; placement: string; visible_ms: number }) =>
+    track('ad_viewable', params),
+
+  adSkipped: (params: { slot_id: string; placement: string; watched_seconds: number }) =>
+    track('ad_skipped', params),
+
+  adCompleted: (params: { slot_id: string; placement: string; duration_seconds: number }) =>
+    track('ad_completed', params),
+
+  adClosed: (params: { slot_id: string; placement: string }) =>
+    track('ad_closed', params),
+
+  adError: (params: { slot_id: string; placement: string; error_reason: string }) =>
+    track('ad_error', params),
+
+  adBlockDetected: (params: { slot_id: string; placement: string }) =>
+    track('ad_block_detected', params),
+
+  rewardedAdStarted: (params: { slot_id: string; placement: string }) =>
+    track('rewarded_ad_started', params),
+
+  rewardedAdCompleted: (params: { slot_id: string; placement: string; reward_type: string }) =>
+    track('rewarded_ad_completed', params),
+
+  premiumUpsellView: (params: { placement: string; page_type: string; trigger?: string }) =>
+    track('premium_upsell_view', params),
+
+  premiumUpsellClick: (params: { placement: string; page_type: string; cta_text?: string }) =>
+    track('premium_upsell_click', params),
+
   sponsoredView: (params: {
     content_type: 'slide' | 'topic' | 'slideo';
     content_id: number;

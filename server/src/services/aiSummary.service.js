@@ -1,24 +1,23 @@
 /**
- * AI summary / BLUF service.
+ * AI summary / BLUF service — provider-agnostic.
  *
  * Given a slide id, downloads its converted PDF, extracts text via pdf-parse,
- * sends a tightly-scoped prompt to Anthropic Claude, and stores a 4-section
+ * sends a tightly-scoped prompt to a configured LLM, and stores a 4-section
  * Turkish summary on Slide.aiSummary. Used by:
  *   - Conversion service (fire-and-forget after conversionStatus → 'done')
  *   - scripts/backfill-ai-summary.js (batch existing slides)
  *
- * Provider abstraction: we currently only ship the Anthropic implementation
- * because the rest of the platform is Turkish-first and Claude Haiku gives
- * the best price/quality on Turkish text. A `_dryRun` mode (env
- * AI_SUMMARY_DRY_RUN=true) returns a deterministic stub so dev/CI works
- * without an API key — and the slide page still renders the section.
+ * Provider selection (in priority order):
+ *   1. ANTHROPIC_API_KEY  → Claude 3.5 Haiku (best Turkish quality)
+ *   2. OPENAI_API_KEY     → GPT-4o-mini (good fallback, cheap)
+ *   3. AI_SUMMARY_DRY_RUN=true → deterministic stub (dev/CI, no key needed)
+ *   4. Neither key present → system disabled, all calls return {status:'skipped'}
  *
- * Cost: ~$0.0015 per slide at the current Haiku pricing (5k input + 300
- * output tokens). 10k slides ≈ $15 total to backfill.
+ * Manual summaries: set Slide.aiSummary directly in DB — they are always
+ * respected (returned as-is) unless the caller passes { force: true }.
  *
- * Failure modes: every error path writes aiSummaryStatus='failed' (or
- * 'skipped' for non-actionable inputs like empty PDFs) so the conversion
- * pipeline never retries silently and the admin UI can surface state.
+ * Cost guidance (Claude 3.5 Haiku, 04-2026 pricing):
+ *   ~$0.0015 per slide. 10 k slides ≈ $15 to backfill.
  */
 
 const fs = require('fs');
@@ -32,13 +31,24 @@ const {
   extractStorageKeyFromUrl,
 } = require('./storage.service');
 
+// ── Config ───────────────────────────────────────────────────────────────────
+
 const ENABLED = String(process.env.AI_SUMMARY_ENABLED || 'true').toLowerCase() !== 'false';
 const DRY_RUN = String(process.env.AI_SUMMARY_DRY_RUN || 'false').toLowerCase() === 'true';
-const API_KEY = String(process.env.ANTHROPIC_API_KEY || '').trim();
-const MODEL = process.env.AI_SUMMARY_MODEL || 'claude-3-5-haiku-latest';
-const MAX_INPUT_CHARS = Math.max(2000, Number(process.env.AI_SUMMARY_MAX_INPUT_CHARS || 18000));
-const REQUEST_TIMEOUT_MS = Math.max(5000, Number(process.env.AI_SUMMARY_TIMEOUT_MS || 30_000));
-const ANTHROPIC_VERSION = '2023-06-01';
+
+const ANTHROPIC_KEY = String(process.env.ANTHROPIC_API_KEY || '').trim();
+const OPENAI_KEY    = String(process.env.OPENAI_API_KEY    || '').trim();
+
+// Model overrides (sensible defaults chosen per-provider).
+const ANTHROPIC_MODEL = process.env.AI_SUMMARY_MODEL || 'claude-3-5-haiku-latest';
+const OPENAI_MODEL    = process.env.AI_SUMMARY_OPENAI_MODEL || 'gpt-4o-mini';
+
+const MAX_INPUT_CHARS   = Math.max(2000, Number(process.env.AI_SUMMARY_MAX_INPUT_CHARS || 18_000));
+const REQUEST_TIMEOUT_MS = Math.max(5_000, Number(process.env.AI_SUMMARY_TIMEOUT_MS   || 30_000));
+
+const ANTHROPIC_API_VERSION = '2023-06-01';
+
+// ── Prompt (shared across providers) ─────────────────────────────────────────
 
 // Keep these short — they show up verbatim in the slide page UI.
 const PROMPT_SYSTEM = `Sen Türkçe sunumları özetleyen bir asistansın. Sana verilen sunumun metnini analiz edip dört kısa bölüm üreteceksin. Dilin sade, doğrudan, profesyonel olsun. Pazarlamacı klişelerinden ("muhteşem", "çığır açan") kaçın. Her bölüm 1-2 cümle, "highlights" maddeleri 5-7 kelime.`;
@@ -59,17 +69,31 @@ ${text}
   "useCase": "Hangi DURUMDA / KULLANIM ALANINDA bu sunumdan yararlanılır? 1-2 cümle."
 }`;
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Provider detection ────────────────────────────────────────────────────────
+
+/**
+ * Returns the active provider name or null if none is available.
+ * @returns {'anthropic'|'openai'|'dry-run'|null}
+ */
+function detectProvider() {
+  if (DRY_RUN)         return 'dry-run';
+  if (ANTHROPIC_KEY)   return 'anthropic';
+  if (OPENAI_KEY)      return 'openai';
+  return null;
+}
 
 function isEnabled() {
-  return ENABLED && (DRY_RUN || Boolean(API_KEY));
+  if (!ENABLED) return false;
+  return detectProvider() !== null;
 }
 
 function getDisabledReason() {
   if (!ENABLED) return 'AI_SUMMARY_ENABLED=false';
-  if (!DRY_RUN && !API_KEY) return 'ANTHROPIC_API_KEY missing';
+  if (!detectProvider()) return 'No LLM API key found (set ANTHROPIC_API_KEY or OPENAI_API_KEY)';
   return null;
 }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function downloadPdfBuffer(pdfUrl) {
   if (!pdfUrl) return null;
@@ -135,7 +159,7 @@ function syntheticDryRunSummary(title) {
 
 function safeParseJson(text) {
   if (!text || typeof text !== 'string') return null;
-  // Claude usually returns clean JSON; handle ```json``` fences just in case.
+  // Most LLMs return clean JSON; handle ```json``` fences just in case.
   const stripped = text
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/i, '')
@@ -154,9 +178,9 @@ function safeParseJson(text) {
 
 function normalizeSummary(parsed) {
   if (!parsed || typeof parsed !== 'object') return null;
-  const what = String(parsed.what || '').trim().slice(0, 500);
-  const audience = String(parsed.audience || '').trim().slice(0, 500);
-  const useCase = String(parsed.useCase || '').trim().slice(0, 500);
+  const what      = String(parsed.what      || '').trim().slice(0, 500);
+  const audience  = String(parsed.audience  || '').trim().slice(0, 500);
+  const useCase   = String(parsed.useCase   || '').trim().slice(0, 500);
   const highlights = Array.isArray(parsed.highlights)
     ? parsed.highlights
         .map((h) => String(h || '').trim().slice(0, 120))
@@ -167,6 +191,9 @@ function normalizeSummary(parsed) {
   return { what, audience, highlights, useCase };
 }
 
+// ── Provider implementations ──────────────────────────────────────────────────
+
+/** Anthropic Claude (raw HTTP — avoids SDK dep). */
 async function callAnthropic(title, text) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -176,11 +203,11 @@ async function callAnthropic(title, text) {
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': API_KEY,
-        'anthropic-version': ANTHROPIC_VERSION,
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': ANTHROPIC_API_VERSION,
       },
       body: JSON.stringify({
-        model: MODEL,
+        model: ANTHROPIC_MODEL,
         max_tokens: 600,
         temperature: 0.3,
         system: PROMPT_SYSTEM,
@@ -193,25 +220,73 @@ async function callAnthropic(title, text) {
       throw new Error(`Anthropic API ${res.status}: ${body.slice(0, 200)}`);
     }
     const json = await res.json();
-    // Concatenate any text blocks Claude returned. Usually 1 block.
     const blocks = Array.isArray(json?.content) ? json.content : [];
     const raw = blocks
       .map((b) => (b?.type === 'text' ? String(b.text || '') : ''))
       .join('')
       .trim();
-    return { raw, model: json?.model || MODEL };
+    return { raw, model: json?.model || ANTHROPIC_MODEL };
   } finally {
     clearTimeout(timer);
   }
 }
 
-// ── Public API ──────────────────────────────────────────────────────────────
+/** OpenAI Chat Completions (raw HTTP — avoids SDK dep). */
+async function callOpenAI(title, text) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_KEY}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        max_tokens: 600,
+        temperature: 0.3,
+        messages: [
+          { role: 'system', content: PROMPT_SYSTEM },
+          { role: 'user',   content: PROMPT_USER(title, text) },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`OpenAI API ${res.status}: ${body.slice(0, 200)}`);
+    }
+    const json = await res.json();
+    const raw = String(json?.choices?.[0]?.message?.content || '').trim();
+    return { raw, model: json?.model || OPENAI_MODEL };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Route to the right provider based on available keys.
+ * @param {string} title
+ * @param {string} text
+ * @returns {Promise<{raw: string, model: string}>}
+ */
+async function callLLM(title, text) {
+  const provider = detectProvider();
+  if (provider === 'anthropic') return callAnthropic(title, text);
+  if (provider === 'openai')    return callOpenAI(title, text);
+  throw new Error('No LLM provider available');
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
 
 /**
  * Generate an AI summary for a single slide.
+ *
  * @param {number} slideId
  * @param {{ force?: boolean }} options
- *        - force: regenerate even if a summary already exists
+ *        - force: regenerate even if a summary already exists (including manual ones)
  * @returns {Promise<{ ok: boolean; status: string; reason?: string; summary?: object }>}
  */
 async function generateSummaryForSlide(slideId, options = {}) {
@@ -235,11 +310,12 @@ async function generateSummaryForSlide(slideId, options = {}) {
       aiSummary: true,
     },
   });
-  if (!slide) return { ok: false, status: 'failed', reason: 'slide not found' };
-  if (slide.deletedAt) return { ok: false, status: 'skipped', reason: 'slide deleted' };
+  if (!slide)            return { ok: false, status: 'failed',  reason: 'slide not found' };
+  if (slide.deletedAt)   return { ok: false, status: 'skipped', reason: 'slide deleted' };
   if (slide.conversionStatus !== 'done' || !slide.pdfUrl) {
     return { ok: false, status: 'skipped', reason: 'conversion not done' };
   }
+  // Manual or previously-generated summaries are always respected unless --force.
   if (slide.aiSummary && !options.force) {
     return { ok: true, status: 'done', reason: 'already exists', summary: slide.aiSummary };
   }
@@ -263,6 +339,7 @@ async function generateSummaryForSlide(slideId, options = {}) {
     return { ok: true, status: 'done', reason: 'dry-run', summary: stub };
   }
 
+  // Download PDF.
   let pdfBuffer = null;
   try {
     pdfBuffer = await downloadPdfBuffer(slide.pdfUrl);
@@ -277,6 +354,7 @@ async function generateSummaryForSlide(slideId, options = {}) {
     return { ok: false, status: 'failed', reason: 'pdf download failed' };
   }
 
+  // Extract text.
   const text = await extractPdfText(pdfBuffer);
   if (!text || text.length < 80) {
     await prisma.slide.update({
@@ -286,12 +364,15 @@ async function generateSummaryForSlide(slideId, options = {}) {
     return { ok: false, status: 'skipped', reason: 'insufficient text' };
   }
 
+  // Call LLM (provider chosen automatically).
   let llmResult;
+  const provider = detectProvider();
   try {
-    llmResult = await callAnthropic(slide.title, text);
+    llmResult = await callLLM(slide.title, text);
   } catch (err) {
-    logger.error('[ai-summary] Anthropic call failed', {
+    logger.error('[ai-summary] LLM call failed', {
       slideId: id,
+      provider,
       error: err?.message || String(err),
     });
     await prisma.slide.update({
@@ -301,11 +382,13 @@ async function generateSummaryForSlide(slideId, options = {}) {
     return { ok: false, status: 'failed', reason: err?.message || 'llm error' };
   }
 
-  const parsed = safeParseJson(llmResult.raw);
+  // Parse + validate output.
+  const parsed     = safeParseJson(llmResult.raw);
   const normalized = normalizeSummary(parsed);
   if (!normalized) {
     logger.warn('[ai-summary] Could not parse LLM output', {
       slideId: id,
+      provider,
       preview: String(llmResult.raw || '').slice(0, 200),
     });
     await prisma.slide.update({
@@ -319,6 +402,7 @@ async function generateSummaryForSlide(slideId, options = {}) {
     ...normalized,
     language: 'tr',
     model: llmResult.model,
+    provider,
     generatedAt: new Date().toISOString(),
   };
 
@@ -335,8 +419,8 @@ async function generateSummaryForSlide(slideId, options = {}) {
 }
 
 /**
- * Fire-and-forget wrapper used by the conversion service. Logs but never throws,
- * so a failed summary never breaks the conversion pipeline.
+ * Fire-and-forget wrapper used by the conversion service. Logs but never
+ * throws, so a failed summary never breaks the conversion pipeline.
  */
 function dispatchSummaryGeneration(slideId) {
   if (!isEnabled()) return;
@@ -355,4 +439,5 @@ module.exports = {
   dispatchSummaryGeneration,
   isEnabled,
   getDisabledReason,
+  detectProvider,
 };

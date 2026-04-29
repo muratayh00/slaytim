@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
@@ -9,14 +9,16 @@ import SelectSlideForSlideoModal from '@/components/slideo/SelectSlideForSlideoM
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
 import SlideoAdCard from '@/components/shared/SlideoAdCard';
+import { AdProvider } from '@/components/ads/AdProvider';
+import {
+  useSlideoFeedWithAds,
+  SlideoVideoAdCard,
+} from '@/components/ads/SlideoAdInjector';
 
 const BATCH = 8;
-/** Show one in-feed ad every N real slideo items */
-const SLIDEO_AD_EVERY = 5;
 
 function SlideoPageContent() {
   const [validFocusId, setValidFocusId] = useState<number | null>(null);
-
   const user = useAuthStore((s) => s.user);
 
   const [slideos, setSlideos] = useState<SlideoItem[]>([]);
@@ -28,6 +30,9 @@ function SlideoPageContent() {
   const [sort, setSort] = useState<'new' | 'popular'>('new');
   const [feedMeta, setFeedMeta] = useState<{ variant?: string; experiment?: string; subjectKey?: string }>({});
   const [showUploadModal, setShowUploadModal] = useState(false);
+
+  // Reklam enjeksiyonlu karışık feed (içerik + reklam slotları)
+  const feedItems = useSlideoFeedWithAds(slideos);
 
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -69,16 +74,20 @@ function SlideoPageContent() {
     fetchSlideos(1, sort, true);
   }, [fetchSlideos, sort]);
 
+  // Focus parametresi ile belirli slideo'ya scroll
   useEffect(() => {
     if (!validFocusId || slideos.length === 0) return;
     if (focusedSlideoRef.current === validFocusId) return;
 
-    const idx = slideos.findIndex((s) => s.id === validFocusId);
-    if (idx !== -1) {
+    // feedItems içinde slideo kind'larının gerçek index'ini bul
+    const feedIdx = feedItems.findIndex(
+      (fi) => fi.kind === 'slideo' && fi.item.id === validFocusId,
+    );
+    if (feedIdx !== -1) {
       focusedSlideoRef.current = validFocusId;
-      setActiveIdx(idx);
+      setActiveIdx(feedIdx);
       requestAnimationFrame(() => {
-        itemRefs.current[idx]?.scrollIntoView({ behavior: 'auto' });
+        itemRefs.current[feedIdx]?.scrollIntoView({ behavior: 'auto' });
       });
       return;
     }
@@ -89,8 +98,9 @@ function SlideoPageContent() {
       setPage(nextPage);
       fetchSlideos(nextPage, sort);
     }
-  }, [validFocusId, slideos, hasMore, loadingMore, loading, page, fetchSlideos, sort]);
+  }, [validFocusId, slideos, feedItems, hasMore, loadingMore, loading, page, fetchSlideos, sort]);
 
+  // Intersection observer — hangi item aktif
   useEffect(() => {
     if (!observerRef.current) {
       observerRef.current = new IntersectionObserver(
@@ -102,26 +112,24 @@ function SlideoPageContent() {
             }
           });
         },
-        { threshold: 0.6, rootMargin: '0px' }
+        { threshold: 0.6, rootMargin: '0px' },
       );
     }
 
     const observer = observerRef.current;
-    itemRefs.current.forEach((el) => {
-      if (el) observer.observe(el);
-    });
-
+    itemRefs.current.forEach((el) => { if (el) observer.observe(el); });
     return () => observer.disconnect();
-  }, [slideos]);
+  }, [feedItems]);
 
+  // Sonuna yaklaşınca daha fazla yükle
   useEffect(() => {
-    if (activeIdx >= slideos.length - 3 && hasMore && !loadingMore && !loading) {
+    if (activeIdx >= feedItems.length - 3 && hasMore && !loadingMore && !loading) {
       setLoadingMore(true);
       const nextPage = page + 1;
       setPage(nextPage);
       fetchSlideos(nextPage, sort);
     }
-  }, [activeIdx, slideos.length, hasMore, loadingMore, loading, page, fetchSlideos, sort]);
+  }, [activeIdx, feedItems.length, hasMore, loadingMore, loading, page, fetchSlideos, sort]);
 
   const scrollToIdx = useCallback((idx: number) => {
     itemRefs.current[idx]?.scrollIntoView({ behavior: 'smooth' });
@@ -129,8 +137,8 @@ function SlideoPageContent() {
 
   const goNext = useCallback(() => {
     const next = activeIdx + 1;
-    if (next < slideos.length) scrollToIdx(next);
-  }, [activeIdx, slideos.length, scrollToIdx]);
+    if (next < feedItems.length) scrollToIdx(next);
+  }, [activeIdx, feedItems.length, scrollToIdx]);
 
   const goPrev = useCallback(() => {
     const prev = activeIdx - 1;
@@ -198,7 +206,7 @@ function SlideoPageContent() {
           onClick={() => setSort('new')}
           className={cn(
             'flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all',
-            sort === 'new' ? 'bg-white text-black' : 'text-white/65 hover:text-white hover:bg-white/10'
+            sort === 'new' ? 'bg-white text-black' : 'text-white/65 hover:text-white hover:bg-white/10',
           )}
         >
           <Clock className="w-3 h-3" />
@@ -208,7 +216,7 @@ function SlideoPageContent() {
           onClick={() => setSort('popular')}
           className={cn(
             'flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all',
-            sort === 'popular' ? 'bg-white text-black' : 'text-white/65 hover:text-white hover:bg-white/10'
+            sort === 'popular' ? 'bg-white text-black' : 'text-white/65 hover:text-white hover:bg-white/10',
           )}
         >
           <Flame className="w-3 h-3" />
@@ -226,36 +234,63 @@ function SlideoPageContent() {
         </button>
         <button
           onClick={goNext}
-          disabled={activeIdx >= slideos.length - 1 && !hasMore}
+          disabled={activeIdx >= feedItems.length - 1 && !hasMore}
           className="w-9 h-9 rounded-xl bg-black/60 backdrop-blur-sm border border-white/12 flex items-center justify-center text-white/70 disabled:opacity-20"
         >
           <ChevronDown className="w-5 h-5" />
         </button>
       </div>
 
-      <div className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-        {slideos.map((slideo, i) => (
-          <div key={slideo.id} ref={(el) => { itemRefs.current[i] = el; }} className="snap-start shrink-0 slideo-h">
-            <SlideoViewer
-              slideo={slideo}
-              isActive={i === activeIdx}
-              onNext={goNext}
-              onPrev={goPrev}
-              feedVariant={feedMeta.variant || 'A'}
-              feedSubjectKey={feedMeta.subjectKey || ''}
-              isFullscreen
-            />
-          </div>
-        ))}
-        {/* In-feed ad cards — injected after every Nth real item.
-            We render them after the list so snap scroll stays clean.
-            Each ad occupies one full slideo-h snap slot. */}
-        {slideos.length > 0 && slideos
-          .filter((_, i) => (i + 1) % SLIDEO_AD_EVERY === 0)
-          .map((slideo) => (
-            <SlideoAdCard key={`ad-after-${slideo.id}`} />
-          ))
-        }
+      <div
+        className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        {feedItems.map((fi, i) => {
+          if (fi.kind === 'slideo') {
+            return (
+              <div
+                key={`slideo-${fi.item.id}`}
+                ref={(el) => { itemRefs.current[i] = el; }}
+                className="snap-start shrink-0 slideo-h"
+              >
+                <SlideoViewer
+                  slideo={fi.item}
+                  isActive={i === activeIdx}
+                  onNext={goNext}
+                  onPrev={goPrev}
+                  feedVariant={feedMeta.variant || 'A'}
+                  feedSubjectKey={feedMeta.subjectKey || ''}
+                  isFullscreen
+                />
+              </div>
+            );
+          }
+
+          if (fi.kind === 'static_ad') {
+            return (
+              <div
+                key={fi.key}
+                ref={(el) => { itemRefs.current[i] = el; }}
+              >
+                {/* Static in-feed reklam kartı */}
+                <SlideoAdCard />
+              </div>
+            );
+          }
+
+          if (fi.kind === 'video_ad') {
+            return (
+              <div
+                key={fi.key}
+                ref={(el) => { itemRefs.current[i] = el; }}
+              >
+                <SlideoVideoAdCard adKey={fi.key} />
+              </div>
+            );
+          }
+
+          return null;
+        })}
 
         {loadingMore && (
           <div className="snap-start shrink-0 slideo-h flex items-center justify-center bg-black">
@@ -283,5 +318,9 @@ function SlideoPageContent() {
 }
 
 export default function SlideoPage() {
-  return <SlideoPageContent />;
+  return (
+    <AdProvider pageType="slideo">
+      <SlideoPageContent />
+    </AdProvider>
+  );
 }

@@ -125,7 +125,10 @@ const nextConfig = {
       // by the :id wildcard and redirected to /konu/new (404).
       { source: '/topics/new', destination: '/konu/yeni', permanent: true },
       { source: '/topics/:id', destination: '/konu/:id', permanent: true },
-      { source: '/slides/:id', destination: '/slayt/:id', permanent: true },
+      // /slayt/* is the legacy Turkish alias; /slides/* is canonical.
+      // The :slug wildcard catches bare IDs (234), id-slug combos (234-guncel-cv),
+      // and any other shape that might exist in the wild.
+      { source: '/slayt/:slug', destination: '/slides/:slug', permanent: true },
       { source: '/categories', destination: '/kategori', permanent: true },
       { source: '/categories/:slug', destination: '/kategori/:slug', permanent: true },
       { source: '/profile/:username', destination: '/@:username', permanent: true },

@@ -22,7 +22,7 @@ import SlideAnalyticsPanel from '@/components/shared/SlideAnalyticsPanel';
 import SlideFlashcardsPanel from '@/components/shared/SlideFlashcardsPanel';
 import { analytics } from '@/lib/analytics';
 import { resolveFileUrl } from '@/lib/pdfRenderer';
-import { buildProfilePath, buildSlideoPath, buildTopicPath, splitIdSlug } from '@/lib/url';
+import { buildProfilePath, buildSlideoPath, buildSlidePath, buildTopicPath, splitIdSlug } from '@/lib/url';
 import { getApiOrigin, API_BASE_URL } from '@/lib/api-origin';
 import AdUnit from '@/components/shared/AdUnit';
 
@@ -450,7 +450,7 @@ function RelatedSection({ slides, title }: { slides: any[]; title: string }) {
 
 // ?? Main page ?????????????????????????????????????????????????????????????????
 
-export default function SlideDetailPage({ initialSlide }: { initialSlide?: any } = {}) {
+export default function SlideDetailPage() {
   const params = useParams();
   const rawParam = String((params as Record<string, string>)?.id || (params as Record<string, string>)?.slug || '');
   const { id: parsedId, slug: parsedSlug } = splitIdSlug(rawParam);
@@ -459,9 +459,9 @@ export default function SlideDetailPage({ initialSlide }: { initialSlide?: any }
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user } = useAuthStore();
-  const [slide, setSlide] = useState<any>(initialSlide || null);
-  const [loading, setLoading] = useState(!initialSlide);
-  const hasInitialDataRef = useRef(Boolean(initialSlide));
+  const [slide, setSlide] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const hasInitialDataRef = useRef(false);
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showReport, setShowReport] = useState(false);
@@ -516,11 +516,14 @@ export default function SlideDetailPage({ initialSlide }: { initialSlide?: any }
 
   useEffect(() => {
     if (!slide || !Number.isInteger(id) || id <= 0) return;
+    // /slides/ is canonical. Fix the slug portion if it's wrong or missing
+    // (e.g. bare /slides/234 → /slides/234-guncel-cv), but never redirect
+    // away from /slides/ itself.
     const expectedSlug = String(slide?.slug || '').toLowerCase();
-    const shouldFixSlug = pathname.startsWith('/slayt/') && expectedSlug && parsedSlug !== expectedSlug;
-    const shouldFixLegacy = pathname.startsWith('/slides/');
-    if (!shouldFixSlug && !shouldFixLegacy) return;
-    const canonical = `/slayt/${id}-${expectedSlug || String(id)}`;
+    const onSlides = pathname.startsWith('/slides/');
+    const shouldFixSlug = onSlides && expectedSlug && parsedSlug !== expectedSlug;
+    if (!shouldFixSlug) return;
+    const canonical = buildSlidePath({ id, slug: expectedSlug });
     const query = searchParams.toString();
     const nextUrl = query ? `${canonical}?${query}` : canonical;
 
@@ -1246,7 +1249,7 @@ export default function SlideDetailPage({ initialSlide }: { initialSlide?: any }
               )}
               {/* Share buttons */}
               <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(slide?.title || '')}&url=${encodeURIComponent(`${SITE_URL}/slayt/${id}-${slide?.slug || id}`)}`}
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(slide?.title || '')}&url=${encodeURIComponent(`${SITE_URL}${buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title })}`)}`}
                 target="_blank" rel="noopener noreferrer"
                 className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
                 title="X / Twitter'da paylaş"
@@ -1254,7 +1257,7 @@ export default function SlideDetailPage({ initialSlide }: { initialSlide?: any }
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.262 5.638L18.243 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
               </a>
               <a
-                href={`https://wa.me/?text=${encodeURIComponent(`${slide?.title || ''} – ${SITE_URL}/slayt/${id}-${slide?.slug || id}`)}`}
+                href={`https://wa.me/?text=${encodeURIComponent(`${slide?.title || ''} – ${SITE_URL}${buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title })}`)}`}
                 target="_blank" rel="noopener noreferrer"
                 className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-green-500 hover:border-green-500/30 hover:bg-green-500/5 transition-all"
                 title="WhatsApp'ta paylaş"

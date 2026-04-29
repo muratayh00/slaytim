@@ -2,6 +2,9 @@
  * Backfill AI summaries for existing slides that are converted but missing
  * a summary. Safe to interrupt — every slide is committed in its own tx.
  *
+ * Provider: set ANTHROPIC_API_KEY (preferred) or OPENAI_API_KEY in .env.
+ * If neither key is present, use --dry-run to preview without calling any LLM.
+ *
  * Usage:
  *   cd server
  *   node scripts/backfill-ai-summary.js --dry-run --limit=10
@@ -12,12 +15,14 @@
  *   --dry-run         do not call the LLM; report which slides would be processed
  *   --limit=<n>       hard cap on slides to process this run (default 50)
  *   --batch=<n>       (alias) same as --limit
- *   --concurrency=<n> parallel calls (default 2; Anthropic Haiku tolerates 5)
- *   --force           regenerate even if a summary already exists
+ *   --concurrency=<n> parallel calls (default 2; bump to 4-5 if using Haiku/4o-mini)
+ *   --force           regenerate even if a summary already exists (including manual ones)
  *   --slide=<id>      process exactly one slide id
  *
  * Cost guidance (Claude 3.5 Haiku, 04-2026 pricing):
  *   ~$0.0015 per slide. 1000 slides ≈ $1.50. Run during off-hours.
+ * Cost guidance (GPT-4o-mini, 04-2026 pricing):
+ *   ~$0.0006 per slide. 1000 slides ≈ $0.60. Good budget alternative.
  */
 
 const { PrismaClient } = require('@prisma/client');
@@ -47,7 +52,7 @@ async function main() {
 
   if (!args.dryRun && !isEnabled()) {
     console.error(`AI summary disabled: ${getDisabledReason()}`);
-    console.error('Run with --dry-run to preview, or set ANTHROPIC_API_KEY.');
+    console.error('Run with --dry-run to preview, or set ANTHROPIC_API_KEY / OPENAI_API_KEY.');
     process.exitCode = 1;
     return;
   }

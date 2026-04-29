@@ -50,7 +50,7 @@ function toCanonicalIdSlug(id: number, slugLike: string): string {
 }
 
 export function buildSlidePath(slide: { id: number; slug?: string | null; title?: string | null }): string {
-  return `/slayt/${toCanonicalIdSlug(slide.id, slide.slug || slide.title || String(slide.id))}`;
+  return `/slides/${toCanonicalIdSlug(slide.id, slide.slug || slide.title || String(slide.id))}`;
 }
 
 export function buildTopicPath(topic: { id: number; slug?: string | null; title?: string | null }): string {

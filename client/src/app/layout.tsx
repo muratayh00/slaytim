@@ -17,6 +17,7 @@ const font = Plus_Jakarta_Sans({
 });
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
+const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || '';
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
@@ -109,6 +110,49 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
         />
+
+        {/*
+          Google Tag (gtag.js) — Consent Mode v2
+          ────────────────────────────────────────
+          • Injected server-side so the measurement ID appears in raw HTML
+            (required for ads.txt verification and Googlebot crawl).
+          • Default consent state is DENIED — GA collects nothing until the
+            user accepts via the cookie banner (useConsentStore).
+          • GoogleAnalytics client component (below) calls gtag('consent','update')
+            on hydration for returning users and on every consent change.
+          • wait_for_update:500 gives the client component 500 ms to promote
+            consent before GA fires the first hit — prevents data loss for
+            users who already accepted.
+          • send_page_view:false — SPA page_view events are sent manually by
+            the GoogleAnalytics component to avoid double-counting on hydration.
+        */}
+        {GA_ID && (
+          <>
+            {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+            <script
+              dangerouslySetInnerHTML={{
+                __html: [
+                  'window.dataLayer=window.dataLayer||[];',
+                  'function gtag(){dataLayer.push(arguments);}',
+                  // Set denied defaults BEFORE loading gtag.js so Consent Mode
+                  // is in effect from the very first hit.
+                  "gtag('consent','default',{",
+                  "  analytics_storage:'denied',",
+                  "  ad_storage:'denied',",
+                  "  ad_user_data:'denied',",
+                  "  ad_personalization:'denied',",
+                  "  wait_for_update:500",
+                  '});',
+                  "gtag('js',new Date());",
+                  `gtag('config','${GA_ID}',{send_page_view:false,anonymize_ip:true});`,
+                ].join('\n'),
+              }}
+            />
+            {/* async — non-blocking; loads in parallel with page render */}
+            {/* eslint-disable-next-line @next/next/no-before-interactive-script-outside-document */}
+            <script async src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} />
+          </>
+        )}
       </head>
       <body className={`${font.variable} font-sans`}>
         <Providers>

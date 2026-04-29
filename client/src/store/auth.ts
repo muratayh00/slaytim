@@ -9,6 +9,8 @@ interface User {
   bio?: string | null;
   isAdmin: boolean;
   emailVerifiedAt?: string | null;
+  /** Premium üyelik — ileride aktif edilecek. False ise reklam gösterilir. */
+  isPremium?: boolean;
 }
 
 interface AuthStore {
