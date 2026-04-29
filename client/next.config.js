@@ -118,6 +118,19 @@ const nextConfig = {
 
   async redirects() {
     return [
+      // ── www → apex canonical redirect ──────────────────────────────────────
+      // Safety net for requests that bypass nginx (direct Node.js access, dev
+      // tunnels, etc.). Nginx already handles this at the edge with 308 — this
+      // rule is a defence-in-depth fallback only.
+      // Note: Next.js redirects() cannot match on Host header directly, so this
+      // uses has:[{type:'host'}] which is supported since Next.js 12.
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'www.slaytim.com' }],
+        destination: 'https://slaytim.com/:path*',
+        permanent: true,
+      },
+
       // Legacy route aliases -> canonical Turkish slug routes
       { source: '/topics', destination: '/kesfet', permanent: true },
       // /topics/new must come BEFORE /topics/:id — Next.js redirects run before
