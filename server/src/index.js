@@ -72,7 +72,10 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 const TRUST_PROXY = process.env.TRUST_PROXY;
-const disableRateLimitForE2E = process.env.E2E_DISABLE_RATE_LIMIT === 'true';
+// E2E_DISABLE_RATE_LIMIT is only honoured outside production.
+// If someone accidentally sets it on a production server, it is silently ignored.
+const disableRateLimitForE2E =
+  process.env.NODE_ENV !== 'production' && process.env.E2E_DISABLE_RATE_LIMIT === 'true';
 const allowNonProdAutomationBypass = process.env.NODE_ENV !== 'production';
 const isAutomationBypassRequest = (req) =>
   allowNonProdAutomationBypass && String(req.headers['x-staging-proof'] || '') === '1';
@@ -419,7 +422,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-seedBadges().catch(console.error);
+seedBadges().catch((err) => logger.error('[badges] Seed failed', { error: err?.message }));
 validateSecurityEnv();
 assertProductionReadiness();
 assertRemoteStorageConfigured();

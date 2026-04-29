@@ -1,8 +1,10 @@
 ﻿require('dotenv').config();
+const logger = require('../lib/logger');
+
 const REDIS_ENABLED = String(process.env.REDIS_ENABLED || 'false').toLowerCase() === 'true';
 
 if (!REDIS_ENABLED) {
-  console.log('[worker] Redis disabled (REDIS_ENABLED=false). Worker not started.');
+  logger.info('[worker] Redis disabled (REDIS_ENABLED=false). Worker not started.');
   process.exit(0);
 }
 
@@ -21,7 +23,7 @@ function writeHeartbeat() {
     fs.writeFileSync(HEARTBEAT_PATH, String(Date.now()), 'utf8');
   } catch (err) {
     // Non-fatal: log but don't crash
-    console.warn('[worker] Failed to write heartbeat file:', err.message);
+    logger.warn('[worker] Failed to write heartbeat file', { error: err.message });
   }
 }
 
@@ -40,7 +42,6 @@ const {
   QUEUE_NAME,
 } = require('../queues/conversion.queue');
 const { convertSlide, getLibreOfficeBinary } = require('../services/conversion.service');
-const logger = require('../lib/logger');
 
 // ── Worker preflight: fail hard if required components are missing ─────────────
 async function workerPreflight() {
@@ -97,7 +98,7 @@ const concurrency = Math.max(1, Number(process.env.CONVERSION_WORKER_CONCURRENCY
   const target = process.env.REDIS_URL
     ? process.env.REDIS_URL.replace(/(:\/\/[^:@]*):([^@]+)@/, '$1:***@') // redact password
     : `${process.env.REDIS_HOST || '127.0.0.1'}:${process.env.REDIS_PORT || 6379}`;
-  console.log(`[worker] Redis hedefi: ${target} (REDIS_ENABLED=true)`);
+  logger.info(`[worker] Redis hedefi: ${target} (REDIS_ENABLED=true)`);
 }
 
 function isUnrecoverable(err) {
@@ -114,12 +115,12 @@ let worker;
 let queueEvents;
 
 function shutdown(signal) {
-  console.log(`[worker] received ${signal}, shutting down gracefully...`);
+  logger.info(`[worker] received ${signal}, shutting down gracefully...`);
   Promise.all([
     worker ? worker.close() : Promise.resolve(),
     queueEvents ? queueEvents.close() : Promise.resolve(),
   ]).catch((err) => {
-    console.error('[worker] shutdown error:', err?.message || err);
+    logger.error('[worker] shutdown error', { error: err?.message || String(err) });
   }).finally(() => process.exit(0));
 }
 

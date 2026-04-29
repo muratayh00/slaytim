@@ -4,6 +4,7 @@
  */
 
 const prisma = require('./prisma');
+const logger = require('./logger');
 const { pushEvent } = require('../services/notification-stream.service');
 
 // Maps notification types to the user preference field that controls them.
@@ -74,7 +75,7 @@ async function createNotification({ userId, type, message, link = null, respectP
     });
   } catch (err) {
     // Bildirim hatası hiçbir zaman ana isteği engellememeli
-    console.error('[notify] Failed to create notification:', err.message);
+    logger.error('[notify] Failed to create notification', { error: err.message });
   }
 }
 

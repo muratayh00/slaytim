@@ -2,6 +2,7 @@
 const path = require('path');
 const pdfParse = require('../lib/pdf-parse');
 const prisma = require('../lib/prisma');
+const logger = require('../lib/logger');
 const { enqueueSlideConversion } = require('../services/conversion.service');
 const { toSlug, uniqueSlug } = require('../lib/slug');
 const { sanitizeText } = require('../lib/sanitize');
@@ -59,7 +60,7 @@ const getPdfPageCount = async (pdfUrl) => {
     }
   }
   if (lastError) {
-    console.warn('[slideo-v3] getPdfPageCount failed:', String(lastError?.message || lastError));
+    logger.warn('[slideo-v3] getPdfPageCount failed', { error: String(lastError?.message || lastError) });
   }
   return null;
 };
@@ -196,7 +197,7 @@ const createSession = async (req, res) => {
     // Local mode: only delete the file if no slide DB record was created yet; once a slide
     // references req.file.path as its permanent fileUrl, deletion would corrupt the record.
     if (isRemoteEnabled() || !slideDbCreated) cleanupUploadedFile(req.file);
-    console.error(err);
+    logger.error('[slideo-v3] createSession failed', { error: err?.message, stack: err?.stack });
     return res.status(500).json({ error: 'Slideo oturumu oluşturulamadı' });
   }
 };
@@ -250,7 +251,7 @@ const getSessionStatus = async (req, res) => {
       updatedAt: new Date().toISOString(),
     });
   } catch (err) {
-    console.error(err);
+    logger.error('[slideo-v3] getSessionStatus failed', { error: err?.message, stack: err?.stack });
     return res.status(500).json({ error: 'Session durumu alınamadı' });
   }
 };
@@ -291,7 +292,7 @@ const getSessionPreviewMeta = async (req, res) => {
       conversionStatus: 'done',
     });
   } catch (err) {
-    console.error(err);
+    logger.error('[slideo-v3] getSessionPreviewMeta failed', { error: err?.message, stack: err?.stack });
     return res.status(500).json({ error: 'Preview metadata alınamadı' });
   }
 };
@@ -373,7 +374,7 @@ const publishSession = async (req, res) => {
       slideo,
     });
   } catch (err) {
-    console.error(err);
+    logger.error('[slideo-v3] publishSession failed', { error: err?.message, stack: err?.stack });
     return res.status(500).json({ error: 'Slideo yayınlanamadı' });
   }
 };
@@ -443,7 +444,7 @@ const createFromSlide = async (req, res) => {
 
     return res.status(201).json({ ok: true, slideoId: slideo.id, slideo });
   } catch (err) {
-    console.error(err);
+    logger.error('[slideo-v3] createFromSlide failed', { error: err?.message, stack: err?.stack });
     return res.status(500).json({ error: 'Slideo oluşturulamadı' });
   }
 };

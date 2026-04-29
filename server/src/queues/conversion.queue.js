@@ -53,12 +53,12 @@ function getRedisConnection() {
           const target = process.env.REDIS_URL
             ? '(REDIS_URL)'
             : `${process.env.REDIS_HOST || '127.0.0.1'}:${process.env.REDIS_PORT || 6379}`;
-          console.error(`[queue] ⚠️  REDIS_ENABLED=true fakat Redis'e bağlanılamıyor (${target}).`);
-          console.error(`[queue] Hata: ${err?.message || err}`);
-          console.error('[queue] .env dosyasında REDIS_URL veya REDIS_HOST/REDIS_PORT değerlerini kontrol edin.');
-          console.error('[queue] Redis olmadan çalışmak için REDIS_ENABLED=false yapın.');
+          logger.error(`[queue] REDIS_ENABLED=true fakat Redis'e bağlanılamıyor (${target})`, {
+            error: err?.message || String(err),
+            hint: 'REDIS_URL / REDIS_HOST:REDIS_PORT degerleri kontrol edin. Devre disi birakmak icin REDIS_ENABLED=false yapin.',
+          });
         } else {
-          console.error(`[queue] Redis bağlantı hatası (×${_errCount}):`, err?.message || err);
+          logger.error(`[queue] Redis baglanti hatasi (x${_errCount})`, { error: err?.message || String(err) });
         }
         _lastErrLog = now;
       }

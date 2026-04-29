@@ -478,7 +478,7 @@ async function hydrateFallbackQueueFromDatabase() {
       scheduleFallback(job.slideId);
     }
   } catch (err) {
-    console.error('[conversion] Failed to hydrate fallback queue:', err?.message || err);
+    logger.error('[conversion] Failed to hydrate fallback queue', { error: err?.message || String(err) });
   }
 }
 
@@ -559,7 +559,7 @@ async function enqueueSlideConversion(slideId) {
   if (!REDIS_ENABLED && LOCAL_FALLBACK_ENABLED) {
     if (!fallbackWarned) {
       fallbackWarned = true;
-      console.warn('[conversion] Redis disabled, using local fallback conversion mode.');
+      logger.warn('[conversion] Redis disabled, using local fallback conversion mode.');
     }
     await hydrateFallbackQueueFromDatabase();
     scheduleFallback(slideId);
@@ -576,7 +576,7 @@ async function enqueueSlideConversion(slideId) {
     if (err instanceof QueueUnavailableError && LOCAL_FALLBACK_ENABLED) {
       if (!fallbackWarned) {
         fallbackWarned = true;
-        console.warn('[conversion] Redis unavailable, switched to local fallback conversion mode.');
+        logger.warn('[conversion] Redis unavailable, switched to local fallback conversion mode.');
       }
       await hydrateFallbackQueueFromDatabase();
       scheduleFallback(slideId);

@@ -30,16 +30,17 @@
  */
 
 require('dotenv').config();
+const logger = require('../lib/logger');
 
 const REDIS_ENABLED = String(process.env.REDIS_ENABLED || 'false').toLowerCase() === 'true';
 if (!REDIS_ENABLED) {
-  console.log('[preview-worker] Redis disabled (REDIS_ENABLED=false). Worker not started.');
+  logger.info('[preview-worker] Redis disabled (REDIS_ENABLED=false). Worker not started.');
   process.exit(0);
 }
 
 const PREVIEW_ENABLED = String(process.env.PREVIEW_ENABLED ?? 'true').toLowerCase() !== 'false';
 if (!PREVIEW_ENABLED) {
-  console.log('[preview-worker] PREVIEW_ENABLED=false. Worker not started.');
+  logger.info('[preview-worker] PREVIEW_ENABLED=false. Worker not started.');
   process.exit(0);
 }
 
@@ -53,7 +54,7 @@ const HEARTBEAT_INTERVAL_MS = Math.max(5000, Number(process.env.WORKER_HEARTBEAT
 
 function writeHeartbeat() {
   try { fs.writeFileSync(HEARTBEAT_PATH, String(Date.now()), 'utf8'); }
-  catch (err) { console.warn('[preview-worker] Heartbeat write failed:', err.message); }
+  catch (err) { logger.warn('[preview-worker] Heartbeat write failed', { error: err.message }); }
 }
 writeHeartbeat();
 const _heartbeatTimer = setInterval(writeHeartbeat, HEARTBEAT_INTERVAL_MS);
@@ -73,7 +74,6 @@ const {
   resolveLocalPdf,
 } = require('../services/preview-generator.service');
 const prisma  = require('../lib/prisma');
-const logger  = require('../lib/logger');
 
 const WORKER_CONCURRENCY       = Math.max(1, Number(process.env.PREVIEW_WORKER_CONCURRENCY || 2));
 const LOCK_DURATION_MS         = Math.max(30000, Number(process.env.PREVIEW_LOCK_DURATION_MS || 180000));

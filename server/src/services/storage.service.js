@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const logger = require('../lib/logger');
 const {
   S3Client,
   PutObjectCommand,
@@ -33,13 +34,13 @@ function remoteDriverIntended() {
 function assertRemoteStorageConfigured() {
   if (!remoteDriverIntended()) {
     // Local disk mode — valid for self-hosted VPS deployments.
-    console.warn('[storage] No remote storage driver configured (STORAGE_DRIVER not set or "local"); using local disk uploads.');
+    logger.warn('[storage] No remote storage driver configured (STORAGE_DRIVER not set or "local"); using local disk uploads.');
     return;
   }
   if (!BUCKET || !ACCESS_KEY_ID || !SECRET_ACCESS_KEY) {
     const msg = 'Remote storage credentials are missing (STORAGE_BUCKET / STORAGE_ACCESS_KEY_ID / STORAGE_SECRET_ACCESS_KEY).';
     if (NODE_ENV === 'production') throw new Error(msg);
-    console.warn(`[storage] ${msg} Using local uploads fallback.`);
+    logger.warn(`[storage] ${msg} Using local uploads fallback.`);
   }
 }
 
