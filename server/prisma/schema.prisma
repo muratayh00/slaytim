@@ -69,6 +69,8 @@ model User {
   @@index([createdAt])
   @@index([isBanned])
   @@index([isMuted])
+  @@index([role])
+  @@index([emailVerifiedAt])
   @@map("users")
 }
 

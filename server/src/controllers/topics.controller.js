@@ -503,8 +503,8 @@ const search = async (req, res) => {
     };
 
     const [rawTopics, rawSlides] = await Promise.all([
-      prisma.topic.findMany({ where: { isHidden: false, OR: makeOr(q, qNorm) }, take: 100, select: topicSelect }),
-      prisma.slide.findMany({ where: { isHidden: false, OR: makeOr(q, qNorm) }, take: 100, select: slideSelect }),
+      prisma.topic.findMany({ where: { isHidden: false, OR: makeOr(q, qNorm) }, take: 30, select: topicSelect }),
+      prisma.slide.findMany({ where: { isHidden: false, OR: makeOr(q, qNorm) }, take: 30, select: slideSelect }),
     ]);
 
     // Deduplicate by id (same item can match multiple OR conditions)

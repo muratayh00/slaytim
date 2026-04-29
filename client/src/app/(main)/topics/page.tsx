@@ -123,7 +123,7 @@ function TopicsContent() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(9)].map((_, i) => <TopicCardSkeleton key={i} />)}
         </div>
       ) : topics.length === 0 ? (
@@ -142,7 +142,7 @@ function TopicsContent() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8"
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8"
           >
             {topics.map((t) => <TopicCard key={t.id} topic={t} />)}
           </motion.div>
@@ -176,7 +176,7 @@ export default function TopicsPage() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="skeleton h-10 w-48 rounded-xl mb-8" />
         <div className="skeleton h-20 w-full rounded-2xl mb-6" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(9)].map((_, i) => <TopicCardSkeleton key={i} />)}
         </div>
       </div>

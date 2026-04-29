@@ -1,5 +1,6 @@
 const fs = require('fs');
 const { execFile } = require('child_process');
+const logger = require('../lib/logger');
 
 function getClamScanBinary() {
   const envPath = String(process.env.CLAMSCAN_PATH || '').trim();
@@ -74,21 +75,20 @@ function assertClamAvStartup() {
   const binary = getClamScanBinary();
 
   if (available) {
-    console.log(`[clamav] ✓ ClamAV found at: ${binary}`);
+    logger.info(`[clamav] ClamAV found at: ${binary}`);
     return;
   }
 
   if (required) {
-    console.error('[clamav] FATAL: CLAMAV_REQUIRED=true but ClamAV binary not found.');
-    console.error('[clamav] Install ClamAV or set CLAMAV_REQUIRED=false to disable.');
-    console.error('[clamav] Searched paths:');
+    logger.error('[clamav] FATAL: CLAMAV_REQUIRED=true but ClamAV binary not found.');
+    logger.error('[clamav] Install ClamAV or set CLAMAV_REQUIRED=false to disable.');
     const paths = process.platform === 'win32'
       ? ['C:\\Program Files\\ClamAV\\clamscan.exe', 'C:\\Program Files\\ClamAV\\clamdscan.exe']
       : ['/usr/bin/clamscan', '/usr/local/bin/clamscan', '/usr/bin/clamdscan'];
-    for (const p of paths) console.error(`  ${p}`);
+    logger.error('[clamav] Searched paths: ' + paths.join(', '));
     process.exit(1);
   } else {
-    console.warn('[clamav] WARNING: ClamAV not found. File scanning disabled. Set CLAMAV_REQUIRED=true to enforce.');
+    logger.warn('[clamav] ClamAV not found. File scanning disabled. Set CLAMAV_REQUIRED=true to enforce.');
   }
 }
 

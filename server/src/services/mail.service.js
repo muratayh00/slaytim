@@ -25,7 +25,14 @@ async function sendMail({ to, subject, html }) {
   let transporter = createTransport();
 
   if (!transporter) {
-    // Auto-create Ethereal test account in development (network failure = silent skip)
+    // Production: SMTP is required — throw so callers can log the failure properly.
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'SMTP not configured (SMTP_HOST missing) — set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS in your environment.',
+      );
+    }
+
+    // Development: fall back to Ethereal test account for quick previews.
     try {
       const testAccount = await nodemailer.createTestAccount();
       transporter = nodemailer.createTransport({
@@ -37,7 +44,7 @@ async function sendMail({ to, subject, html }) {
         from: `"Slaytim" <${testAccount.user}>`,
         to, subject, html,
       });
-      console.log('[mail] Preview URL:', nodemailer.getTestMessageUrl(info));
+      console.log('[mail] Ethereal preview URL:', nodemailer.getTestMessageUrl(info));
     } catch (err) {
       console.warn('[mail] Ethereal test account unavailable — e-posta gönderilmedi:', err.message);
     }
