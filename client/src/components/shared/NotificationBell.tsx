@@ -110,7 +110,7 @@ export default function NotificationBell() {
   const fetchCount = useCallback(async () => {
     if (!userRef.current) return;
     try {
-      const { data } = await api.get('/notifications/unread-count');
+      const { data } = await api.get('/notifications/unread-count', { timeout: 8_000 });
       setUnread(data.count);
     } catch (err) {
       logSoftError('fetchCount failed', err);

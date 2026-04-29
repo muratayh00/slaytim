@@ -1579,21 +1579,28 @@ const remove = async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    for (const fileUrl of [slide.fileUrl, slide.pdfUrl, slide.thumbnailUrl]) {
-      if (!fileUrl) continue;
-      try {
-        await deleteStoredObject(fileUrl);
-      } catch (cleanupErr) {
-        logger.warn('Failed to cleanup slide file in storage', {
-          slideId: Number(id),
-          fileUrl,
-          error: cleanupErr?.message || String(cleanupErr),
-        });
-      }
-    }
-
+    // Delete DB record first so the slide is immediately inaccessible,
+    // then respond right away — don't block the client on storage I/O.
     await prisma.slide.delete({ where: { id: Number(id) } });
     res.json({ success: true });
+
+    // Clean up stored files in background (parallel, fire-and-forget).
+    // Failures here are logged but do not affect the user-visible response.
+    const filesToDelete = [slide.fileUrl, slide.pdfUrl, slide.thumbnailUrl].filter(Boolean);
+    if (filesToDelete.length > 0) {
+      Promise.allSettled(filesToDelete.map((fileUrl) => deleteStoredObject(fileUrl)))
+        .then((results) => {
+          results.forEach((r, i) => {
+            if (r.status === 'rejected') {
+              logger.warn('Failed to cleanup slide file in storage', {
+                slideId: Number(id),
+                fileUrl: filesToDelete[i],
+                error: r.reason?.message || String(r.reason),
+              });
+            }
+          });
+        });
+    }
   } catch (err) {
     logger.error('Failed to delete slide', { error: err.message, stack: err.stack });
     const isForeignKeyError = err?.code === 'P2003';

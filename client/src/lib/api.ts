@@ -35,7 +35,13 @@ api.interceptors.request.use(async (config) => {
   const method = String(config.method || 'get').toLowerCase();
   if (!UNSAFE_METHODS.has(method)) return config;
 
-  const token = await ensureCsrfToken();
+  let token = await ensureCsrfToken();
+  // If the first fetch failed (network blip), retry once before giving up so
+  // we don't immediately hit a 403 → CSRF-retry cycle on every unsafe request.
+  if (!token) {
+    await new Promise((r) => setTimeout(r, 200));
+    token = await ensureCsrfToken();
+  }
   if (token) {
     config.headers = config.headers || {};
     if (!config.headers['x-csrf-token']) {

@@ -587,7 +587,7 @@ export default function SlideDetailPage() {
   useEffect(() => {
     if (!userId || !id) return;
     let cancelled = false;
-    Promise.allSettled([api.get('/likes/me'), api.get('/saves/me')]).then(([likes, saves]) => {
+    Promise.allSettled([api.get('/likes/me', { timeout: 8_000 }), api.get('/saves/me', { timeout: 8_000 })]).then(([likes, saves]) => {
       if (cancelled) return;
       const likedSlides = likes.status === 'fulfilled' && Array.isArray(likes.value?.data?.slides)
         ? likes.value.data.slides
@@ -605,13 +605,13 @@ export default function SlideDetailPage() {
   useEffect(() => {
     if (!id) return;
     api
-      .get(`/slides/${id}/related`)
+      .get(`/slides/${id}/related`, { timeout: 8_000 })
       .then(({ data }) => setRelated(data))
       .catch((err) => {
         logSoftError('related slides fetch failed', err);
         setRelated(null);
       });
-    api.get(`/slideo/by-slide/${id}`).then(({ data }) => setSlideos(data)).catch(() => {});
+    api.get(`/slideo/by-slide/${id}`, { timeout: 8_000 }).then(({ data }) => setSlideos(data)).catch(() => {});
   }, [id]);
 
   const loadFlashcards = useCallback(async () => {
@@ -787,7 +787,7 @@ export default function SlideDetailPage() {
 
     const fetchMeta = async () => {
       try {
-        const { data } = await api.get(`/slides/${id}/preview-meta`);
+        const { data } = await api.get(`/slides/${id}/preview-meta`, { timeout: 8_000 });
         if (cancelled) return;
         setPreviewMeta({
           previewMode:   data.previewMode === 'images' ? 'images' : 'pdf',
@@ -834,7 +834,7 @@ export default function SlideDetailPage() {
       if (pollCount > MAX_POLLS) { clearInterval(timer); return; }
 
       try {
-        const { data } = await api.get(`/slides/${id}/preview-meta`);
+        const { data } = await api.get(`/slides/${id}/preview-meta`, { timeout: 8_000 });
         const newMode   = data.previewMode === 'images' ? 'images' : 'pdf';
         const newStatus = data.previewStatus || 'none';
         const newPages  = Array.isArray(data.pages) ? data.pages : [];
