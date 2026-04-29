@@ -11,7 +11,6 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import TopicCard from '@/components/shared/TopicCard';
 import SlideCard from '@/components/shared/SlideCard';
-import AdUnit from '@/components/shared/AdUnit';
 import { TopicCardSkeleton, SlideCardSkeleton } from '@/components/shared/Skeleton';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -281,23 +280,8 @@ export default function HomeClient({
               </section>
             )}
 
-            {/* ── Homepage mid-content ad ── */}
-            <section aria-hidden="true">
-              <div className="hidden sm:block">
-                <AdUnit
-                  slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME_MID || '0000000000'}
-                  placement="home_mid_desktop"
-                  size="leaderboard"
-                />
-              </div>
-              <div className="sm:hidden">
-                <AdUnit
-                  slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME_MID || '0000000000'}
-                  placement="home_mid_mobile"
-                  size="leaderboard-sm"
-                />
-              </div>
-            </section>
+            {/* ── Homepage mid-content ad slot ── */}
+            {/* TODO: Google Ads kodu buraya eklenecek (home_mid) */}
 
             {trendingSlideos.length > 0 && (
               <section>
@@ -389,14 +373,8 @@ export default function HomeClient({
               )}
             </section>
 
-            {/* ── Bottom-of-feed ad ── */}
-            <section aria-hidden="true">
-              <AdUnit
-                slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME_BOTTOM || process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME_MID || '0000000000'}
-                placement="home_bottom"
-                size="infeed"
-              />
-            </section>
+            {/* ── Bottom-of-feed ad slot ── */}
+            {/* TODO: Google Ads kodu buraya eklenecek (home_bottom) */}
           </>
         )}
       </div>

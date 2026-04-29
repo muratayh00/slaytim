@@ -13,7 +13,6 @@ import { SlideCardSkeleton } from '@/components/shared/Skeleton';
 import UploadSlideModal from '@/components/shared/UploadSlideModal';
 import CommentSection from '@/components/shared/CommentSection';
 import ReportModal from '@/components/shared/ReportModal';
-import AdUnit from '@/components/shared/AdUnit';
 import toast from 'react-hot-toast';
 import { resolveFileUrl } from '@/lib/pdfRenderer';
 import { buildCategoryPath, buildProfilePath, buildTopicPath, splitIdSlug } from '@/lib/url';
@@ -468,40 +467,15 @@ export default function TopicDetailPage({ initialTopic }: { initialTopic?: any }
         </div>
       )}
 
-      {/* ── Mid-content ad ── after slide grid, before comments.
-           Reader already consumed the content → high purchase intent.
-           Desktop: leaderboard. Mobile: leaderboard-sm. */}
-      {visibleSlides.length > 0 && (
-        <>
-          <div className="mt-8 hidden sm:block">
-            <AdUnit
-              slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_TOPIC_MID || process.env.NEXT_PUBLIC_ADSENSE_SLOT_TOPIC_DETAIL || '0000000000'}
-              placement="topic_mid_desktop"
-              size="leaderboard"
-            />
-          </div>
-          <div className="mt-8 sm:hidden">
-            <AdUnit
-              slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_TOPIC_MID || process.env.NEXT_PUBLIC_ADSENSE_SLOT_TOPIC_DETAIL || '0000000000'}
-              placement="topic_mid_mobile"
-              size="leaderboard-sm"
-            />
-          </div>
-        </>
-      )}
+      {/* ── Mid-content ad slot ── */}
+      {/* TODO: Google Ads kodu buraya eklenecek (topic_mid) */}
 
       <div className="mt-8">
         <CommentSection topicId={Number(topic?.id || 0)} />
       </div>
 
-      {/* ── Bottom ad ── after comments (long-session readers) */}
-      <div className="mt-6">
-        <AdUnit
-          slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_TOPIC_DETAIL || '0000000000'}
-          placement="topic_bottom"
-          size="infeed"
-        />
-      </div>
+      {/* ── Bottom ad slot ── */}
+      {/* TODO: Google Ads kodu buraya eklenecek (topic_bottom) */}
 
       {showUpload && (
         <UploadSlideModal

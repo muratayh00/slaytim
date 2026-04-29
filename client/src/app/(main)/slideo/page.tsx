@@ -8,12 +8,8 @@ import SlideoViewer, { SlideoItem } from '@/components/slideo/SlideoViewer';
 import SelectSlideForSlideoModal from '@/components/slideo/SelectSlideForSlideoModal';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
-import SlideoAdCard from '@/components/shared/SlideoAdCard';
 import { AdProvider } from '@/components/ads/AdProvider';
-import {
-  useSlideoFeedWithAds,
-  SlideoVideoAdCard,
-} from '@/components/ads/SlideoAdInjector';
+import { useSlideoFeedWithAds } from '@/components/ads/SlideoAdInjector';
 
 const BATCH = 8;
 
@@ -266,27 +262,9 @@ function SlideoPageContent() {
             );
           }
 
-          if (fi.kind === 'static_ad') {
-            return (
-              <div
-                key={fi.key}
-                ref={(el) => { itemRefs.current[i] = el; }}
-              >
-                {/* Static in-feed reklam kartı */}
-                <SlideoAdCard />
-              </div>
-            );
-          }
-
-          if (fi.kind === 'video_ad') {
-            return (
-              <div
-                key={fi.key}
-                ref={(el) => { itemRefs.current[i] = el; }}
-              >
-                <SlideoVideoAdCard adKey={fi.key} />
-              </div>
-            );
+          if (fi.kind === 'static_ad' || fi.kind === 'video_ad') {
+            /* TODO: Google Ads kodu buraya eklenecek (slideo_infeed) */
+            return null;
           }
 
           return null;

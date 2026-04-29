@@ -24,7 +24,6 @@ import { analytics } from '@/lib/analytics';
 import { resolveFileUrl } from '@/lib/pdfRenderer';
 import { buildProfilePath, buildSlideoPath, buildSlidePath, buildTopicPath, splitIdSlug } from '@/lib/url';
 import { getApiOrigin, API_BASE_URL } from '@/lib/api-origin';
-import AdUnit from '@/components/shared/AdUnit';
 
 // PDF/canvas-based viewers are client-only — skip SSR to prevent hydration mismatches (#422, #425)
 const SlideViewer = dynamic(() => import('@/components/shared/SlideViewer'), { ssr: false });
@@ -1338,22 +1337,8 @@ export default function SlideDetailPage() {
           />
         )}
 
-        {/* ── Mid-content ad ── highest viewability position: after viewer, before CTA.
-             Desktop: leaderboard (728×90). Mobile: leaderboard-sm (320×50). */}
-        <div className="mt-6 hidden sm:block">
-          <AdUnit
-            slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_SLIDE_MID || process.env.NEXT_PUBLIC_ADSENSE_SLOT_SLIDE_DETAIL || '0000000000'}
-            placement="slide_detail_mid_desktop"
-            size="leaderboard"
-          />
-        </div>
-        <div className="mt-6 sm:hidden">
-          <AdUnit
-            slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_SLIDE_MID || process.env.NEXT_PUBLIC_ADSENSE_SLOT_SLIDE_DETAIL || '0000000000'}
-            placement="slide_detail_mid_mobile"
-            size="leaderboard-sm"
-          />
-        </div>
+        {/* ── Mid-content ad slot ── */}
+        {/* TODO: Google Ads kodu buraya eklenecek (slide_detail_mid) */}
 
         <SlideFlashcardsPanel
           slideId={Number(id)}
@@ -1460,14 +1445,8 @@ export default function SlideDetailPage() {
           </div>
         )}
 
-        {/* ── Bottom ad ── after related slides; lower intent but high dwell time */}
-        <div className="mt-8">
-          <AdUnit
-            slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_SLIDE_DETAIL || '0000000000'}
-            placement="slide_detail_bottom"
-            size="infeed"
-          />
-        </div>
+        {/* ── Bottom ad slot ── */}
+        {/* TODO: Google Ads kodu buraya eklenecek (slide_detail_bottom) */}
       </motion.div>
 
       <AnimatePresence>
