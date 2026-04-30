@@ -67,6 +67,7 @@ const tagRoutes = require('./routes/tags');
 const recommendationRoutes = require('./routes/recommendation');
 const eventRoutes = require('./routes/events');
 const feedRoutes = require('./routes/feed');
+const seoPagesRoutes = require('./routes/seo-pages');
 
 const app = express();
 const server = http.createServer(app);
@@ -330,6 +331,7 @@ app.use('/api/tags', tagRoutes);
 app.use('/api/recommendation', recommendationRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/feed', feedRoutes);
+app.use('/api/seo-pages', seoPagesRoutes);
 
 app.get('/api/health', async (req, res) => {
   const checks = { status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() };

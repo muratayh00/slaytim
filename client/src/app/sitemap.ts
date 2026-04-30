@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next';
 import { buildCategoryPath, buildCollectionPath, buildSlideoPath, buildSlidePath, buildTopicPath } from '@/lib/url';
 import { getApiBaseUrl } from '@/lib/api-origin';
+import { SEO_PAGES, SEO_INDEX_THRESHOLD } from '@/lib/programmaticSeoPages';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
 const API_URL = getApiBaseUrl().replace(/\/+$/, '');
@@ -203,6 +204,42 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.5,
     }));
 
+  // ── Programmatic SEO landing pages (/sunumlar/[slug]) ──────────────────────
+  // Only include pages that have enough content (contentCount >= threshold).
+  // We do NOT await individual page-data fetches here to keep sitemap fast —
+  // instead we rely on the page's own robots meta to manage noindex.
+  // The listing page itself is always included.
+  const seoLandingPages: MetadataRoute.Sitemap = [
+    {
+      url: `${BASE_URL}/sunumlar`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.75,
+    },
+  ];
+
+  // Fetch all page content counts in parallel (fire-and-forget friendly).
+  if (API_URL) {
+    const seoCounts = await Promise.allSettled(
+      SEO_PAGES.map((page) =>
+        fetchJson<{ contentCount: number }>(`/seo-pages/${page.slug}`),
+      ),
+    );
+    SEO_PAGES.forEach((page, i) => {
+      const result = seoCounts[i];
+      const count =
+        result.status === 'fulfilled' ? (result.value?.contentCount ?? 0) : 0;
+      if (count >= SEO_INDEX_THRESHOLD) {
+        seoLandingPages.push({
+          url: `${BASE_URL}/sunumlar/${page.slug}`,
+          lastModified: new Date(),
+          changeFrequency: 'weekly',
+          priority: 0.7,
+        });
+      }
+    });
+  }
+
   return [
     ...staticPages,
     ...categoryPages,
@@ -213,5 +250,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...collectionPages,
     ...profilePages,
     ...tagPages,
+    ...seoLandingPages,
   ];
 }
