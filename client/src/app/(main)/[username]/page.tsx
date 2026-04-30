@@ -9,16 +9,16 @@ export const dynamic = 'force-dynamic';
 async function fetchProfileData(username: string) {
   if (!API_URL) return null;
   try {
-    const [profileRes, detailsRes, topicsRes] = await Promise.all([
+    // Details endpoint requires auth — the server component has no user cookie,
+    // so it always returns 403. Skip it here; ProfilePage fetches it client-side.
+    const [profileRes, topicsRes] = await Promise.all([
       fetch(`${API_URL}/users/${encodeURIComponent(username)}`, { cache: 'no-store' }),
-      fetch(`${API_URL}/users/${encodeURIComponent(username)}/details`, { cache: 'no-store' }),
       fetch(`${API_URL}/users/${encodeURIComponent(username)}/topics`, { cache: 'no-store' }),
     ]);
     if (!profileRes.ok) return null;
     const profile = await profileRes.json();
-    const details = detailsRes.ok ? await detailsRes.json() : null;
     const topics = topicsRes.ok ? await topicsRes.json() : [];
-    return { profile, details, topics };
+    return { profile, details: null, topics };
   } catch {
     return null;
   }

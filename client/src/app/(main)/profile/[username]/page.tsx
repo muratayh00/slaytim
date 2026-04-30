@@ -67,14 +67,17 @@ export default function ProfilePage({
     const load = async () => {
       try {
         if (hasInitialData) {
-          // SSR already provided profile, details and topics — only fetch
-          // the client-specific extras: slideos, badges and follow/block state.
-          const [sl, b] = await Promise.all([
+          // SSR already provided profile and topics. Details requires auth, so the
+          // server component couldn't fetch it — always fetch it client-side where
+          // the auth cookie is available. Also fetch slideos and badges here.
+          const [sl, b, d] = await Promise.all([
             api.get(`/users/${username}/slideos`).catch(() => ({ data: [] })),
             api.get(`/badges/user/${username}`).catch(() => ({ data: { badges: [] } })),
+            api.get(`/users/${username}/details`).catch(() => ({ data: null })),
           ]);
           setMySlideos(sl.data);
           setBadges(b.data.badges || []);
+          if (d.data) setDetails(d.data);
 
           if (me && profile && me.username !== username) {
             const [follows, blockStatus] = await Promise.all([
@@ -87,14 +90,14 @@ export default function ProfilePage({
         } else {
           const [p, d, t, sl, b] = await Promise.all([
             api.get(`/users/${username}`),
-            api.get(`/users/${username}/details`),
-            api.get(`/users/${username}/topics`),
+            api.get(`/users/${username}/details`).catch(() => ({ data: null })),
+            api.get(`/users/${username}/topics`).catch(() => ({ data: [] })),
             api.get(`/users/${username}/slideos`).catch(() => ({ data: [] })),
             api.get(`/badges/user/${username}`).catch(() => ({ data: { badges: [] } })),
           ]);
           setProfile(p.data);
-          setDetails(d.data);
-          setMyTopics(t.data);
+          if (d.data) setDetails(d.data);
+          setMyTopics(Array.isArray(t.data) ? t.data : []);
           setMySlideos(sl.data);
           setBadges(b.data.badges || []);
 
