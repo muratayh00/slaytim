@@ -76,91 +76,131 @@ const getProfile = async (req, res) => {
 const getProfileDetails = async (req, res) => {
   try {
     const { username } = req.params;
-    if (!req.user || (req.user.username !== username && !hasAdminAccess(req.user))) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
 
-    const user = await prisma.user.findUnique({ where: { username } });
+    const user = await prisma.user.findUnique({
+      where: { username },
+      select: {
+        id: true,
+        showFollowing: true, showFollowers: true, showVisited: true,
+        showSaved: true, showLikedSlides: true, showLikedTopics: true,
+      },
+    });
     if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const isOwner = Boolean(req.user && req.user.username === username);
+    const isAdmin = Boolean(req.user && hasAdminAccess(req.user));
+    const canSeeAll = isOwner || isAdmin;
+
+    // Which sections to actually query from the DB
+    const show = {
+      likedSlides:  canSeeAll || user.showLikedSlides,
+      likedTopics:  canSeeAll || user.showLikedTopics,
+      savedSlides:  canSeeAll || user.showSaved,
+      followedUsers: canSeeAll || user.showFollowing,
+      followers:    canSeeAll || user.showFollowers,
+      visitedTopics: canSeeAll || user.showVisited,
+    };
 
     const [likedSlides, likedTopics, savedSlides, followedCategories, followedUsers, followers, visitedTopics] =
       await Promise.all([
-        prisma.slideLike.findMany({
-          where: { userId: user.id },
-          include: {
-            slide: {
-              select: {
-                id: true, title: true, fileUrl: true, thumbnailUrl: true,
-                likesCount: true, savesCount: true, viewsCount: true, createdAt: true,
-                user: { select: { id: true, username: true, avatarUrl: true } },
-                topic: { select: { id: true, title: true } },
+        show.likedSlides
+          ? prisma.slideLike.findMany({
+              where: { userId: user.id },
+              include: {
+                slide: {
+                  select: {
+                    id: true, title: true, fileUrl: true, thumbnailUrl: true,
+                    likesCount: true, savesCount: true, viewsCount: true, createdAt: true,
+                    user: { select: { id: true, username: true, avatarUrl: true } },
+                    topic: { select: { id: true, title: true } },
+                  },
+                },
               },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 20,
-        }),
-        prisma.topicLike.findMany({
-          where: { userId: user.id },
-          include: {
-            topic: {
-              select: {
-                id: true, title: true, likesCount: true, viewsCount: true, createdAt: true,
-                user: { select: { id: true, username: true } },
-                category: { select: { name: true, slug: true } },
+              orderBy: { createdAt: 'desc' },
+              take: 20,
+            })
+          : Promise.resolve([]),
+        show.likedTopics
+          ? prisma.topicLike.findMany({
+              where: { userId: user.id },
+              include: {
+                topic: {
+                  select: {
+                    id: true, title: true, likesCount: true, viewsCount: true, createdAt: true,
+                    user: { select: { id: true, username: true } },
+                    category: { select: { name: true, slug: true } },
+                  },
+                },
               },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 20,
-        }),
-        prisma.savedSlide.findMany({
-          where: { userId: user.id },
-          include: {
-            slide: {
-              select: {
-                id: true, title: true, fileUrl: true, thumbnailUrl: true,
-                likesCount: true, savesCount: true, viewsCount: true, createdAt: true,
-                user: { select: { id: true, username: true, avatarUrl: true } },
-                topic: { select: { id: true, title: true } },
+              orderBy: { createdAt: 'desc' },
+              take: 20,
+            })
+          : Promise.resolve([]),
+        show.savedSlides
+          ? prisma.savedSlide.findMany({
+              where: { userId: user.id },
+              include: {
+                slide: {
+                  select: {
+                    id: true, title: true, fileUrl: true, thumbnailUrl: true,
+                    likesCount: true, savesCount: true, viewsCount: true, createdAt: true,
+                    user: { select: { id: true, username: true, avatarUrl: true } },
+                    topic: { select: { id: true, title: true } },
+                  },
+                },
               },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 20,
-        }),
+              orderBy: { createdAt: 'desc' },
+              take: 20,
+            })
+          : Promise.resolve([]),
+        // Followed categories are always public
         prisma.followedCategory.findMany({
           where: { userId: user.id },
           include: { category: { select: { id: true, name: true, slug: true } } },
         }),
-        prisma.followedUser.findMany({
-          where: { followerId: user.id },
-          include: {
-            following: { select: { id: true, username: true, avatarUrl: true, bio: true } },
-          },
-        }),
-        prisma.followedUser.findMany({
-          where: { followingId: user.id },
-          include: {
-            follower: { select: { id: true, username: true, avatarUrl: true, bio: true } },
-          },
-          take: 50,
-        }),
-        prisma.visitedTopic.findMany({
-          where: { userId: user.id },
-          include: {
-            topic: {
-              select: {
-                id: true, title: true, viewsCount: true,
-                category: { select: { name: true, slug: true } },
-                user: { select: { id: true, username: true } },
+        show.followedUsers
+          ? prisma.followedUser.findMany({
+              where: { followerId: user.id },
+              include: {
+                following: { select: { id: true, username: true, avatarUrl: true, bio: true } },
               },
-            },
-          },
-          orderBy: { visitedAt: 'desc' },
-          take: 10,
-        }),
+            })
+          : Promise.resolve([]),
+        show.followers
+          ? prisma.followedUser.findMany({
+              where: { followingId: user.id },
+              include: {
+                follower: { select: { id: true, username: true, avatarUrl: true, bio: true } },
+              },
+              take: 50,
+            })
+          : Promise.resolve([]),
+        show.visitedTopics
+          ? prisma.visitedTopic.findMany({
+              where: { userId: user.id },
+              include: {
+                topic: {
+                  select: {
+                    id: true, title: true, viewsCount: true,
+                    category: { select: { name: true, slug: true } },
+                    user: { select: { id: true, username: true } },
+                  },
+                },
+              },
+              orderBy: { visitedAt: 'desc' },
+              take: 10,
+            })
+          : Promise.resolve([]),
       ]);
+
+    const privacy = {
+      showFollowing: user.showFollowing,
+      showFollowers: user.showFollowers,
+      showVisited: user.showVisited,
+      showSaved: user.showSaved,
+      showLikedSlides: user.showLikedSlides,
+      showLikedTopics: user.showLikedTopics,
+    };
 
     res.json(normalizeMediaUrls({
       likedSlides: likedSlides.map((l) => l.slide),
@@ -170,10 +210,38 @@ const getProfileDetails = async (req, res) => {
       followedUsers: followedUsers.map((f) => f.following),
       followers: followers.map((f) => f.follower),
       visitedTopics: visitedTopics.map((v) => v.topic),
+      privacy,
+      isOwner,
     }));
   } catch (err) {
     logger.error('Failed to fetch profile details', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch profile details' });
+  }
+};
+
+// PATCH /users/me/privacy-settings
+const updatePrivacySettings = async (req, res) => {
+  try {
+    const allowed = ['showFollowing', 'showFollowers', 'showVisited', 'showSaved', 'showLikedSlides', 'showLikedTopics'];
+    const data = {};
+    for (const key of allowed) {
+      if (typeof req.body[key] === 'boolean') data[key] = req.body[key];
+    }
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'No valid fields provided' });
+    }
+    const updated = await prisma.user.update({
+      where: { id: req.user.id },
+      data,
+      select: {
+        showFollowing: true, showFollowers: true, showVisited: true,
+        showSaved: true, showLikedSlides: true, showLikedTopics: true,
+      },
+    });
+    res.json(updated);
+  } catch (err) {
+    logger.error('Failed to update privacy settings', { error: err.message });
+    res.status(500).json({ error: 'Failed to update privacy settings' });
   }
 };
 
@@ -384,4 +452,4 @@ const updateNotificationPrefs = async (req, res) => {
   }
 };
 
-module.exports = { getProfile, getProfileDetails, updateProfile, getUserTopics, getUserSlideos, searchUsers, deleteAccount, getMyRecentTopics, getNotificationPrefs, updateNotificationPrefs };
+module.exports = { getProfile, getProfileDetails, updateProfile, getUserTopics, getUserSlideos, searchUsers, deleteAccount, getMyRecentTopics, getNotificationPrefs, updateNotificationPrefs, updatePrivacySettings };

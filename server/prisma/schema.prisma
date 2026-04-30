@@ -22,6 +22,13 @@ model User {
   notifyOnLike    Boolean @default(true) @map("notify_on_like")
   notifyOnComment Boolean @default(true) @map("notify_on_comment")
   notifyOnFollow  Boolean @default(true) @map("notify_on_follow")
+  // Profile privacy settings
+  showFollowing   Boolean @default(true)  @map("show_following")
+  showFollowers   Boolean @default(true)  @map("show_followers")
+  showVisited     Boolean @default(false) @map("show_visited")
+  showSaved       Boolean @default(false) @map("show_saved")
+  showLikedSlides Boolean @default(false) @map("show_liked_slides")
+  showLikedTopics Boolean @default(false) @map("show_liked_topics")
   emailVerifiedAt DateTime? @map("email_verified_at")
   createdAt    DateTime @default(now()) @map("created_at")
 

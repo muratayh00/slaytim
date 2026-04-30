@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Heart, Bookmark, Tag, Users, Clock,
   Calendar, Loader2, UserPlus, UserCheck, LayoutGrid, Pencil, UserX, Award, Play, Eye,
-  Link2, TrendingUp, Layers, Flag,
+  Link2, TrendingUp, Layers, Flag, Lock, Unlock,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { resolveFileUrl } from '@/lib/pdfRenderer';
@@ -62,6 +62,11 @@ export default function ProfilePage({
   const [showEdit, setShowEdit] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [badges, setBadges] = useState<any[]>([]);
+  const [privacy, setPrivacy] = useState<{
+    showFollowing: boolean; showFollowers: boolean; showVisited: boolean;
+    showSaved: boolean; showLikedSlides: boolean; showLikedTopics: boolean;
+  } | null>(null);
+  const [privacyLoading, setPrivacyLoading] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -77,7 +82,10 @@ export default function ProfilePage({
           ]);
           setMySlideos(sl.data);
           setBadges(b.data.badges || []);
-          if (d.data) setDetails(d.data);
+          if (d.data) {
+            setDetails(d.data);
+            if (d.data.privacy) setPrivacy(d.data.privacy);
+          }
 
           if (me && profile && me.username !== username) {
             const [follows, blockStatus] = await Promise.all([
@@ -96,7 +104,10 @@ export default function ProfilePage({
             api.get(`/badges/user/${username}`).catch(() => ({ data: { badges: [] } })),
           ]);
           setProfile(p.data);
-          if (d.data) setDetails(d.data);
+          if (d.data) {
+            setDetails(d.data);
+            if (d.data.privacy) setPrivacy(d.data.privacy);
+          }
           setMyTopics(Array.isArray(t.data) ? t.data : []);
           setMySlideos(sl.data);
           setBadges(b.data.badges || []);
@@ -117,6 +128,21 @@ export default function ProfilePage({
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username, me]);
+
+  const togglePrivacy = async (field: string, current: boolean) => {
+    if (privacyLoading) return;
+    setPrivacyLoading(field);
+    const next = !current;
+    setPrivacy((p) => p ? { ...p, [field]: next } : p);
+    try {
+      await api.patch('/users/me/privacy-settings', { [field]: next });
+    } catch {
+      setPrivacy((p) => p ? { ...p, [field]: current } : p);
+      toast.error('Ayar kaydedilemedi');
+    } finally {
+      setPrivacyLoading(null);
+    }
+  };
 
   const handleFollow = async () => {
     if (!me) return toast.error('Giriş yapmalısın');
@@ -187,22 +213,26 @@ export default function ProfilePage({
   const isOwn = me?.username === username;
   const avatarGradient = AVATAR_COLORS[profile.id % AVATAR_COLORS.length];
 
-  // Tabs with dynamic counts
-  const TABS = [
-    { id: 'topics', label: 'Konular', icon: LayoutGrid, count: myTopics.length },
-    { id: 'slideos', label: 'Slideo', icon: Play, count: mySlideos.length },
-    { id: 'liked-slides', label: 'Beğenilen Slaytlar', icon: Heart, count: details?.likedSlides?.length },
-    { id: 'liked-topics', label: 'Beğenilen Konular', icon: Heart, count: details?.likedTopics?.length },
-    { id: 'saved', label: 'Kaydedilenler', icon: Bookmark, count: details?.savedSlides?.length },
-    { id: 'categories', label: 'Kategoriler', icon: Tag, count: details?.followedCategories?.length },
-    { id: 'following', label: 'Takip', icon: Users, count: details?.followedUsers?.length },
-    { id: 'followers', label: 'Takipçiler', icon: Users, count: details?.followers?.length },
-    { id: 'visited', label: 'Son Ziyaretler', icon: Clock, count: details?.visitedTopics?.length },
-    { id: 'badges', label: 'Rozetler', icon: Award, count: badges.length },
+  // Tabs — privacyKey: which privacy field controls this tab (null = always public)
+  const ALL_TABS = [
+    { id: 'topics',       label: 'Konular',            icon: LayoutGrid, count: myTopics.length,               privacyKey: null },
+    { id: 'slideos',      label: 'Slideo',              icon: Play,       count: mySlideos.length,              privacyKey: null },
+    { id: 'liked-slides', label: 'Beğenilen Slaytlar',  icon: Heart,      count: details?.likedSlides?.length,  privacyKey: 'showLikedSlides' },
+    { id: 'liked-topics', label: 'Beğenilen Konular',   icon: Heart,      count: details?.likedTopics?.length,  privacyKey: 'showLikedTopics' },
+    { id: 'saved',        label: 'Kaydedilenler',        icon: Bookmark,   count: details?.savedSlides?.length,  privacyKey: 'showSaved' },
+    { id: 'categories',   label: 'Kategoriler',          icon: Tag,        count: details?.followedCategories?.length, privacyKey: null },
+    { id: 'following',    label: 'Takip',               icon: Users,      count: details?.followedUsers?.length, privacyKey: 'showFollowing' },
+    { id: 'followers',    label: 'Takipçiler',           icon: Users,      count: details?.followers?.length,    privacyKey: 'showFollowers' },
+    { id: 'visited',      label: 'Son Ziyaretler',       icon: Clock,      count: details?.visitedTopics?.length, privacyKey: 'showVisited' },
+    { id: 'badges',       label: 'Rozetler',             icon: Award,      count: badges.length,                 privacyKey: null },
   ];
 
+  // For non-owners: only show tabs that are public
+  const TABS = isOwn
+    ? ALL_TABS
+    : ALL_TABS.filter((t) => !t.privacyKey || Boolean((privacy as any)?.[t.privacyKey]));
+
   const renderTab = () => {
-    if (!details) return null;
     switch (activeTab) {
       case 'topics':
         return myTopics.length === 0 ? (
@@ -251,24 +281,28 @@ export default function ProfilePage({
           </div>
         );
       case 'liked-slides':
+        if (!details) return <Empty message="Beğenilen slayt yok" />;
         return details.likedSlides.length === 0 ? <Empty message="Beğenilen slayt yok" /> : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {details.likedSlides.map((s: any) => <SlideCard key={s.id} slide={s} />)}
           </div>
         );
       case 'liked-topics':
+        if (!details) return <Empty message="Beğenilen konu yok" />;
         return details.likedTopics.length === 0 ? <Empty message="Beğenilen konu yok" /> : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {details.likedTopics.map((t: any) => <TopicCard key={t.id} topic={{ ...t, user: { username: t.user?.username || '?', id: 0 } }} />)}
           </div>
         );
       case 'saved':
+        if (!details) return <Empty message="Kaydedilen slayt yok" />;
         return details.savedSlides.length === 0 ? <Empty message="Kaydedilen slayt yok" /> : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {details.savedSlides.map((s: any) => <SlideCard key={s.id} slide={s} />)}
           </div>
         );
       case 'categories':
+        if (!details) return <Empty message="Takip edilen kategori yok" />;
         return details.followedCategories.length === 0 ? <Empty message="Takip edilen kategori yok" /> : (
           <div className="flex flex-wrap gap-2.5">
             {details.followedCategories.map((c: any) => (
@@ -281,18 +315,21 @@ export default function ProfilePage({
           </div>
         );
       case 'following':
+        if (!details) return <Empty message="Takip edilen kullanıcı yok" />;
         return details.followedUsers.length === 0 ? <Empty message="Takip edilen kullanıcı yok" /> : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {details.followedUsers.map((u: any) => <UserCard key={u.id} user={u} />)}
           </div>
         );
       case 'followers':
+        if (!details) return <Empty message="Henüz takipçi yok" />;
         return !details.followers || details.followers.length === 0 ? <Empty message="Henüz takipçi yok" /> : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {details.followers.map((u: any) => <UserCard key={u.id} user={u} />)}
           </div>
         );
       case 'visited':
+        if (!details) return <Empty message="Son ziyaret yok" />;
         return details.visitedTopics.length === 0 ? <Empty message="Son ziyaret yok" /> : (
           <div className="space-y-2.5">
             {details.visitedTopics.map((t: any) => (
@@ -468,25 +505,45 @@ export default function ProfilePage({
       {/* Tabs */}
       <div className="overflow-x-auto mb-6">
         <div className="flex gap-1 bg-muted p-1 rounded-xl w-max min-w-full sm:min-w-0">
-          {TABS.map(({ id, label, icon: Icon, count }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
-                activeTab === id ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {label}
-              {count !== undefined && count > 0 && (
-                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
-                  activeTab === id ? 'bg-primary/15 text-primary' : 'bg-muted-foreground/15 text-muted-foreground'
-                }`}>
-                  {count}
-                </span>
-              )}
-            </button>
-          ))}
+          {TABS.map(({ id, label, icon: Icon, count, privacyKey }) => {
+            const isPrivate = isOwn && privacyKey && privacy ? !(privacy as any)[privacyKey] : false;
+            const isToggling = privacyLoading === privacyKey;
+            return (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                  activeTab === id ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {label}
+                {count !== undefined && count > 0 && (
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                    activeTab === id ? 'bg-primary/15 text-primary' : 'bg-muted-foreground/15 text-muted-foreground'
+                  }`}>
+                    {count}
+                  </span>
+                )}
+                {/* Lock icon for privacy-controlled tabs — visible only to profile owner */}
+                {isOwn && privacyKey && privacy && (
+                  <span
+                    role="button"
+                    title={isPrivate ? 'Gizli — herkese açmak için tıkla' : 'Herkese açık — gizlemek için tıkla'}
+                    onClick={(e) => { e.stopPropagation(); togglePrivacy(privacyKey, (privacy as any)[privacyKey]); }}
+                    className={`ml-0.5 rounded p-0.5 transition-colors ${isToggling ? 'opacity-40' : 'hover:bg-muted-foreground/20'}`}
+                  >
+                    {isToggling
+                      ? <Loader2 className="w-3 h-3 animate-spin" />
+                      : isPrivate
+                        ? <Lock className="w-3 h-3 text-muted-foreground" />
+                        : <Unlock className="w-3 h-3 text-emerald-500" />
+                    }
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
