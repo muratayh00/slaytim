@@ -2,6 +2,7 @@
 import { Suspense } from 'react';
 import { buildCategoryPath, buildProfilePath, buildSlidePath, buildTopicPath, splitIdSlug } from '@/lib/url';
 import { getApiBaseUrl, getApiOrigin } from '@/lib/api-origin';
+import { OG_WIDTH, OG_HEIGHT } from '@/app/api/og/_lib/theme';
 
 const API_URL = getApiBaseUrl();
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
@@ -43,7 +44,7 @@ export async function generateMetadata({ params }: { params: { id?: string; slug
       ? (slide.description as string).slice(0, 155)
       : `"${title}" sunumunu goruntule ve indir.`;
     const url = `${BASE_URL}${buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title })}`;
-    const image = resolveUrl(slide.thumbnailUrl);
+    const ogImage = `${BASE_URL}/api/og/slide/${slide.id}`;
 
     const shouldNoIndex = !slide.pdfUrl || slide.conversionStatus !== 'done';
 
@@ -57,13 +58,13 @@ export async function generateMetadata({ params }: { params: { id?: string; slug
         url,
         type: 'article',
         siteName: 'Slaytim',
-        ...(image ? { images: [{ url: image, width: 1280, height: 720, alt: title }] } : {}),
+        images: [{ url: ogImage, width: OG_WIDTH, height: OG_HEIGHT, alt: title }],
       },
       twitter: {
-        card: image ? 'summary_large_image' : 'summary',
+        card: 'summary_large_image',
         title,
         description,
-        ...(image ? { images: [image] } : {}),
+        images: [ogImage],
       },
       alternates: { canonical: url },
     };

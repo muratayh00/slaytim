@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { buildCategorySeoDescription } from '@/lib/categorySeo';
 import { getApiBaseUrl } from '@/lib/api-origin';
+import { OG_WIDTH, OG_HEIGHT } from '@/app/api/og/_lib/theme';
 
 const API_URL = getApiBaseUrl();
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
@@ -30,12 +31,26 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     const url = `${BASE_URL}/kategori/${params.slug}`;
     const topicCount = Number(cat?._count?.topics || 0);
 
+    const ogImage = `${BASE_URL}/api/og/category/${params.slug}`;
+
     return {
       title,
       description,
       ...(topicCount <= 0 ? { robots: { index: false, follow: false } } : {}),
-      openGraph: { title, description, url, type: 'website', siteName: 'Slaytim' },
-      twitter: { card: 'summary', title, description },
+      openGraph: {
+        title,
+        description,
+        url,
+        type: 'website',
+        siteName: 'Slaytim',
+        images: [{ url: ogImage, width: OG_WIDTH, height: OG_HEIGHT, alt: title }],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title,
+        description,
+        images: [ogImage],
+      },
       alternates: { canonical: url },
     };
   } catch {

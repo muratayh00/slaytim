@@ -1,5 +1,7 @@
+import type { Metadata } from 'next';
 import { buildCategoryPath, buildSlideoPath, buildTopicPath, splitIdSlug } from '@/lib/url';
 import { getApiBaseUrl, getApiOrigin } from '@/lib/api-origin';
+import { OG_WIDTH, OG_HEIGHT } from '@/app/api/og/_lib/theme';
 
 const API_URL = getApiBaseUrl();
 const SERVER_BASE = getApiOrigin();
@@ -21,6 +23,43 @@ async function fetchSlideo(id: number) {
     return res.json();
   } catch {
     return null;
+  }
+}
+
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  try {
+    const parsed = splitIdSlug(params.id);
+    const slideo = parsed.id ? await fetchSlideo(parsed.id) : null;
+    if (!slideo) return { title: 'Slideo Bulunamadı', robots: { index: false, follow: false } };
+
+    const title = slideo.title as string;
+    const description = slideo.description
+      ? (slideo.description as string).slice(0, 155)
+      : `"${title}" slideosu — hızlıca izle.`;
+    const url = `${BASE_URL}${buildSlideoPath({ id: slideo.id, title: slideo.title })}`;
+    const ogImage = `${BASE_URL}/api/og/slideo/${slideo.id}`;
+
+    return {
+      title,
+      description,
+      openGraph: {
+        title,
+        description,
+        url,
+        type: 'video.other',
+        siteName: 'Slaytim',
+        images: [{ url: ogImage, width: OG_WIDTH, height: OG_HEIGHT, alt: title }],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title,
+        description,
+        images: [ogImage],
+      },
+      alternates: { canonical: url },
+    };
+  } catch {
+    return { title: 'Slideo', robots: { index: false, follow: false } };
   }
 }
 

@@ -1,6 +1,7 @@
 ﻿import type { Metadata } from 'next';
 import { buildProfilePath } from '@/lib/url';
 import { getApiBaseUrl } from '@/lib/api-origin';
+import { OG_WIDTH, OG_HEIGHT } from '@/app/api/og/_lib/theme';
 
 const API_URL = getApiBaseUrl();
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
@@ -28,9 +29,9 @@ export async function generateMetadata({ params }: { params: { username: string 
     const title = `@${profile.username}`;
     const description = profile.bio
       ? profile.bio.slice(0, 155)
-      : `${profile._count?.topics || 0} konu ve ${profile._count?.slides || 0} slayt. Slaytim'de @${profile.username} profilini kesfet.`;
+      : `${profile._count?.topics || 0} konu ve ${profile._count?.slides || 0} slayt. Slaytim'de @${profile.username} profilini keşfet.`;
     const url = `${BASE_URL}${buildProfilePath(params.username)}`;
-    const image = profile.avatarUrl || undefined;
+    const ogImage = `${BASE_URL}/api/og/profile/${encodeURIComponent(params.username)}`;
     const totalPublicContent =
       Number(profile?._count?.topics || 0)
       + Number(profile?._count?.slides || 0)
@@ -46,13 +47,13 @@ export async function generateMetadata({ params }: { params: { username: string 
         url,
         type: 'profile',
         siteName: 'Slaytim',
-        ...(image ? { images: [{ url: image, width: 400, height: 400 }] } : {}),
+        images: [{ url: ogImage, width: OG_WIDTH, height: OG_HEIGHT, alt: title }],
       },
       twitter: {
-        card: 'summary',
+        card: 'summary_large_image',
         title,
         description,
-        ...(image ? { images: [image] } : {}),
+        images: [ogImage],
       },
       alternates: { canonical: url },
     };

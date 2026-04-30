@@ -1,6 +1,7 @@
 ﻿import type { Metadata } from 'next';
 import { getApiBaseUrl } from '@/lib/api-origin';
 import { buildProfilePath, buildTopicPath, splitIdSlug } from '@/lib/url';
+import { OG_WIDTH, OG_HEIGHT } from '@/app/api/og/_lib/theme';
 
 const API_URL = getApiBaseUrl();
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
@@ -51,6 +52,8 @@ export async function generateMetadata({ params }: { params: RouteParams }): Pro
       : `${topic._count?.slides || 0} slayt iceren "${title}" konusunu kesfet.`;
     const url = `${BASE_URL}${buildTopicPath({ id: topic.id, slug: topic.slug, title: topic.title })}`;
 
+    const ogImage = `${BASE_URL}/api/og/topic/${topic.id}`;
+
     return {
       title,
       description,
@@ -61,8 +64,14 @@ export async function generateMetadata({ params }: { params: RouteParams }): Pro
         url,
         type: 'article',
         siteName: 'Slaytim',
+        images: [{ url: ogImage, width: OG_WIDTH, height: OG_HEIGHT, alt: title }],
       },
-      twitter: { card: 'summary', title, description },
+      twitter: {
+        card: 'summary_large_image',
+        title,
+        description,
+        images: [ogImage],
+      },
       alternates: { canonical: url },
     };
   } catch {
