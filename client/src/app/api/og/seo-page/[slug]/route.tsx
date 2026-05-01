@@ -2,16 +2,10 @@ import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
 import { getFonts } from '../../_lib/font';
 import { COLORS, OG_WIDTH, OG_HEIGHT, CACHE_HEADER } from '../../_lib/theme';
-import { getSeoPageConfig, SEO_PAGE_SLUGS } from '@/lib/programmaticSeoPages';
+import { getSeoPageConfig } from '@/lib/programmaticSeoPages';
 
 export const runtime = 'nodejs';
-// Config is static — cache aggressively, revalidate on deploy only.
-export const dynamic = 'force-static';
-export const revalidate = 86400; // 24 h
-
-export function generateStaticParams() {
-  return SEO_PAGE_SLUGS.map((slug) => ({ slug }));
-}
+export const dynamic = 'force-dynamic';
 
 export async function GET(_req: NextRequest, { params }: { params: { slug: string } }) {
   const cfg = getSeoPageConfig(params.slug);
