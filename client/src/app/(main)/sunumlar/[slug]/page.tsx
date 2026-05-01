@@ -1,16 +1,18 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { Upload, ChevronRight, Tag, Search } from 'lucide-react';
+import { Upload, ChevronRight, Tag, Search, ChevronDown } from 'lucide-react';
 import {
   getSeoPageConfig,
   SEO_PAGE_SLUGS,
   SEO_INDEX_THRESHOLD,
+  type SeoPageConfig,
 } from '@/lib/programmaticSeoPages';
 import { getApiBaseUrl } from '@/lib/api-origin';
 import { buildSlidePath, buildSlideoPath, buildTopicPath, buildTagPath } from '@/lib/url';
 import TopicCard from '@/components/shared/TopicCard';
 import SlideCard from '@/components/shared/SlideCard';
+import { OG_WIDTH, OG_HEIGHT } from '@/app/api/og/_lib/theme';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://slaytim.com';
 const API_URL = getApiBaseUrl();
@@ -71,7 +73,8 @@ export async function generateMetadata({
   const isIndexable = contentCount >= SEO_INDEX_THRESHOLD;
 
   const canonical = `${BASE_URL}/sunumlar/${cfg.slug}`;
-  const title = `${cfg.h1} | Slaytim`;
+  const title = cfg.ogTitle ?? `${cfg.h1} | Slaytim`;
+  const ogImage = `${BASE_URL}/api/og/seo-page/${cfg.slug}`;
 
   return {
     title,
@@ -81,25 +84,28 @@ export async function generateMetadata({
       ? { index: true, follow: true }
       : { index: false, follow: true },
     openGraph: {
-      title: cfg.ogTitle ?? title,
+      title,
       description: cfg.metaDescription,
       url: canonical,
       siteName: 'Slaytim',
       type: 'website',
+      images: [{ url: ogImage, width: OG_WIDTH, height: OG_HEIGHT, alt: cfg.h1 }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description: cfg.metaDescription,
+      images: [ogImage],
     },
   };
 }
 
 // ---------------------------------------------------------------------------
-// Structured data helpers
+// Structured data
 // ---------------------------------------------------------------------------
-function buildJsonLd(
-  cfg: ReturnType<typeof getSeoPageConfig> & object,
-  data: SeoPageData,
-) {
+function buildCollectionAndItemJsonLd(cfg: SeoPageConfig, data: SeoPageData) {
   const pageUrl = `${BASE_URL}/sunumlar/${cfg.slug}`;
 
-  // Collect up to 10 representative items for ItemList
   const listItems: { url: string; name: string }[] = [
     ...data.topics.slice(0, 4).map((t: any) => ({
       url: `${BASE_URL}${buildTopicPath({ id: t.id, slug: t.slug, title: t.title })}`,
@@ -147,6 +153,19 @@ function buildJsonLd(
   return [collectionPage, itemList];
 }
 
+function buildFaqJsonLd(cfg: SeoPageConfig) {
+  if (!cfg.faqs?.length) return null;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: cfg.faqs.map((faq) => ({
+      '@type': 'Question',
+      name: faq.q,
+      acceptedAnswer: { '@type': 'Answer', text: faq.a },
+    })),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -159,21 +178,31 @@ export default async function SeoLandingPage({
   if (!cfg) notFound();
 
   const data = await fetchSeoPageData(params.slug);
-  const isEmpty = !data || data.contentCount === 0;
-  const isIndexable = (data?.contentCount ?? 0) >= SEO_INDEX_THRESHOLD;
+  const contentCount = data?.contentCount ?? 0;
+  const isEmpty = contentCount === 0;
+  const isIndexable = contentCount >= SEO_INDEX_THRESHOLD;
 
-  const jsonLd = data && !isEmpty ? buildJsonLd(cfg, data) : null;
+  // JSON-LD: CollectionPage + ItemList only when we have content to list.
+  const contentJsonLd = data && !isEmpty ? buildCollectionAndItemJsonLd(cfg, data) : null;
+  // FAQPage JSON-LD is always emitted (evergreen value regardless of content count).
+  const faqJsonLd = buildFaqJsonLd(cfg);
 
   return (
     <>
       {/* Structured data */}
-      {jsonLd?.map((schema, i) => (
+      {contentJsonLd?.map((schema, i) => (
         <script
           key={i}
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
         />
       ))}
+      {faqJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+        />
+      )}
 
       <div className="max-w-6xl mx-auto px-4 py-8 space-y-10">
         {/* Breadcrumb */}
@@ -207,7 +236,7 @@ export default async function SeoLandingPage({
           {/* Noindex notice — dev only */}
           {!isIndexable && process.env.NODE_ENV !== 'production' && (
             <p className="mt-4 text-xs text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
-              ⚠ Bu sayfa henüz yeterli içeriğe sahip değil ({data?.contentCount ?? 0}/{SEO_INDEX_THRESHOLD}). noindex, follow uygulandı.
+              ⚠ Bu sayfa henüz yeterli içeriğe sahip değil ({contentCount}/{SEO_INDEX_THRESHOLD}). noindex, follow uygulandı.
             </p>
           )}
         </section>
@@ -229,12 +258,10 @@ export default async function SeoLandingPage({
           </Link>
         </div>
 
-        {/* Empty state */}
+        {/* Content or evergreen */}
         {isEmpty ? (
-          <EmptySection
-            title="Henüz içerik yok"
-            description={`${cfg.h1} kategorisinde henüz sunum paylaşılmamış. İlk sunum senin olsun!`}
-          />
+          /* No community content yet — show evergreen guide instead of dead empty state */
+          <EvergreenContent cfg={cfg} />
         ) : (
           <>
             {/* Topics */}
@@ -289,6 +316,9 @@ export default async function SeoLandingPage({
             )}
           </>
         )}
+
+        {/* FAQ — always shown, SEO value regardless of content count */}
+        {cfg.faqs?.length > 0 && <FaqSection faqs={cfg.faqs} />}
 
         {/* Bottom CTA */}
         <div className="border-t border-border pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -353,19 +383,71 @@ function Section({
   );
 }
 
-function EmptySection({ title, description }: { title: string; description: string }) {
+/**
+ * Evergreen guide shown when contentCount === 0.
+ * Renders the per-slug long-form sections so the page has substantive content
+ * for crawlers even before any community submissions arrive.
+ */
+function EvergreenContent({ cfg }: { cfg: SeoPageConfig }) {
   return (
-    <div className="text-center py-20 border-2 border-dashed border-border rounded-2xl">
-      <p className="text-lg font-bold text-foreground mb-2">{title}</p>
-      <p className="text-muted-foreground text-sm max-w-sm mx-auto">{description}</p>
-      <Link
-        href="/konu/yeni"
-        className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-button hover:shadow-button-hover transition-all"
-      >
-        <Upload className="w-4 h-4" />
-        İlk Sunumu Ekle
-      </Link>
-    </div>
+    <article className="prose prose-invert prose-sm sm:prose-base max-w-none">
+      {cfg.evergreenSections.map((section) => (
+        <section key={section.heading} className="mb-8">
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-3 not-prose">
+            {section.heading}
+          </h2>
+          <p className="text-muted-foreground leading-relaxed not-prose">
+            {section.body}
+          </p>
+        </section>
+      ))}
+
+      {/* Gentle call-to-action inside the evergreen section */}
+      <div className="not-prose mt-8 rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center">
+        <p className="font-semibold text-foreground mb-1">
+          {cfg.h1} konusunda sunum hazırladın mı?
+        </p>
+        <p className="text-sm text-muted-foreground mb-4">
+          Topluluğumuza ilk içeriği ekleyen sen ol — binlerce kişi görsün.
+        </p>
+        <Link
+          href="/konu/yeni"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-button hover:shadow-button-hover hover:-translate-y-0.5 transition-all"
+        >
+          <Upload className="w-4 h-4" />
+          İlk Sunumu Ekle
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+/**
+ * FAQ accordion using native <details>/<summary> — no client JS required,
+ * works in SSR and is directly readable by Googlebot for FAQPage rich results.
+ */
+function FaqSection({ faqs }: { faqs: SeoPageConfig['faqs'] }) {
+  return (
+    <section aria-labelledby="faq-heading">
+      <h2 id="faq-heading" className="text-xl font-bold mb-5">
+        Sık Sorulan Sorular
+      </h2>
+      <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden">
+        {faqs.map((faq, i) => (
+          <details key={i} className="group">
+            <summary className="flex items-center justify-between gap-4 px-5 py-4 cursor-pointer select-none hover:bg-muted/40 transition-colors list-none [&::-webkit-details-marker]:hidden">
+              <span className="font-semibold text-sm sm:text-base text-foreground">
+                {faq.q}
+              </span>
+              <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="px-5 pb-5 pt-1">
+              <p className="text-sm text-muted-foreground leading-relaxed">{faq.a}</p>
+            </div>
+          </details>
+        ))}
+      </div>
+    </section>
   );
 }
 
