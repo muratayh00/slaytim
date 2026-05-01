@@ -2,17 +2,15 @@ import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
 import { getFonts } from '../../_lib/font';
 import { COLORS, OG_WIDTH, OG_HEIGHT, CACHE_HEADER } from '../../_lib/theme';
-import { getSeoPageConfig } from '@/lib/programmaticSeoPages';
+import { getSeoPageConfig, SEO_PAGE_SLUGS } from '@/lib/programmaticSeoPages';
 
 export const runtime = 'nodejs';
-// Config is static so we can cache aggressively; revalidate on deploy only.
+// Config is static — cache aggressively, revalidate on deploy only.
 export const dynamic = 'force-static';
 export const revalidate = 86400; // 24 h
 
 export function generateStaticParams() {
-  // Pre-render OG images for all known slugs at build time.
-  const { SEO_PAGE_SLUGS } = require('@/lib/programmaticSeoPages');
-  return (SEO_PAGE_SLUGS as string[]).map((slug) => ({ slug }));
+  return SEO_PAGE_SLUGS.map((slug) => ({ slug }));
 }
 
 export async function GET(_req: NextRequest, { params }: { params: { slug: string } }) {
@@ -31,7 +29,7 @@ export async function GET(_req: NextRequest, { params }: { params: { slug: strin
           width: OG_WIDTH,
           height: OG_HEIGHT,
           background: COLORS.bg,
-          fontFamily: 'Inter, system-ui, sans-serif',
+          fontFamily: 'system-ui, sans-serif',
           position: 'relative',
           overflow: 'hidden',
         }}

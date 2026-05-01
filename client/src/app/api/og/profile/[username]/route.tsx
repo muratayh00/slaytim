@@ -46,7 +46,7 @@ export async function GET(_req: NextRequest, { params }: { params: { username: s
           width: OG_WIDTH,
           height: OG_HEIGHT,
           background: COLORS.bg,
-          fontFamily: 'Inter, system-ui, sans-serif',
+          fontFamily: 'system-ui, sans-serif',
           position: 'relative',
           overflow: 'hidden',
         }}
