@@ -25,7 +25,11 @@ async function fetchSlide(id: string) {
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const slide = await fetchSlide(params.id);
-  const fonts = await getFonts();
+  const fonts = getFonts();
+
+  if (fonts.length === 0) {
+    return new Response('Font unavailable', { status: 500 });
+  }
 
   // Thumbnail: use the backend page-image proxy — avoids signed R2 URL issues
   const thumbUrl = slide

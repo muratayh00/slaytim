@@ -25,7 +25,11 @@ async function fetchSlideo(id: string) {
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const slideo = await fetchSlideo(params.id);
-  const fonts = await getFonts();
+  const fonts = getFonts();
+
+  if (fonts.length === 0) {
+    return new Response('Font unavailable', { status: 500 });
+  }
 
   const thumbUrl = slideo?.slide?.id
     ? `${API_URL}/slides/${slideo.slide.id}/page-image/1`

@@ -25,7 +25,11 @@ async function fetchCategory(slug: string) {
 
 export async function GET(_req: NextRequest, { params }: { params: { slug: string } }) {
   const category = await fetchCategory(params.slug);
-  const fonts = await getFonts();
+  const fonts = getFonts();
+
+  if (fonts.length === 0) {
+    return new Response('Font unavailable', { status: 500 });
+  }
 
   const name: string = category?.name ?? 'Kategori';
   const topicCount: number = category?._count?.topics ?? 0;

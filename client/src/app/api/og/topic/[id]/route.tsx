@@ -25,7 +25,11 @@ async function fetchTopic(id: string) {
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const topic = await fetchTopic(params.id);
-  const fonts = await getFonts();
+  const fonts = getFonts();
+
+  if (fonts.length === 0) {
+    return new Response('Font unavailable', { status: 500 });
+  }
 
   const title = topic ? truncate(topic.title, 80) : 'Konu Bulunamadı';
   const category = topic?.category?.name ?? null;

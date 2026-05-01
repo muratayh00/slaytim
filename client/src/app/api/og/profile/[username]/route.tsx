@@ -25,7 +25,11 @@ async function fetchProfile(username: string) {
 
 export async function GET(_req: NextRequest, { params }: { params: { username: string } }) {
   const profile = await fetchProfile(params.username);
-  const fonts = await getFonts();
+  const fonts = getFonts();
+
+  if (fonts.length === 0) {
+    return new Response('Font unavailable', { status: 500 });
+  }
 
   const username = profile?.username ?? params.username ?? 'Kullanıcı';
   const bio = profile?.bio ? truncate(profile.bio, 110) : null;
