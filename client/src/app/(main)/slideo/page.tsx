@@ -6,6 +6,7 @@ import { Play, Loader2, Flame, Clock, ChevronUp, ChevronDown, Plus } from 'lucid
 import api from '@/lib/api';
 import SlideoViewer, { SlideoItem } from '@/components/slideo/SlideoViewer';
 import SelectSlideForSlideoModal from '@/components/slideo/SelectSlideForSlideoModal';
+import EmptyState from '@/components/shared/EmptyState';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
 import { AdProvider } from '@/components/ads/AdProvider';
@@ -146,7 +147,7 @@ function SlideoPageContent() {
       <div className="slideo-h flex flex-col items-center justify-center bg-black">
         <div className="flex flex-col items-center gap-4 text-white/70">
           <Loader2 className="w-8 h-8 animate-spin" />
-          <span className="text-sm font-semibold">Slideo yükleniyor...</span>
+          <span className="text-sm font-semibold">Slideo akışı yükleniyor...</span>
         </div>
       </div>
     );
@@ -155,18 +156,25 @@ function SlideoPageContent() {
   if (!loading && slideos.length === 0) {
     return (
       <>
-        <div className="slideo-h flex flex-col items-center justify-center gap-6 bg-black text-white">
-          <div className="w-20 h-20 rounded-lg bg-white/10 flex items-center justify-center">
-            <Play className="w-10 h-10 text-white/60" fill="currentColor" />
-          </div>
-          <div className="text-center">
-            <h2 className="text-xl font-semibold mb-2">Henüz Slideo yok</h2>
-            <button
-              onClick={() => setShowUploadModal(true)}
-              className="px-5 py-2.5 rounded-lg bg-primary text-white font-semibold text-sm hover:opacity-90 transition-opacity"
-            >
-              Slayttan Slideo Oluştur
-            </button>
+        <div className="slideo-h flex items-center justify-center bg-black px-4">
+          <div className="w-full max-w-md text-white">
+            <EmptyState
+              icon={Play}
+              title="Henüz Slideo yok"
+              description="Kısa slayt akışını başlatmak için ilk Slideo'nu oluştur veya popüler slaytları keşfet."
+              primaryAction={
+                user
+                  ? { label: 'Slayt Yükle', onClick: () => setShowUploadModal(true) }
+                  : { label: 'Ücretsiz Başla', href: '/register' }
+              }
+              secondaryAction={{
+                label: 'Konuları Keşfet',
+                href: '/kesfet',
+                variant: 'outline',
+              }}
+              tone="dark"
+              className="bg-white/[0.03] border-white/10"
+            />
           </div>
         </div>
 

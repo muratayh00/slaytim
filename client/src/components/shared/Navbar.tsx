@@ -287,20 +287,39 @@ export default function Navbar() {
           <div className="h-px bg-border my-1" />
           {user ? (
             <>
-              <Link href={buildTopicCreatePath()} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-white text-sm font-bold"><Plus className="w-4 h-4" />Konu Aç</Link>
-              <Link href={buildProfilePath(user.username)} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors"><User className="w-4 h-4 text-muted-foreground" />Profilim</Link>
-              <Link href="/collections" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors"><Folder className="w-4 h-4 text-muted-foreground" />Koleksiyonlarım</Link>
-              <Link href="/settings" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors"><Settings className="w-4 h-4 text-muted-foreground" />Ayarlar</Link>
-              <Link href="/rooms" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors"><Users className="w-4 h-4 text-muted-foreground" />Odalar</Link>
+              <Link
+                href={buildTopicCreatePath()}
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary text-white text-sm font-bold hover:opacity-90 transition-opacity min-h-[44px] mb-1"
+              >
+                <Plus className="w-4 h-4" strokeWidth={2.5} />Konu Aç
+              </Link>
+              <Link href={buildProfilePath(user.username)} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><User className="w-4 h-4 text-muted-foreground" />Profilim</Link>
+              <Link href="/collections" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><Folder className="w-4 h-4 text-muted-foreground" />Koleksiyonlarım</Link>
+              <Link href="/settings" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><Settings className="w-4 h-4 text-muted-foreground" />Ayarlar</Link>
+              <Link href="/rooms" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><Users className="w-4 h-4 text-muted-foreground" />Odalar</Link>
               {(user as any).isAdmin && (
-                <Link href="/admin" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors"><Shield className="w-4 h-4 text-muted-foreground" />Admin Paneli</Link>
+                <Link href="/admin" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><Shield className="w-4 h-4 text-muted-foreground" />Admin Paneli</Link>
               )}
-              <button onClick={() => { handleLogout(); setMobileOpen(false); }} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"><LogOut className="w-4 h-4" />Çıkış Yap</button>
+              <button onClick={() => { handleLogout(); setMobileOpen(false); }} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors min-h-[44px]"><LogOut className="w-4 h-4" />Çıkış Yap</button>
             </>
           ) : (
             <>
-              <Link href="/login" onClick={() => setMobileOpen(false)} className="flex items-center justify-center py-2.5 rounded-lg border border-border text-sm font-semibold hover:bg-muted transition-colors">Giriş Yap</Link>
-              <Link href="/register" onClick={() => setMobileOpen(false)} className="flex items-center justify-center py-2.5 rounded-lg bg-primary text-white text-sm font-bold">Kayıt Ol</Link>
+              <Link
+                href="/register"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-white text-sm font-bold hover:opacity-90 transition-opacity min-h-[44px]"
+              >
+                <Plus className="w-4 h-4" strokeWidth={2.5} />
+                Ücretsiz Başla
+              </Link>
+              <Link
+                href="/login"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center justify-center py-3 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"
+              >
+                Giriş Yap
+              </Link>
             </>
           )}
         </div>

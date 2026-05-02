@@ -96,7 +96,7 @@ function CategoryPicker({
         )}
       >
         <span className={cn(!selected && 'text-muted-foreground')}>
-          {loading ? 'Kategoriler yukleniyor...' : selected ? selected.name : placeholder || 'Kategori sec...'}
+          {loading ? 'Kategoriler yükleniyor...' : selected ? selected.name : placeholder || 'Kategori seç...'}
         </span>
         <ChevronDown className={cn('w-4 h-4 text-muted-foreground transition-transform', open && 'rotate-180')} />
       </button>
@@ -503,7 +503,7 @@ export default function NewTopicPage() {
       fallback={
         <div className="max-w-2xl mx-auto px-4 py-10 flex items-center gap-2 text-muted-foreground">
           <Loader2 className="w-4 h-4 animate-spin" />
-          Yukleniyor...
+          Yükleniyor...
         </div>
       }
     >

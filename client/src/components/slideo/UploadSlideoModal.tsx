@@ -555,7 +555,7 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
                 <>
                   <Loader2 className="w-10 h-10 animate-spin text-primary" />
                   <p className="text-sm font-bold">
-                    {conversionPhase === 'uploading' && 'Dosya yukleniyor...'}
+                    {conversionPhase === 'uploading' && 'Dosya yükleniyor...'}
                     {conversionPhase === 'converting' && 'LibreOffice donusumu yapiliyor...'}
                     {conversionPhase === 'preparing' && 'Sayfa onizleme bilgisi hazirlaniyor...'}
                   </p>
@@ -598,7 +598,7 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
                     {previewFrameLoading && (
                       <div className="absolute inset-0 z-10 bg-card/80 flex items-center justify-center gap-2 text-sm text-muted-foreground">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Sayfa onizleme yukleniyor...
+                        Sayfa önizleme yükleniyor...
                       </div>
                     )}
                     <iframe
@@ -765,7 +765,7 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
             >
               {uploading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Yukleniyor...
+                  <Loader2 className="w-4 h-4 animate-spin" /> Yükleniyor...
                 </>
               ) : (
                 <>
@@ -787,7 +787,7 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
               <input
                 value={slideoDesc}
                 onChange={(e) => setSlideoDesc(e.target.value)}
-                placeholder="Kisa aciklama (opsiyonel)"
+                placeholder="Kısa açıklama (opsiyonel)"
                 maxLength={200}
                 className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-border bg-muted/40 focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/50"
               />

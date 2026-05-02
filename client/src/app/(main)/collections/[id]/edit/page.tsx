@@ -66,7 +66,7 @@ export default function EditCollectionPage() {
     }
   };
 
-  if (loading) return <div className="max-w-3xl mx-auto px-4 py-8 text-muted-foreground">Yukleniyor...</div>;
+  if (loading) return <div className="max-w-3xl mx-auto px-4 py-8 text-muted-foreground">Yükleniyor...</div>;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">

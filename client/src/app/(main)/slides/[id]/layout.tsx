@@ -37,12 +37,12 @@ function getParamId(params: { id?: string; slug?: string }): string {
 export async function generateMetadata({ params }: { params: { id?: string; slug?: string } }): Promise<Metadata> {
   try {
     const slide = await fetchSlide(getParamId(params));
-    if (!slide) return { title: 'Slayt Bulunamadi', robots: { index: false, follow: false } };
+    if (!slide) return { title: 'Slayt Bulunamadı', robots: { index: false, follow: false } };
 
     const title = slide.title as string;
     const description = slide.description
       ? (slide.description as string).slice(0, 155)
-      : `"${title}" sunumunu goruntule ve indir.`;
+      : `"${title}" sunumunu görüntüle ve indir.`;
     const url = `${BASE_URL}${buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title })}`;
     const ogImage = `${BASE_URL}/api/og/slide/${slide.id}`;
 

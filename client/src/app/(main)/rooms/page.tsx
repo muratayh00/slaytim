@@ -8,6 +8,7 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import toast from 'react-hot-toast';
 import { buildRoomPath } from '@/lib/url';
+import EmptyState from '@/components/shared/EmptyState';
 
 type Room = {
   id: number;
@@ -268,56 +269,95 @@ export default function RoomsPage() {
           Yükleniyor...
         </div>
       ) : filteredRooms.length === 0 ? (
-        <div className="text-center py-16 border-2 border-dashed border-border rounded-2xl text-muted-foreground">
-          <Search className="w-10 h-10 mx-auto mb-3 opacity-20" />
-          <p className="font-bold">{searchQuery ? `"${searchQuery}" için oda bulunamadı` : 'Henüz hiç oda yok'}</p>
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="mt-2 text-sm text-primary hover:underline">
-              Aramayı temizle
-            </button>
-          )}
-        </div>
+        searchQuery ? (
+          <EmptyState
+            icon={Search}
+            title={`"${searchQuery}" için oda bulunamadı`}
+            description="Farklı bir kelime dene veya tüm odalara göz at."
+            primaryAction={{
+              label: 'Aramayı Temizle',
+              onClick: () => setSearchQuery(''),
+            }}
+          />
+        ) : (
+          <EmptyState
+            icon={Users}
+            title="Henüz herkese açık oda yok"
+            description="Ders, ekip veya topluluk odanı oluşturarak ilk sohbeti başlat."
+            primaryAction={
+              user
+                ? {
+                    label: 'Oda Oluştur',
+                    onClick: () => ownedRoomsCount < 2 && setCreateOpen(true),
+                  }
+                : { label: 'Giriş Yap', href: '/login' }
+            }
+            secondaryAction={{
+              label: 'Konuları Keşfet',
+              href: '/kesfet',
+              variant: 'outline',
+            }}
+          />
+        )
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredRooms.map((room) => {
             const joined = myRoomIds.has(room.id);
             return (
-              <div key={room.id} className="border border-border rounded-2xl p-4 bg-card">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="font-bold text-base">{room.name}</h2>
-                    {room.description && <p className="text-sm text-muted-foreground mt-1">{room.description}</p>}
-                  </div>
-                  <span className="text-xs px-2 py-1 rounded-full bg-muted inline-flex items-center gap-1">
+              <div
+                key={room.id}
+                className="border border-border rounded-2xl p-4 bg-card hover:border-primary/30 hover:shadow-card-hover hover:-translate-y-0.5 transition-all"
+              >
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <h2 className="font-bold text-base leading-tight line-clamp-1 flex-1">
+                    {room.name}
+                  </h2>
+                  <span
+                    className={`text-[11px] font-semibold px-2 py-1 rounded-full inline-flex items-center gap-1 shrink-0 ${
+                      room.isPublic
+                        ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                        : 'bg-zinc-500/10 text-zinc-700 dark:text-zinc-400'
+                    }`}
+                  >
                     {room.isPublic ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
                     {room.isPublic ? 'Açık' : 'Gizli'}
                   </span>
                 </div>
-                <div className="mt-3 text-xs text-muted-foreground flex items-center gap-3">
-                  <span className="inline-flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5" />
-                    {Number(room._count?.members || 0)} üye
+                {room.description && (
+                  <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                    {room.description}
+                  </p>
+                )}
+                <div className="text-xs text-muted-foreground flex items-center gap-3 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Users className="w-4 h-4" />
+                    <span className="font-semibold text-foreground">
+                      {Number(room._count?.members || 0)}
+                    </span>
+                    üye
                   </span>
-                  {room.owner?.username && <span>Kurucu: {room.owner.username}</span>}
+                  {room.owner?.username && (
+                    <span className="truncate">@{room.owner.username}</span>
+                  )}
                 </div>
                 <div className="mt-4 flex items-center gap-2">
                   <Link
                     href={buildRoomPath(room)}
                     prefetch={false}
-                    className="px-3 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
+                    className="px-3.5 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors min-h-[40px] inline-flex items-center"
                   >
                     Odayı Aç
                   </Link>
                   {!joined && user && room.isPublic && (
                     <button
                       onClick={() => followRoom(room.id, room.slug)}
-                      className="px-3 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90"
+                      className="px-3.5 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:opacity-90 min-h-[40px] inline-flex items-center"
                     >
                       Takip Et
                     </button>
                   )}
                   {joined && (
-                    <span className="px-3 py-2 rounded-xl bg-emerald-500/10 text-emerald-600 text-sm font-semibold">
+                    <span className="px-3.5 py-2 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-sm font-semibold min-h-[40px] inline-flex items-center">
                       Takiptesin
                     </span>
                   )}

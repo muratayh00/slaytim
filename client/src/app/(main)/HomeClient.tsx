@@ -6,6 +6,7 @@ import Link from 'next/link';
 import {
   TrendingUp, Layers, Plus, ChevronRight, Flame,
   ArrowRight, Rss, Search, Star, Play, Eye, Heart,
+  Upload, FileText, Sparkles,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
@@ -149,36 +150,45 @@ export default function HomeClient({
   return (
     <div>
       {!user && (
-        <section className="border-b border-border bg-card">
-          <div className="max-w-4xl mx-auto px-5 pt-14 pb-12 text-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-muted text-muted-foreground text-xs font-semibold mb-5">
-              Slayt tabanli bilgi platformu
+        <section className="border-b border-border bg-gradient-to-b from-card to-background">
+          <div className="max-w-4xl mx-auto px-5 pt-14 pb-10 text-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-semibold mb-5">
+              <Sparkles className="w-3.5 h-3.5" /> Slayt tabanlı bilgi platformu
             </div>
             <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4 leading-[1.1]">
-              Bilgini slaytla paylas
+              Slayt paylaşmanın <span className="text-primary">yeni yolu</span>.
             </h1>
-            <p className="text-muted-foreground text-base max-w-[520px] mx-auto leading-relaxed mb-8">
-              Konu Aç, slayt yükle ve düzenli bir bilgi arşivi oluştur.
+            <p className="text-muted-foreground text-base sm:text-[17px] max-w-[560px] mx-auto leading-relaxed mb-8">
+              PPT/PPTX sunumlarını yükle, konularla paylaş ve Slideo akışında kısa slaytları keşfet.
             </p>
             <form onSubmit={handleSearch} className="relative max-w-md mx-auto mb-6">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground pointer-events-none" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <input
                 value={searchQ}
                 onChange={(e) => setSearchQ(e.target.value)}
                 placeholder="Konu veya slayt ara..."
-                className="w-full pl-12 pr-28 py-3 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
+                className="w-full pl-12 pr-28 py-3 text-sm rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
               />
-              <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 rounded-md bg-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity">
+              <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity">
                 Ara
               </button>
             </form>
             <div className="flex items-center justify-center gap-3 flex-wrap">
-              <Link href="/register" className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-primary text-white font-semibold text-sm hover:opacity-90 transition-opacity">
+              <Link href="/register" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-semibold text-sm hover:opacity-90 transition-opacity min-h-[44px]">
                 Ücretsiz Başla
               </Link>
-              <Link href="/kesfet" className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg border border-border bg-background font-semibold text-sm hover:bg-muted transition-colors">
-                Konuları Keşfet <ArrowRight className="w-4 h-4" />
+              <Link href="/slideo" prefetch={false} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-border bg-background font-semibold text-sm hover:bg-muted transition-colors min-h-[44px]">
+                Slideo&apos;yu Keşfet <ArrowRight className="w-4 h-4" />
               </Link>
+            </div>
+          </div>
+
+          {/* 3 mini feature cards */}
+          <div className="max-w-4xl mx-auto px-5 pb-12">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <FeatureCard icon={Upload} title="PPT/PPTX yükle" description="PDF + thumbnail otomatik oluşur." />
+              <FeatureCard icon={FileText} title="PDF önizleme" description="Tarayıcıda anında görüntüle." />
+              <FeatureCard icon={Sparkles} title="Slideo'da keşfet" description="Kısa dikey akışta keşfedilebilirlik." />
             </div>
           </div>
         </section>
@@ -234,8 +244,8 @@ export default function HomeClient({
             ) : feedEmpty ? (
               <div className="text-center py-20 border border-dashed border-border rounded-xl text-muted-foreground">
                 <Rss className="w-10 h-10 mx-auto mb-3 opacity-20" />
-                <p className="font-semibold mb-1">Akisin boş</p>
-                <p className="text-sm opacity-70 mb-5">Kullanıcıları ve kategorileri takip ederek kişisel akisini Oluştur.</p>
+                <p className="font-semibold mb-1">Akışın boş</p>
+                <p className="text-sm opacity-70 mb-5">Kullanıcıları ve kategorileri takip ederek kişisel akışını oluştur.</p>
                 <Link href="/kesfet" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity">
                   Konuları Keşfet <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
@@ -252,7 +262,7 @@ export default function HomeClient({
           <>
             {trending.length > 0 && (
               <section>
-                <SectionHeader icon={<Flame className="w-4 h-4 text-primary" />} iconBg="bg-primary/10" title="Trend Konular" sub="Bugun en cok goruntulenenler" href="/kesfet?sort=popular" />
+                <SectionHeader icon={<Flame className="w-4 h-4 text-primary" />} iconBg="bg-primary/10" title="Trend Konular" sub="Bugün en çok görüntülenenler" href="/kesfet?sort=popular" />
                 {loading ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {[...Array(6)].map((_, i) => <TopicCardSkeleton key={i} />)}
@@ -285,7 +295,7 @@ export default function HomeClient({
 
             {trendingSlideos.length > 0 && (
               <section>
-                <SectionHeader icon={<Play className="w-4 h-4 text-primary" fill="currentColor" />} iconBg="bg-primary/10" title="Slideo'da Yukselenler" sub="Kisa içeriklerle Keşfet" href="/slideo" />
+                <SectionHeader icon={<Play className="w-4 h-4 text-primary" fill="currentColor" />} iconBg="bg-primary/10" title="Slideo'da Yükselenler" sub="Kısa içeriklerle keşfet" href="/slideo" />
                 <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1">
                   {trendingSlideos.map((s: any) => <SlideoPreviewCard key={s.id} slideo={s} />)}
                   <Link href="/slideo" prefetch={false} className="shrink-0 w-[140px] rounded-xl border border-dashed border-border bg-background flex flex-col items-center justify-center gap-2 hover:border-primary transition-colors group">
@@ -339,7 +349,7 @@ export default function HomeClient({
                 <div className="flex flex-col items-center justify-center py-24 text-muted-foreground border border-dashed border-border rounded-xl">
                   <Layers className="w-10 h-10 mb-4 opacity-20" strokeWidth={1} />
                   <p className="font-semibold text-lg mb-1">Konu bulunamadı</p>
-                  <p className="text-sm mb-6 opacity-70">Filtreni değiştir veya ilk konuyu ac.</p>
+                  <p className="text-sm mb-6 opacity-70">Filtreni değiştir veya ilk konuyu aç.</p>
                   {user && (
                     <Link href={buildTopicCreatePath()} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity">
                       Konu Aç
@@ -420,6 +430,28 @@ function SlideoPreviewCard({ slideo }: { slideo: any }) {
         </div>
       </div>
     </Link>
+  );
+}
+
+function FeatureCard({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: typeof Upload;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 bg-card border border-border/60 rounded-2xl p-4 hover:border-primary/30 hover:shadow-card-hover transition-all">
+      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+        <Icon className="w-5 h-5 text-primary" strokeWidth={2} />
+      </div>
+      <div className="text-left">
+        <p className="text-sm font-semibold text-foreground leading-tight mb-1">{title}</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
+      </div>
+    </div>
   );
 }
 
