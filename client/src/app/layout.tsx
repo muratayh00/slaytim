@@ -21,11 +21,11 @@ const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || '';
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
   title: {
-    default: 'Slaytim - Kisa Slayt Kesif Platformu',
+    default: 'Slaytim - Kısa Slayt Keşif Platformu',
     template: '%s | Slaytim',
   },
-  description: "Sunumlardan kisa slaytlar olustur, paylas ve kesfet. Turkiye'nin slayt kesif platformu.",
-  keywords: ['slayt', 'sunum', 'paylasim', 'egitim', 'slideo', 'slaytim', 'konu', 'kategori', 'kisa slayt', 'kesif'],
+  description: "Sunumlardan kısa slaytlar oluştur, paylaş ve keşfet. Türkiye'nin slayt keşif platformu.",
+  keywords: ['slayt', 'sunum', 'paylaşım', 'eğitim', 'slideo', 'slaytim', 'konu', 'kategori', 'kısa slayt', 'keşif'],
   authors: [{ name: 'Slaytim' }],
   creator: 'Slaytim',
   openGraph: {
@@ -33,14 +33,14 @@ export const metadata: Metadata = {
     locale: 'tr_TR',
     url: '/',
     siteName: 'Slaytim',
-    title: 'Slaytim - Kisa Slayt Kesif Platformu',
-    description: 'Sunumlardan kisa slaytlar olustur, paylas ve kesfet.',
+    title: 'Slaytim - Kısa Slayt Keşif Platformu',
+    description: 'Sunumlardan kısa slaytlar oluştur, paylaş ve keşfet.',
     images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: 'Slaytim' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Slaytim - Kisa Slayt Kesif Platformu',
-    description: 'Sunumlardan kisa slaytlar olustur, paylas ve kesfet.',
+    title: 'Slaytim - Kısa Slayt Keşif Platformu',
+    description: 'Sunumlardan kısa slaytlar oluştur, paylaş ve keşfet.',
     creator: '@slaytim',
     images: ['/opengraph-image'],
   },

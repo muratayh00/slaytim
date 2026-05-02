@@ -78,7 +78,7 @@ export default function RoomsPage() {
       setRooms(Array.isArray(allRes?.data?.rooms) ? allRes.data.rooms : []);
       setMyRooms(Array.isArray(mineRes?.data?.rooms) ? mineRes.data.rooms : []);
     } catch {
-      toast.error('Odalar yuklenemedi');
+      toast.error('Odalar yüklenemedi');
     } finally {
       setLoading(false);
     }
@@ -89,7 +89,7 @@ export default function RoomsPage() {
   }, [load]);
 
   const createRoom = async () => {
-    if (!user) return toast.error('Oda olusturmak icin giris yapmalisin');
+    if (!user) return toast.error('Oda oluşturmak için giriş yapmalısın');
     if (!form.name.trim()) return;
     setCreateBusy(true);
     try {
@@ -101,7 +101,7 @@ export default function RoomsPage() {
       });
       setForm({ name: '', description: '', isPublic: true, accessPassword: '' });
       setCreateOpen(false);
-      toast.success('Oda olusturuldu');
+      toast.success('Oda oluşturuldu');
       if (data?.id) {
         navigateSafely(buildRoomPath(data));
         return;
@@ -121,20 +121,20 @@ export default function RoomsPage() {
   };
 
   const followRoom = async (roomId: number, slug?: string) => {
-    if (!user) return toast.error('Takip icin giris yapmalisin');
+    if (!user) return toast.error('Takip için giriş yapmalısın');
     try {
       await api.post(`/rooms/${slug || roomId}/follow`);
       await load();
-      toast.success('Odayi takip etmeye basladin');
+      toast.success('Odayı takip etmeye başladın');
     } catch {
       toast.error('Oda takip edilemedi');
     }
   };
 
   const accessPrivateRoom = async () => {
-    if (!user) return toast.error('Kapali odaya girmek icin giris yapmalisin');
+    if (!user) return toast.error('Kapalı odaya girmek için giriş yapmalısın');
     if (!privateAccess.name.trim() || !privateAccess.password.trim()) {
-      return toast.error('Oda adi ve sifre gerekli');
+      return toast.error('Oda adı ve şifre gerekli');
     }
     setPrivateAccessBusy(true);
     try {
@@ -142,13 +142,13 @@ export default function RoomsPage() {
         name: privateAccess.name.trim(),
         password: privateAccess.password,
       });
-      toast.success('Kapali odaya giris yapildi');
+      toast.success('Kapalı odaya giriş yapıldı');
       setPrivateAccess({ name: '', password: '' });
       await load();
       if (data?.slug) window.location.href = buildRoomPath({ slug: data.slug });
       else if (data?.roomId) window.location.href = `/rooms/${data.roomId}`;
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Kapali odaya giris basarisiz');
+      toast.error(err?.response?.data?.error || 'Kapalı odaya giriş başarısız');
     } finally {
       setPrivateAccessBusy(false);
     }
@@ -195,13 +195,13 @@ export default function RoomsPage() {
             <input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="Oda adi"
+              placeholder="Oda adı"
               className="px-3 py-2 rounded-xl border border-border bg-muted/50 focus:outline-none"
             />
             <input
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              placeholder="Aciklama (opsiyonel)"
+              placeholder="Açıklama (opsiyonel)"
               className="px-3 py-2 rounded-xl border border-border bg-muted/50 focus:outline-none"
             />
           </div>
@@ -212,13 +212,13 @@ export default function RoomsPage() {
                 checked={form.isPublic}
                 onChange={(e) => setForm((f) => ({ ...f, isPublic: e.target.checked }))}
               />
-              Herkese acik oda
+              Herkese açık oda
             </label>
             {!form.isPublic && (
               <input
                 value={form.accessPassword}
                 onChange={(e) => setForm((f) => ({ ...f, accessPassword: e.target.value }))}
-                placeholder="Oda sifresi (min 4 karakter)"
+                placeholder="Oda şifresi (min 4 karakter)"
                 type="password"
                 className="px-3 py-2 rounded-xl border border-border bg-muted/50 focus:outline-none text-sm"
               />
@@ -228,7 +228,7 @@ export default function RoomsPage() {
               disabled={createBusy || !form.name.trim() || (!form.isPublic && form.accessPassword.trim().length < 4)}
               className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
             >
-              {createBusy ? 'Olusturuluyor...' : 'Olustur'}
+              {createBusy ? 'Oluşturuluyor...' : 'Oluştur'}
             </button>
           </div>
         </div>
@@ -236,18 +236,18 @@ export default function RoomsPage() {
 
       {user && (
         <div className="mb-6 border border-border rounded-2xl p-4 bg-card">
-          <h3 className="font-bold text-sm mb-3">Kapali Odaya Gir</h3>
+          <h3 className="font-bold text-sm mb-3">Kapalı Odaya Gir</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <input
               value={privateAccess.name}
               onChange={(e) => setPrivateAccess((s) => ({ ...s, name: e.target.value }))}
-              placeholder="Oda adi"
+              placeholder="Oda adı"
               className="px-3 py-2 rounded-xl border border-border bg-muted/50 focus:outline-none"
             />
             <input
               value={privateAccess.password}
               onChange={(e) => setPrivateAccess((s) => ({ ...s, password: e.target.value }))}
-              placeholder="Sifre"
+              placeholder="Şifre"
               type="password"
               className="px-3 py-2 rounded-xl border border-border bg-muted/50 focus:outline-none"
             />
@@ -265,7 +265,7 @@ export default function RoomsPage() {
       {loading ? (
         <div className="py-16 text-center text-muted-foreground">
           <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
-          Yukleniyor...
+          Yükleniyor...
         </div>
       ) : filteredRooms.length === 0 ? (
         <div className="text-center py-16 border-2 border-dashed border-border rounded-2xl text-muted-foreground">
@@ -290,13 +290,13 @@ export default function RoomsPage() {
                   </div>
                   <span className="text-xs px-2 py-1 rounded-full bg-muted inline-flex items-center gap-1">
                     {room.isPublic ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-                    {room.isPublic ? 'Acik' : 'Gizli'}
+                    {room.isPublic ? 'Açık' : 'Gizli'}
                   </span>
                 </div>
                 <div className="mt-3 text-xs text-muted-foreground flex items-center gap-3">
                   <span className="inline-flex items-center gap-1">
                     <Users className="w-3.5 h-3.5" />
-                    {Number(room._count?.members || 0)} uye
+                    {Number(room._count?.members || 0)} üye
                   </span>
                   {room.owner?.username && <span>Kurucu: {room.owner.username}</span>}
                 </div>
@@ -306,7 +306,7 @@ export default function RoomsPage() {
                     prefetch={false}
                     className="px-3 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
                   >
-                    Odayi Ac
+                    Odayı Aç
                   </Link>
                   {!joined && user && room.isPublic && (
                     <button
