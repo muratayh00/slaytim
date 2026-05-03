@@ -68,6 +68,8 @@ const shouldBypass = (req) => {
     '/api/auth/csrf',
     '/api/analytics/batch',
     '/api/analytics/session-snapshot',
+    '/api/analytics/event',          // realtime tracker — no CSRF token in sendBeacon
+    '/api/analytics/preview-metric', // sendBeacon, no token
     '/api/recommendation/events',
   ]);
   return authBypassPaths.has(path);

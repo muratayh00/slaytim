@@ -466,7 +466,7 @@ function SectionHeader({ icon, iconBg, title, sub, href }: { icon: React.ReactNo
         </div>
       </div>
       {href && (
-        <Link href={href} prefetch={href.startsWith('/slideo') ? false : undefined} className="text-[13px] text-muted-foreground hover:text-primary flex items-center gap-1 font-medium transition-colors">
+        <Link href={href} prefetch={false} className="text-[13px] text-muted-foreground hover:text-primary flex items-center gap-1 font-medium transition-colors">
           Tümü <ChevronRight className="w-3.5 h-3.5" />
         </Link>
       )}
