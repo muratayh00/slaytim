@@ -6,10 +6,14 @@ import Sidebar from '@/components/shared/Sidebar';
 import TopBar from '@/components/shared/TopBar';
 import BottomNav from '@/components/shared/BottomNav';
 import SiteFooter from '@/components/shared/SiteFooter';
+import AnalyticsTracker from '@/components/shared/AnalyticsTracker';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
+      {/* Route-change tracker — fires page_view events to /api/analytics/event */}
+      <Suspense fallback={null}><AnalyticsTracker /></Suspense>
+
       <Suspense fallback={null}><Sidebar /></Suspense>
       <Suspense fallback={null}><Navbar /></Suspense>
       <Suspense fallback={null}><TopBar /></Suspense>
