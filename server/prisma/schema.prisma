@@ -544,6 +544,36 @@ model SessionSnapshot {
   @@map("session_snapshots")
 }
 
+// Tracks every search query for intelligence/analytics.
+model SearchQuery {
+  id          Int      @id @default(autoincrement())
+  query       String   @db.VarChar(500)
+  queryNorm   String?  @db.VarChar(500) @map("query_norm")
+  userId      Int?     @map("user_id")
+  sessionId   String?  @db.VarChar(128) @map("session_id")
+  resultCount Int      @default(0) @map("result_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([query])
+  @@index([queryNorm])
+  @@map("search_queries")
+}
+
+// Daily aggregated metric snapshots for fast dashboard queries.
+model AnalyticsDailyAgg {
+  id        Int      @id @default(autoincrement())
+  date      DateTime @db.Date
+  metric    String   @db.VarChar(100)
+  value     Int      @default(0)
+  metadata  Json?
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([date, metric])
+  @@index([date])
+  @@map("analytics_daily_agg")
+}
+
 model Report {
   id         Int       @id @default(autoincrement())
   userId     Int       @map("user_id")

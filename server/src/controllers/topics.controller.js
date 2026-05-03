@@ -535,7 +535,7 @@ const search = async (req, res) => {
     const topicsPage = allTopics.slice((page - 1) * limit, page * limit);
     const slidesPage = allSlides.slice((page - 1) * limit, page * limit);
 
-    res.json(normalizeMediaUrls({
+    const result = normalizeMediaUrls({
       topics: topicsPage,
       slides: slidesPage,
       total,
@@ -543,7 +543,28 @@ const search = async (req, res) => {
       pages: maxPages,
       totals: { topics: topicTotal, slides: slideTotal, all: total },
       paging: { topics: topicPages, slides: slidePages, max: maxPages },
-    }));
+    });
+
+    res.json(result);
+
+    // Fire-and-forget: persist query for search intelligence (page 1 only to avoid duplicates)
+    if (page === 1) {
+      const realtimeSvc = (() => {
+        try { return require('../services/analytics-realtime.service'); } catch { return null; }
+      })();
+      Promise.all([
+        prisma.searchQuery.create({
+          data: {
+            query:       q.slice(0, 500),
+            queryNorm:   qNorm.slice(0, 500),
+            userId:      req.user?.id ?? null,
+            sessionId:   String(req.headers['x-session-id'] || '').slice(0, 128) || null,
+            resultCount: total,
+          },
+        }).catch(() => {}),
+        realtimeSvc ? realtimeSvc.incrementToday('searches').catch(() => {}) : Promise.resolve(),
+      ]);
+    }
   } catch (err) {
     logger.error('Search failed', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Search failed' });

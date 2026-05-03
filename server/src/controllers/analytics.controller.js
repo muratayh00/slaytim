@@ -89,6 +89,30 @@ const ingestBatch = async (req, res) => {
 
     const inserted = await persistEventsBestEffort(normalized);
     res.json({ ok: true, inserted, deduped: normalized.length - inserted });
+
+    // Fire-and-forget: push page_view events to Redis realtime counters.
+    // Any error here must never bubble up or affect the response.
+    const pageViews = normalized.filter(e => e.eventType === 'page_view');
+    if (pageViews.length > 0) {
+      const realtimeSvc = (() => {
+        try { return require('../services/analytics-realtime.service'); } catch { return null; }
+      })();
+      if (realtimeSvc) {
+        pageViews.forEach(e => {
+          const page = (() => { try { const p = JSON.parse(e.payload || '{}'); return p?.page || null; } catch { return null; } })();
+          realtimeSvc.recordPageView(e.sessionId, page).catch(() => {});
+        });
+      }
+    }
+    const slideoViews = normalized.filter(e => e.eventType === 'slideo_view');
+    if (slideoViews.length > 0) {
+      const realtimeSvc = (() => {
+        try { return require('../services/analytics-realtime.service'); } catch { return null; }
+      })();
+      if (realtimeSvc) {
+        slideoViews.forEach(e => realtimeSvc.recordSlideoView(e.sessionId).catch(() => {}));
+      }
+    }
   } catch (err) {
     logger.warn('[analytics] ingestBatch degraded', { code: err?.code, error: err?.message });
     // Never break UX for telemetry failures.

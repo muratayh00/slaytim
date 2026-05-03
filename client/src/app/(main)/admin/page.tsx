@@ -388,14 +388,23 @@ function AnalyticsTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-extrabold">Admin Analytics</h2>
           <p className="text-sm text-muted-foreground">Canlı platform metrikleri ve öneri sistemi telemetrisi</p>
         </div>
-        <button onClick={load} className="px-3 py-2 rounded-lg border border-border text-sm font-semibold hover:bg-muted">
-          Yenile
-        </button>
+        <div className="flex items-center gap-2">
+          <a
+            href="/admin/analytics"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:opacity-90 transition-opacity"
+          >
+            <BarChart3 className="w-4 h-4" />
+            Control Tower
+          </a>
+          <button onClick={load} className="px-3 py-2 rounded-lg border border-border text-sm font-semibold hover:bg-muted">
+            Yenile
+          </button>
+        </div>
       </div>
 
       <Section title="Temel Metrikler (7g)">
