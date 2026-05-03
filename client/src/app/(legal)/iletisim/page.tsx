@@ -29,28 +29,28 @@ export default function ContactPage() {
           icon={<Mail className="w-5 h-5 text-primary" />}
           title="Genel Destek"
           desc="Hesap sorunları, teknik destek ve genel sorular için."
-          email="admin@slaytim.com"
+          email="support@slaytim.com"
           label="Destek E-postası"
         />
         <ContactCard
           icon={<Shield className="w-5 h-5 text-primary" />}
           title="Güvenlik Bildirimi"
           desc="Güvenlik açığı veya veri ihlali bildirimleri için."
-          email="admin@slaytim.com"
+          email="info@slaytim.com"
           label="Güvenlik E-postası"
         />
         <ContactCard
           icon={<MessageSquare className="w-5 h-5 text-primary" />}
           title="KVKK ve Gizlilik"
           desc="Kişisel veri talepleri ve KVKK hakları için."
-          email="admin@slaytim.com"
+          email="info@slaytim.com"
           label="Gizlilik E-postası"
         />
         <ContactCard
           icon={<Mail className="w-5 h-5 text-primary" />}
           title="İş Birliği"
           desc="Sponsorluk, iş ortaklığı ve reklam teklifleri için."
-          email="admin@slaytim.com"
+          email="hello@slaytim.com"
           label="İş Birliği E-postası"
         />
       </div>

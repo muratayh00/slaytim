@@ -487,9 +487,16 @@ const search = async (req, res) => {
     const qNorm = normalizeTr(q);
     // Build OR conditions: original + normalized variant (covers Turkish case-insensitivity)
     const makeOr = (q, qNorm) => {
-      const conditions = [{ title: { contains: q } }, { description: { contains: q } }];
+      // mode: 'insensitive' makes PostgreSQL use ILIKE so "figma" matches "Figma".
+      const conditions = [
+        { title: { contains: q, mode: 'insensitive' } },
+        { description: { contains: q, mode: 'insensitive' } },
+      ];
       if (qNorm !== q.toLowerCase()) {
-        conditions.push({ title: { contains: qNorm } }, { description: { contains: qNorm } });
+        conditions.push(
+          { title: { contains: qNorm, mode: 'insensitive' } },
+          { description: { contains: qNorm, mode: 'insensitive' } },
+        );
       }
       return conditions;
     };

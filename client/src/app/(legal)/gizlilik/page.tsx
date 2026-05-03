@@ -171,7 +171,7 @@ export default function GizlilikPage() {
           <Mail className="w-4 h-4 text-primary shrink-0" />
           <div>
             <p className="text-xs text-muted-foreground">Gizlilik İletişim</p>
-            <a href="mailto:admin@slaytim.com" className="text-sm font-semibold text-primary hover:underline">admin@slaytim.com</a>
+            <a href="mailto:info@slaytim.com" className="text-sm font-semibold text-primary hover:underline">info@slaytim.com</a>
           </div>
         </div>
       </section>

@@ -25,8 +25,21 @@ async function fetchCollection(idOrSlug: string): Promise<Record<string, unknown
 export default async function CollectionDetailPage({ params }: { params: { id: string } }) {
   const col = await fetchCollection(params.id);
 
-  // True 404 (collection doesn't exist)
-  if (!col) notFound();
+  // True 404 (collection doesn't exist).
+  // For RSC prefetch requests we return a 200 with empty UI so the browser
+  // doesn't log a network error in the console (same pattern as /kategori/[slug]).
+  if (!col) {
+    let isPrefetch = false;
+    try {
+      const { headers } = await import('next/headers');
+      isPrefetch = headers().get('Next-Router-Prefetch') === '1';
+    } catch {
+      // headers() unavailable during build — treat as direct navigation
+    }
+    if (!isPrefetch) notFound();
+    // Prefetch: render nothing (200) so the browser discards it silently
+    return null;
+  }
 
   // Private collection: server component has no auth cookie, delegate entirely to client
   if (col === FORBIDDEN) {

@@ -18,24 +18,24 @@ async function getPdfjs() {
       // NOTE: Use native browser module import from /public to avoid Next/Webpack
       // interop issues with pdfjs-dist package entrypoints in dev mode.
       lib = await runtimeImport('/pdf.min.mjs');
-      console.log('[PDF] loaded from /pdf.min.mjs');
+      if (process.env.NODE_ENV !== 'production') console.log('[PDF] loaded from /pdf.min.mjs');
     } catch (err) {
       primaryErr = err;
-      console.error('[PDF] primary import failed (/pdf.min.mjs):', err);
+      if (process.env.NODE_ENV !== 'production') console.error('[PDF] primary import failed (/pdf.min.mjs):', err);
     }
 
     if (!lib) {
       try {
         lib = await runtimeImport('/pdf.legacy.min.mjs');
-        console.log('[PDF] loaded from /pdf.legacy.min.mjs');
+        if (process.env.NODE_ENV !== 'production') console.log('[PDF] loaded from /pdf.legacy.min.mjs');
       } catch (legacyErr) {
-        console.error('[PDF] legacy import failed (/pdf.legacy.min.mjs):', legacyErr);
+        if (process.env.NODE_ENV !== 'production') console.error('[PDF] legacy import failed (/pdf.legacy.min.mjs):', legacyErr);
         throw primaryErr || legacyErr;
       }
     }
 
     lib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-    console.log('[PDF] workerSrc set to /pdf.worker.min.mjs');
+    if (process.env.NODE_ENV !== 'production') console.log('[PDF] workerSrc set to /pdf.worker.min.mjs');
     pdfjsLib = lib;
   }
   return pdfjsLib;
@@ -76,7 +76,7 @@ export async function warmupPdfjs(): Promise<void> {
 export async function loadPdfDocument(pdfPath: string) {
   const lib = await getPdfjs();
   const resolved = resolveFileUrl(pdfPath);
-  console.log('[PDF] Loading:', resolved);
+  if (process.env.NODE_ENV !== 'production') console.log('[PDF] Loading:', resolved);
 
   try {
     const doc = await lib.getDocument({
@@ -87,10 +87,10 @@ export async function loadPdfDocument(pdfPath: string) {
       disableStream: false,    // allow PDF.js to start rendering before full download
       disableAutoFetch: true,  // prioritize first visible page; fetch additional pages on demand
     }).promise;
-    console.log('[PDF] Loaded OK — pages:', doc.numPages);
+    if (process.env.NODE_ENV !== 'production') console.log('[PDF] Loaded OK — pages:', doc.numPages);
     return doc;
   } catch (err: any) {
-    console.error('[PDF] getDocument() failed:', err);
+    if (process.env.NODE_ENV !== 'production') console.error('[PDF] getDocument() failed:', err);
     // UnexpectedResponseException carries the HTTP status
     if (err?.name === 'UnexpectedResponseException') {
       throw new Error(`PDF fetch failed: ${err.status || 'unknown'}`);

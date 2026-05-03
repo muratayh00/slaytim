@@ -339,8 +339,8 @@ const searchUsers = async (req, res) => {
     const users = await prisma.user.findMany({
       where: {
         OR: [
-          { username: { contains: q } },
-          { bio: { contains: q } },
+          { username: { contains: q, mode: 'insensitive' } },
+          { bio: { contains: q, mode: 'insensitive' } },
         ],
       },
       select: {

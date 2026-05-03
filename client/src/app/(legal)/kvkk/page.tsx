@@ -37,7 +37,7 @@ export default function KVKKPage() {
           Slaytim platformu, <strong>slaytim.com</strong> alan adı üzerinden hizmet vermektedir. Kişisel verileriniz
           Slaytim işletmecisi tarafından işlenmektedir.
         </p>
-        <ContactCard label="KVKK İletişim" email="admin@slaytim.com" />
+        <ContactCard label="KVKK İletişim" email="info@slaytim.com" />
       </Section>
 
       {/* Section 2 */}
@@ -144,7 +144,7 @@ export default function KVKKPage() {
           ))}
         </div>
         <p className="text-sm text-muted-foreground mt-4">
-          Haklarınızı kullanmak için <a href="mailto:admin@slaytim.com" className="text-primary hover:underline font-medium">admin@slaytim.com</a> adresine
+          Haklarınızı kullanmak için <a href="mailto:info@slaytim.com" className="text-primary hover:underline font-medium">info@slaytim.com</a> adresine
           e-posta gönderebilir veya hesap ayarlarınızdan "Verilerimi Sil" seçeneğini kullanabilirsiniz.
           Talepler en geç <strong className="text-foreground">30 gün</strong> içinde yanıtlanır.
         </p>

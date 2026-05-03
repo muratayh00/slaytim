@@ -53,7 +53,7 @@ export default function TermsPage() {
         <p className="text-sm text-muted-foreground leading-relaxed">
           Hesap bilgilerinizi (şifre, e-posta) korumak sizin sorumluluğunuzdadır.
           Hesabınıza yetkisiz erişim şüphesi durumunda şifrenizi değiştirin ve{' '}
-          <a href="mailto:admin@slaytim.com" className="text-primary hover:underline font-medium">admin@slaytim.com</a>{' '}
+          <a href="mailto:support@slaytim.com" className="text-primary hover:underline font-medium">support@slaytim.com</a>{' '}
           adresinden destek ekibine bildirim yapabilirsiniz.
         </p>
       </Section>
@@ -62,7 +62,7 @@ export default function TermsPage() {
         <p className="text-sm text-muted-foreground leading-relaxed">
           Platform, raporlanan içerikleri inceleme ve gerekli durumlarda görünürlüğü kısıtlama,
           içeriği kaldırma veya hesabı askıya alma hakkını saklı tutar. Moderasyon kararlarına
-          itiraz için <a href="mailto:admin@slaytim.com" className="text-primary hover:underline font-medium">admin@slaytim.com</a> ile iletişime geçebilirsiniz.
+          itiraz için <a href="mailto:support@slaytim.com" className="text-primary hover:underline font-medium">support@slaytim.com</a> ile iletişime geçebilirsiniz.
         </p>
       </Section>
 
@@ -106,7 +106,7 @@ export default function TermsPage() {
           <Mail className="w-4 h-4 text-primary shrink-0" />
           <div>
             <p className="text-xs text-muted-foreground">Genel İletişim</p>
-            <a href="mailto:admin@slaytim.com" className="text-sm font-semibold text-primary hover:underline">admin@slaytim.com</a>
+            <a href="mailto:hello@slaytim.com" className="text-sm font-semibold text-primary hover:underline">hello@slaytim.com</a>
           </div>
         </div>
       </section>
