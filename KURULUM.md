@@ -58,13 +58,11 @@ ALLOW_LOCAL_STORAGE_DEV=true
 # STORAGE_ACCESS_KEY_ID=""
 # STORAGE_SECRET_ACCESS_KEY=""
 
-# ── E-posta (şifre sıfırlama, bildirimler) ───────────────────
-# SMTP_HOST="smtp.example.com"
-# SMTP_PORT=587
-# SMTP_SECURE=false
-# SMTP_USER="no-reply@slaytim.com"
-# SMTP_PASS="your_smtp_password"
-# SMTP_FROM="Slaytim.com <no-reply@slaytim.com>"
+# ── E-posta — Resend (resend.com) ────────────────────────────
+# Kayıt doğrulama, şifre sıfırlama ve magic link e-postaları için.
+# API anahtarını https://resend.com/api-keys adresinden alabilirsin.
+RESEND_API_KEY="REPLACE_WITH_YOUR_RESEND_API_KEY"
+EMAIL_FROM="Slaytim <hello@slaytim.com>"
 
 # ── Hata takibi (opsiyonel) ──────────────────────────────────
 # SENTRY_DSN=""

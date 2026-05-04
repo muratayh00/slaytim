@@ -40,9 +40,10 @@ Thumbs.db
 .vscode/
 .idea/
 
-# ── Doküman dosyaları (AI prompt, proje notları) ─────────────────
+# ── Doküman dosyaları (AI prompt, proje notları, auto-generated ref) ─────────
 # Bu dosyalar versiyon kontrolüne girmemeli.
 master-prompt.md
+PROJECT_FULL_CODEBASE_REFERENCE.md
 
 # Launch ignore baseline
 node_modules
@@ -54,12 +55,16 @@ tmp
 *.log
 *.tsbuildinfo
 
+# ── Env dosyaları (gerçek değer içerebilir — asla commit etme) ──
 .env
 .env.local
 .env.production
+.env.staging
 client/.env.local
 server/.env
 server/.env.local
 server/.env.production
+server/.env.staging
+# .env.*.example ve .env.staging.e2e şablon olarak commit'lenebilir (placeholder değerler)
 
 .claude/
