@@ -4,6 +4,7 @@ const { getHotFeedPage, invalidateHotFeedCache } = require('../services/slideo-f
 const { getAssignedVariant, trackFeedEvents, getFeedEvaluation } = require('../services/slideo-feed-experiment.service');
 const { getRecommendationFlags } = require('../services/feature-flag.service');
 const { runSlideoShadowEvaluation } = require('../services/recommendation-shadow.service');
+const { incrementColdStartImpression } = require('../services/slideo-coldstart.service');
 const ttlCache = require('../lib/ttl-cache');
 const { normalizeMediaUrls } = require('../lib/media-normalize');
 
@@ -297,6 +298,10 @@ const trackView = async (req, res) => {
     if (updated.count === 0) {
       return res.status(404).json({ error: 'Slideo not found' });
     }
+    // Non-blocking: cold-start impression + threshold evaluation.
+    // setImmediate keeps this off the critical path — the view response is
+    // already sent; any error here is swallowed and logged inside the service.
+    setImmediate(() => incrementColdStartImpression(slideoId).catch(() => {}));
     res.json({ ok: true, deduped: false });
   } catch (err) {
     logger.error('trackView failed', { error: err.message, stack: err.stack });
