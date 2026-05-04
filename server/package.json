@@ -35,8 +35,7 @@
     "db:seed:categories": "node scripts/seed-categories.js",
     "preflight:prod": "node ../scripts/preflight-launch.mjs --url https://slaytim.com --api-url https://api.slaytim.com/api",
     "preflight:staging": "node ../scripts/preflight-launch.mjs --url https://staging.slaytim.com --api-url https://api-staging.slaytim.com/api",
-    "staging:proof": "node scripts/staging-proof.mjs"
-    ,
+    "staging:proof": "node scripts/staging-proof.mjs",
     "conversion:recover-failed": "node scripts/recover-failed-conversions.js",
     "conversion:reclassify-invalid": "node scripts/reclassify-invalid-conversions.js",
     "preview:backfill": "node scripts/backfill-preview-assets.js",
@@ -68,10 +67,10 @@
     "ioredis": "^5.10.1",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
-    "nodemailer": "^8.0.3",
     "pdf-parse": "^1.1.1",
-    "sharp": "^0.33.5",
     "pg": "^8.20.0",
+    "resend": "^4.8.0",
+    "sharp": "^0.33.5",
     "sqlite3": "^6.0.1",
     "winston": "^3.11.0",
     "ws": "^8.18.0"

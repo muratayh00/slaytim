@@ -42,9 +42,7 @@ function validateEnv() {
     'STORAGE_BUCKET',
     'STORAGE_ACCESS_KEY_ID',
     'STORAGE_SECRET_ACCESS_KEY',
-    'SMTP_HOST',
-    'SMTP_USER',
-    'SMTP_PASS',
+    'RESEND_API_KEY',
   ];
 
   for (const key of requiredAlways) {
