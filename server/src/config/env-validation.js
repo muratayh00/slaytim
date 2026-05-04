@@ -43,6 +43,7 @@ function validateEnv() {
     'STORAGE_ACCESS_KEY_ID',
     'STORAGE_SECRET_ACCESS_KEY',
     'RESEND_API_KEY',
+    'EMAIL_FROM',
   ];
 
   for (const key of requiredAlways) {
@@ -161,6 +162,25 @@ function validateEnv() {
     if (isProd) hasFatal = true;
   } else if (jwt) {
     rows.push({ key: 'JWT_SECRET(strength)', status: 'OK', note: `${jwt.length} chars` });
+  }
+
+  // ── Resend API key format check ─────────────────────────────────────────────
+  const resendKey = process.env.RESEND_API_KEY || '';
+  if (resendKey) {
+    if (!resendKey.startsWith('re_') || resendKey.length < 20) {
+      rows.push({
+        key: 'RESEND_API_KEY(format)',
+        status: isProd ? 'FAIL' : 'WARN',
+        note: 'Must start with re_ and be at least 20 characters (obtain from resend.com/api-keys)',
+      });
+      if (isProd) hasFatal = true;
+    } else {
+      rows.push({
+        key: 'RESEND_API_KEY(format)',
+        status: 'OK',
+        note: `re_***${resendKey.slice(-4)} (${resendKey.length} chars)`,
+      });
+    }
   }
 
   const clam = process.env.CLAMAV_REQUIRED;

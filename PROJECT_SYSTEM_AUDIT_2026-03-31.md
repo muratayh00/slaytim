@@ -220,7 +220,7 @@ Backend ana bileşenler:
 - multer
 - ws
 - @aws-sdk/client-s3, @aws-sdk/s3-request-presigner
-- nodemailer
+- resend (transactional email)
 - @sentry/node
 
 Frontend ana bileşenler:
