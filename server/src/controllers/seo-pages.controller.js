@@ -64,6 +64,8 @@ const getPage = async (req, res) => {
     const { searchTerms } = config;
     const titleDescWhere = buildTermsWhere(searchTerms, ['title', 'description']);
 
+    // Each query is isolated with its own .catch so a single schema mismatch
+    // or transient DB error cannot 500 the entire SEO page.
     const [topics, slides, slideos, tags] = await Promise.all([
       prisma.topic.findMany({
         where: { ...titleDescWhere, isHidden: false, deletedAt: null },
@@ -76,6 +78,9 @@ const getPage = async (req, res) => {
           user: { select: { id: true, username: true, avatarUrl: true } },
           _count: { select: { slides: true } },
         },
+      }).catch((err) => {
+        logger.warn('[seo-pages] topics query failed', { slug, error: err.message });
+        return [];
       }),
       prisma.slide.findMany({
         where: { ...titleDescWhere, isHidden: false, deletedAt: null, conversionStatus: 'done' },
@@ -88,9 +93,13 @@ const getPage = async (req, res) => {
           user: { select: { id: true, username: true, avatarUrl: true } },
           topic: { select: { id: true, title: true, slug: true } },
         },
+      }).catch((err) => {
+        logger.warn('[seo-pages] slides query failed', { slug, error: err.message });
+        return [];
       }),
+      // Slideo model uses isHidden + hiddenAt — it has NO deletedAt field.
       prisma.slideo.findMany({
-        where: { ...buildTermsWhere(searchTerms, ['title', 'description']), deletedAt: null },
+        where: { ...buildTermsWhere(searchTerms, ['title', 'description']), isHidden: false },
         orderBy: [{ viewsCount: 'desc' }, { likesCount: 'desc' }],
         take: 8,
         select: {
@@ -99,6 +108,9 @@ const getPage = async (req, res) => {
           user: { select: { id: true, username: true, avatarUrl: true } },
           slide: { select: { id: true, title: true, thumbnailUrl: true } },
         },
+      }).catch((err) => {
+        logger.warn('[seo-pages] slideos query failed', { slug, error: err.message });
+        return [];
       }),
       prisma.tag.findMany({
         where: {
@@ -108,6 +120,9 @@ const getPage = async (req, res) => {
         },
         take: 10,
         select: { slug: true, name: true },
+      }).catch((err) => {
+        logger.warn('[seo-pages] tags query failed', { slug, error: err.message });
+        return [];
       }),
     ]);
 
