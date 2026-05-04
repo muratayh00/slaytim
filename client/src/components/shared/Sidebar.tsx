@@ -140,7 +140,7 @@ export default function Sidebar() {
   return (
     <aside className="hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-56 bg-card border-r border-border z-40">
       <div className="px-4 h-14 flex items-center border-b border-border/60 shrink-0">
-        <Link href="/" className="flex items-center gap-2.5">
+        <Link href="/" prefetch={false} className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
             <Presentation className="w-[18px] h-[18px] text-white" strokeWidth={2.5} />
           </div>

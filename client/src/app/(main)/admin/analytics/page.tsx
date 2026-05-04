@@ -143,28 +143,101 @@ export default function AdminAnalyticsPage() {
   const [content,  setContent]  = useState<ContentData | null>(null);
   const [loading,  setLoading]  = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
-  const sseRef = useRef<EventSource | null>(null);
+  const sseRef            = useRef<EventSource | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollTimerRef      = useRef<ReturnType<typeof setInterval> | null>(null);
+  const failCountRef      = useRef(0);
+  const mountedRef        = useRef(false);
 
-  /* ── SSE connection ─── */
+  /* ── SSE connection with single-timer reconnect + polling fallback ─── */
   const connectSSE = useCallback(() => {
-    if (sseRef.current) sseRef.current.close();
+    if (!mountedRef.current) return;
+
+    // Clear any existing reconnect timer before opening a new connection
+    if (reconnectTimerRef.current !== null) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    if (sseRef.current) {
+      sseRef.current.onmessage = null;
+      sseRef.current.onerror   = null;
+      sseRef.current.close();
+      sseRef.current = null;
+    }
+
     const BASE = getApiBaseUrl();
     const es = new EventSource(`${BASE}/admin/analytics/realtime`, { withCredentials: true });
+
     es.onmessage = (e) => {
+      failCountRef.current = 0; // reset on successful message
       try { setRt(JSON.parse(e.data)); } catch {}
     };
+
     es.onerror = () => {
-      // auto-reconnect after 10 s on error
+      // Null out handlers immediately so this closure never fires again
+      es.onmessage = null;
+      es.onerror   = null;
       es.close();
-      setTimeout(connectSSE, 10_000);
+      sseRef.current = null;
+
+      if (!mountedRef.current) return;
+
+      failCountRef.current += 1;
+
+      // After 3 consecutive failures switch to silent REST polling
+      if (failCountRef.current >= 3) {
+        if (pollTimerRef.current === null) {
+          pollTimerRef.current = setInterval(async () => {
+            if (!mountedRef.current) return;
+            try {
+              const BASE2 = getApiBaseUrl();
+              const res = await fetch(`${BASE2}/admin/analytics/realtime-snapshot`, {
+                credentials: 'include',
+              });
+              if (res.ok) {
+                const data = await res.json();
+                setRt(data);
+              }
+            } catch {
+              // silent — no console spam
+            }
+          }, 10_000);
+        }
+        return; // don't schedule another SSE reconnect
+      }
+
+      // Schedule exactly one reconnect attempt
+      reconnectTimerRef.current = setTimeout(() => {
+        reconnectTimerRef.current = null;
+        connectSSE();
+      }, 10_000);
     };
+
     sseRef.current = es;
   }, []);
 
   useEffect(() => {
     if (!user?.isAdmin) return;
+    mountedRef.current = true;
+    failCountRef.current = 0;
     connectSSE();
-    return () => { sseRef.current?.close(); };
+    return () => {
+      mountedRef.current = false;
+      if (reconnectTimerRef.current !== null) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (pollTimerRef.current !== null) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+      if (sseRef.current) {
+        sseRef.current.onmessage = null;
+        sseRef.current.onerror   = null;
+        sseRef.current.close();
+        sseRef.current = null;
+      }
+    };
   }, [user, connectSSE]);
 
   /* ── REST data fetch ─── */

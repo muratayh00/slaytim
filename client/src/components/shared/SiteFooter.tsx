@@ -34,7 +34,7 @@ export default function SiteFooter() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-6">
           {/* Brand column — full width on mobile, single column on desktop */}
           <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="inline-flex items-center gap-2 mb-3">
+            <Link href="/" prefetch={false} className="inline-flex items-center gap-2 mb-3">
               <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
                 <Presentation className="w-[18px] h-[18px] text-white" strokeWidth={2.5} />
               </div>
