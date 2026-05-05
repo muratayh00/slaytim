@@ -9,6 +9,7 @@ import {
   Heart, Bookmark, Download, ArrowLeft, Presentation, Calendar,
   ExternalLink, Lock, Eye, Flag, Loader2, AlertTriangle, FileX,
   FolderPlus, X, Check, Plus, ChevronRight, Play, Share2, Code2, Copy, Trash2,
+  FileText,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
@@ -482,6 +483,8 @@ export default function SlideDetailPage() {
   const [likeBusy, setLikeBusy] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
   const [coverSaving, setCoverSaving] = useState(false);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const downloadMenuRef = useRef<HTMLDivElement>(null);
   const [previewMeta, setPreviewMeta] = useState<{
     previewMode: 'images' | 'pdf';
     previewStatus: string;  // none | processing | ready | failed
@@ -1028,6 +1031,32 @@ export default function SlideDetailPage() {
     }
   };
 
+  // Close the download format menu when the user clicks outside of it.
+  useEffect(() => {
+    if (!showDownloadMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (!downloadMenuRef.current?.contains(e.target as Node)) {
+        setShowDownloadMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showDownloadMenu]);
+
+  const handleDownloadFormat = async (format: 'pdf' | 'pptx') => {
+    setShowDownloadMenu(false);
+    // Best-effort download counter — does not block file retrieval.
+    try { await api.post(`/slides/${id}/download`); } catch {}
+    // Navigate current tab to the download URL.
+    // Server returns Content-Disposition: attachment → browser downloads the
+    // file without navigating away from the slide detail page.
+    const url =
+      format === 'pdf'
+        ? `${API_BASE_URL}/slides/${id}/pdf?download=1`
+        : `${API_BASE_URL}/slides/${id}/file`;
+    window.location.href = url;
+  };
+
   const handleDeleteSlide = async () => {
     if (!slide) return;
     if (!user) return;
@@ -1349,15 +1378,39 @@ export default function SlideDetailPage() {
 
         {/* Download */}
         {user ? (
-          <a
-            href={`${API_BASE}${slide.fileUrl}`}
-            download
-            onClick={handleDownload}
-            className="flex items-center justify-center gap-2.5 w-full py-3.5 rounded-2xl bg-primary text-white font-bold text-sm hover:bg-primary/90 transition-all shadow-button hover:shadow-button-hover hover:-translate-y-0.5"
-          >
-            <Download className="w-4 h-4" />
-            {fileExt === 'PDF' ? "PDF'i İndir" : `Slaytı İndir (.${fileExt.toLowerCase()})`}
-          </a>
+          <div ref={downloadMenuRef} className="relative w-full">
+            {/* Toggle button */}
+            <button
+              onClick={() => setShowDownloadMenu((v) => !v)}
+              className="flex items-center justify-center gap-2.5 w-full py-3.5 rounded-2xl bg-primary text-white font-bold text-sm hover:bg-primary/90 transition-all shadow-button hover:shadow-button-hover hover:-translate-y-0.5"
+            >
+              <Download className="w-4 h-4" />
+              Slayt İndir
+              <ChevronRight className={cn('w-4 h-4 ml-auto transition-transform duration-200', showDownloadMenu && 'rotate-90')} />
+            </button>
+
+            {/* Format menu — opens above the button */}
+            {showDownloadMenu && (
+              <div className="absolute bottom-full left-0 right-0 mb-2 rounded-2xl border border-border bg-card shadow-lg overflow-hidden z-50">
+                {hasPdf && (
+                  <button
+                    onClick={() => handleDownloadFormat('pdf')}
+                    className="flex items-center gap-2.5 w-full px-4 py-3 text-sm font-semibold hover:bg-muted transition-colors text-left"
+                  >
+                    <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                    PDF Olarak İndir
+                  </button>
+                )}
+                <button
+                  onClick={() => handleDownloadFormat('pptx')}
+                  className="flex items-center gap-2.5 w-full px-4 py-3 text-sm font-semibold hover:bg-muted transition-colors text-left"
+                >
+                  <Presentation className="w-4 h-4 text-muted-foreground shrink-0" />
+                  {`Slayt Olarak İndir (.${fileExt.toLowerCase()})`}
+                </button>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="rounded-2xl border-2 border-dashed border-border p-6 text-center">
             <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-3">

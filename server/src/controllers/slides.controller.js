@@ -871,6 +871,7 @@ const getPdfForPreview = async (req, res) => {
       where: { id: slideId },
       select: {
         id: true,
+        title: true,
         userId: true,
         isHidden: true,
         deletedAt: true,
@@ -892,6 +893,20 @@ const getPdfForPreview = async (req, res) => {
     // Allow short-lived browser caching for repeat opens while keeping user-scoped privacy.
     res.setHeader('Cache-Control', 'private, max-age=120, must-revalidate');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+    // ?download=1 → browser downloads the file instead of opening it in the PDF viewer.
+    // Content-Disposition: attachment + RFC 5987 UTF-8 filename for non-ASCII titles.
+    if (req.query.download === '1') {
+      const safeName  = (slide.title || 'slayt').replace(/[^\wÀ-ɏ\s.-]/g, '_').trim() || 'slayt';
+      const ascii     = safeName.replace(/[^\x20-\x7E]/g, '_');
+      const encoded   = encodeURIComponent(safeName);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${ascii}.pdf"; filename*=UTF-8''${encoded}.pdf`,
+      );
+      // No caching for download responses — avoid stale signed-URL issues.
+      res.setHeader('Cache-Control', 'no-store');
+    }
 
     const localCandidatePath = toUploadAbsPath(slide.pdfUrl);
     const isRemote =
@@ -1656,6 +1671,123 @@ const getRelated = async (req, res) => {
   }
 };
 
+// GET /api/slides/:id/file
+// Serves the original PPT/PPTX file with Content-Disposition: attachment so the
+// browser downloads it without navigating away from the slide detail page.
+// Mirrors getPdfForPreview's storage resolution pattern for local + S3/R2.
+const downloadFile = async (req, res) => {
+  try {
+    const slideId = Number(req.params.id);
+    if (!Number.isInteger(slideId) || slideId <= 0) {
+      return res.status(400).json({ error: 'Invalid slide id' });
+    }
+
+    const slide = await prisma.slide.findUnique({
+      where:  { id: slideId },
+      select: {
+        id:               true,
+        title:            true,
+        userId:           true,
+        fileUrl:          true,
+        isHidden:         true,
+        deletedAt:        true,
+        conversionStatus: true,
+      },
+    });
+
+    if (!slide || slide.deletedAt) {
+      return res.status(404).json({ error: 'Slide not found' });
+    }
+    if (slide.isHidden && slide.userId !== req.user?.id && !req.user?.isAdmin) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    if (!slide.fileUrl) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Derive extension and MIME type from the stored fileUrl.
+    const ext = (slide.fileUrl.split('.').pop() || 'pptx').toLowerCase();
+    const mimeMap = {
+      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      ppt:  'application/vnd.ms-powerpoint',
+    };
+    const mimeType = mimeMap[ext] || 'application/octet-stream';
+
+    // Build a safe filename — ASCII fallback + UTF-8 RFC 5987 extended param.
+    const rawName   = (slide.title || 'slayt').replace(/[^\wÀ-ɏ\s.-]/g, '_').trim() || 'slayt';
+    const ascii     = rawName.replace(/[^\x20-\x7E]/g, '_');
+    const encoded   = encodeURIComponent(rawName);
+
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${ascii}.${ext}"; filename*=UTF-8''${encoded}.${ext}`,
+    );
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+    // Increment download counter asynchronously — does not block the file stream.
+    prisma.slide.update({
+      where: { id: slideId },
+      data:  { downloadsCount: { increment: 1 } },
+    }).catch(() => {});
+
+    // ── Remote storage (S3 / R2) ──────────────────────────────────────────
+    const localCandidatePath = toUploadAbsPath(slide.fileUrl);
+    const isRemote =
+      /^https?:\/\//i.test(slide.fileUrl) ||
+      (String(slide.fileUrl).startsWith('/uploads/') &&
+        isRemoteEnabled() &&
+        (!localCandidatePath || !fs.existsSync(localCandidatePath)));
+
+    if (isRemote) {
+      const readUrl = await resolveStorageReadUrl(slide.fileUrl);
+      const parsed  = new URL(readUrl);
+
+      // SSRF guard — mirrors getPdfForPreview
+      const allowedHosts   = (process.env.ALLOWED_CDN_HOSTS || '').split(',').filter(Boolean);
+      const isAllowed      = allowedHosts.length === 0 ||
+        allowedHosts.some((h) => parsed.hostname === h || parsed.hostname.endsWith(`.${h}`));
+      if (!isAllowed) {
+        const privateRanges = /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/;
+        if (privateRanges.test(parsed.hostname)) {
+          logger.warn('SSRF attempt blocked in downloadFile', { url: slide.fileUrl, ip: req.ip });
+          return res.status(403).json({ error: 'Forbidden URL' });
+        }
+      }
+
+      const upstream = await fetch(readUrl);
+      if (!upstream.ok) {
+        return res.status(502).json({ error: 'Remote file fetch failed' });
+      }
+
+      const contentLength = upstream.headers.get('content-length');
+      if (contentLength) res.setHeader('Content-Length', contentLength);
+
+      if (upstream.body) {
+        Readable.fromWeb(upstream.body).pipe(res);
+      } else {
+        const raw = await upstream.arrayBuffer();
+        res.end(Buffer.from(raw));
+      }
+      return;
+    }
+
+    // ── Local filesystem ──────────────────────────────────────────────────
+    const filePath = localCandidatePath;
+    if (!filePath || !fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found on disk' });
+    }
+
+    const stat = fs.statSync(filePath);
+    res.setHeader('Content-Length', stat.size);
+    fs.createReadStream(filePath).pipe(res);
+  } catch (err) {
+    logger.error('downloadFile failed', { error: err.message, stack: err.stack });
+    res.status(500).json({ error: 'Failed to serve file' });
+  }
+};
+
 const trackDownload = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -1805,6 +1937,7 @@ module.exports = {
   getPageStats,
   getCreatorInsights,
   trackDownload,
+  downloadFile,
   getPreviewMeta,
   getPdfForPreview,
   getPageImage,

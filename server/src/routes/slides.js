@@ -28,6 +28,7 @@ const {
   getPdfForPreview,
   getPageImage,
   updateThumbnail,
+  downloadFile,
 } = require('../controllers/slides.controller');
 const { authenticate, optionalAuth } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -68,7 +69,8 @@ router.get('/:id/insights', validateNumericParam('id'), authenticate, getCreator
 router.get('/:id/comments', validateNumericParam('id'), listSlideComments);
 router.get('/:id/related', validateNumericParam('id'), getRelated);
 router.get('/:id/preview-meta', validateNumericParam('id'), optionalAuth, getPreviewMeta);
-router.get('/:id/pdf', validateNumericParam('id'), optionalAuth, getPdfForPreview);
+router.get('/:id/pdf',  validateNumericParam('id'), optionalAuth,  getPdfForPreview);
+router.get('/:id/file', validateNumericParam('id'), authenticate,   downloadFile);
 router.get('/:id/page-image/:page', validateNumericParam('id'), optionalAuth, getPageImage);
 router.get('/:id', validateNumericParam('id'), getOne);
 router.post('/:id/retry-conversion', validateNumericParam('id'), authenticate, retryConversion);
