@@ -75,7 +75,7 @@ export async function generateMetadata({ params }: { params: { id?: string; slug
 
 function SlideSkeleton() {
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="max-w-5xl mx-auto px-4 py-8">
       <div className="skeleton h-8 w-48 mb-6 rounded-xl" />
       <div className="skeleton aspect-video rounded-2xl mb-6" />
       <div className="skeleton h-10 w-2/3 rounded-xl mb-4" />
@@ -241,7 +241,7 @@ export default async function SlideLayout({
         // is emitted above; this nav is purely for users + non-script crawlers.
         <nav
           aria-label="Breadcrumb"
-          className="max-w-4xl mx-auto px-4 pt-6 -mb-2 text-sm text-muted-foreground flex flex-wrap items-center gap-1.5"
+          className="max-w-5xl mx-auto px-4 pt-6 -mb-2 text-sm text-muted-foreground flex flex-wrap items-center gap-1.5"
         >
           {breadcrumbTrail.map((item, idx) => {
             const isLast = idx === breadcrumbTrail.length - 1;
@@ -274,7 +274,7 @@ export default async function SlideLayout({
         <section
           aria-labelledby="ai-summary-heading"
           data-ai-summary="true"
-          className="max-w-4xl mx-auto px-4 pt-6"
+          className="max-w-5xl mx-auto px-4 pt-6"
         >
           <div className="rounded-2xl border border-border bg-card/50 p-5 sm:p-6">
             <h2

@@ -46,14 +46,10 @@ interface ImageSlideViewerProps {
   navStartMs?: number;
 }
 
-// Max height for the slide image area — tall enough to read, small enough not
-// to dominate the page. Fullscreen mode ignores this via the viewer container.
-const SLIDE_MAX_H = 'max-h-[460px]';
-
 // ── Skeleton ─────────────────────────────────────────────────────────────────
 function PageSkeleton() {
   return (
-    <div className={cn('w-full bg-muted/60 animate-pulse rounded-lg', SLIDE_MAX_H, 'aspect-video')} />
+    <div className="w-full bg-muted/60 animate-pulse rounded-lg aspect-video" />
   );
 }
 
@@ -77,7 +73,7 @@ function SlidePageImage({
 
   if (error) {
     return (
-      <div className={cn('w-full flex items-center justify-center bg-muted/40 rounded-lg aspect-video', SLIDE_MAX_H)}>
+      <div className="w-full flex items-center justify-center bg-muted/40 rounded-lg min-h-[200px]">
         <span className="text-xs text-muted-foreground">Sayfa yüklenemedi</span>
       </div>
     );
@@ -87,10 +83,11 @@ function SlidePageImage({
     <div className="relative w-full flex items-center justify-center">
       {/* Skeleton shown until image loads */}
       {!loaded && (
-        <div className={cn('w-full bg-muted/60 animate-pulse rounded-lg aspect-video', SLIDE_MAX_H)} />
+        <div className="w-full bg-muted/60 animate-pulse rounded-lg aspect-video" />
       )}
-      {/* Image — scales to fill width, never taller than SLIDE_MAX_H.
-          next/image fill mode is incompatible with h-auto + max-h constraints. */}
+      {/* Image — w-auto lets portrait pages be their natural width (prevents tiny
+          letterboxing). max-w-full prevents overflow. max-h provides vh cap so
+          tall pages never push actions out of view. object-contain preserves ratio. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={page.url}
@@ -99,8 +96,9 @@ function SlidePageImage({
         decoding={eager ? 'sync' : 'async'}
         draggable={false}
         className={cn(
-          'w-full h-auto object-contain rounded-lg select-none transition-opacity duration-200',
-          SLIDE_MAX_H,
+          'block mx-auto h-auto w-auto max-w-full object-contain rounded-lg select-none transition-opacity duration-200',
+          // Mobile: 65 vh  |  Tablet: 74 vh  |  Desktop: 78 vh
+          'max-h-[65vh] sm:max-h-[74vh] lg:max-h-[78vh]',
           loaded ? 'opacity-100' : 'absolute opacity-0 pointer-events-none'
         )}
         onLoad={handleLoad}
@@ -264,7 +262,11 @@ export default function ImageSlideViewer({
       <div
         className={cn(
           'flex items-center justify-center p-3 sm:p-4',
-          isFullscreen ? 'flex-1 bg-black' : 'bg-muted/20'
+          isFullscreen
+            ? 'flex-1 bg-black'
+            // Min-height: ensures viewer never collapses before image loads.
+            // Mobile: 260px  |  Tablet: 360px  |  Desktop: 480px
+            : 'bg-muted/20 min-h-[260px] sm:min-h-[360px] md:min-h-[480px]'
         )}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
@@ -274,7 +276,7 @@ export default function ImageSlideViewer({
             'w-full',
             isFullscreen
               ? 'flex items-center justify-center h-full'
-              : 'max-w-3xl mx-auto'
+              : 'max-w-5xl mx-auto'
           )}>
             {isFullscreen ? (
               // Fullscreen: fill available height, no max-h cap.

@@ -1082,7 +1082,7 @@ export default function SlideDetailPage() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="skeleton h-8 w-48 mb-6 rounded-xl" />
         <div className="skeleton aspect-video rounded-2xl mb-6" />
         <div className="skeleton h-10 w-2/3 rounded-xl mb-4" />
@@ -1118,7 +1118,7 @@ export default function SlideDetailPage() {
   const canDeleteSlide = Boolean(user && (isSlideOwner || user.isAdmin));
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="max-w-5xl mx-auto px-4 py-8">
       <Link
         href={slide.topic?.id
           ? buildTopicPath({ id: slide.topic.id, slug: slide.topic.slug, title: slide.topic.title })

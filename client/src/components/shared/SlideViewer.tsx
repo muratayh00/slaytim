@@ -232,22 +232,25 @@ export default function SlideViewer({
     try {
       const isFs = fullscreenRef.current;
       const containerW = canvasRef.current.parentElement?.clientWidth || 800;
-      // Keep the first visual fast by limiting non-fullscreen render size.
-      // This cuts render pixel count materially on large displays.
+      // Allow wider renders so landscape slides fill the container.
+      // Portrait slides are bounded by maxH anyway, not width.
       const w = isFs
         ? Math.max(containerW, 400)
-        : Math.min(Math.max(containerW, 360), 960);
+        : Math.min(Math.max(containerW, 360), 1100);
       // Lower DPR on normal mode for quicker page paint while remaining readable.
       const dpr = Math.min(
         typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1,
         isFs ? 1.75 : 1.2,
       );
-      // Constrain height so portrait/A4 slides don't require vertical scrolling.
-      // Cap height so slides never overflow the viewport on first view.
-      // 640 px feels readable without being overwhelming; fullscreen is uncapped.
+      // Max render height: ~78 % of viewport so portrait/A4 pages are big
+      // enough to read without dominating the screen.
+      // Breakpoints: mobile ≤ 767 px → 65 vh, tablet 768–1199 px → 74 vh, desktop → 78 vh.
+      const vph = typeof window !== 'undefined' ? window.innerHeight : 800;
+      const vpw = typeof window !== 'undefined' ? window.innerWidth  : 1200;
+      const maxVhRatio = vpw < 768 ? 0.65 : vpw < 1200 ? 0.74 : 0.78;
       const maxH = isFs
         ? undefined
-        : Math.min(Math.max((typeof window !== 'undefined' ? window.innerHeight : 800) - 280, 360), 640);
+        : Math.floor(Math.min(vph * maxVhRatio, Math.max(vph - 180, 420)));
       await renderPageToCanvas(doc, pageNum, canvasRef.current, w, dpr, maxH);
       if (seq === renderSeqRef.current) {
         localStorage.setItem(storageKey, String(pageNum));
@@ -436,7 +439,7 @@ export default function SlideViewer({
                 src={coverUrl}
                 alt="Slayt önizlemesi"
                 className="w-full block"
-                style={{ maxHeight: '640px', objectFit: 'contain', background: '#18181b' }}
+                style={{ maxHeight: 'min(78vh, 900px)', objectFit: 'contain', background: '#18181b' }}
                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
               />
               <div className="absolute inset-0 flex items-end justify-center pb-6 pointer-events-none">
@@ -598,7 +601,7 @@ export default function SlideViewer({
               <Loader2 className="w-7 h-7 animate-spin text-white/30" />
             </div>
           )}
-          <div className={`w-full flex items-center justify-center ${!fullscreen ? 'min-h-[30vh]' : ''}`}>
+          <div className={`w-full flex items-center justify-center ${!fullscreen ? 'min-h-[260px] sm:min-h-[360px] md:min-h-[44vh]' : ''}`}>
             <canvas
               ref={canvasRef}
               className={fullscreen ? 'max-h-full max-w-full object-contain bg-white' : 'max-w-full h-auto block bg-white mx-auto'}
