@@ -1097,7 +1097,24 @@ export default function SlideDetailPage() {
   const bgGradient = BG_GRADIENTS[slide.id % BG_GRADIENTS.length];
   const avatarGradient = AVATAR_COLORS[slide.user.id % AVATAR_COLORS.length];
   const hasPdf = slide.conversionStatus === 'done' && slide.pdfUrl;
-  const fileExt = slide.fileUrl?.split('.').pop()?.toUpperCase() || 'PPTX';
+
+  // Strip query-string (S3/R2 signed URLs) before extracting extension
+  const rawFileExt = (slide.fileUrl || '')
+    .split('?')[0]
+    .split('.')
+    .pop()
+    ?.replace(/[^a-zA-Z0-9]/g, '')   // strip any stray chars
+    .toLowerCase() || 'pptx';
+  const fileExt = rawFileExt.toUpperCase();
+
+  // Robust PDF detection: extension + mime + URL suffix
+  const isOriginalPdf =
+    rawFileExt === 'pdf' ||
+    String((slide as any).mimeType || (slide as any).fileType || '')
+      .toLowerCase()
+      .includes('pdf') ||
+    (slide.fileUrl || '').toLowerCase().split('?')[0].endsWith('.pdf');
+
   const canDeleteSlide = Boolean(user && (isSlideOwner || user.isAdmin));
 
   return (
@@ -1378,39 +1395,51 @@ export default function SlideDetailPage() {
 
         {/* Download */}
         {user ? (
-          <div ref={downloadMenuRef} className="relative w-full">
-            {/* Toggle button */}
+          isOriginalPdf ? (
+            /* Original file is a PDF — single direct download button, no dropdown needed */
             <button
-              onClick={() => setShowDownloadMenu((v) => !v)}
+              onClick={() => handleDownloadFormat('pdf')}
               className="flex items-center justify-center gap-2.5 w-full py-3.5 rounded-2xl bg-primary text-white font-bold text-sm hover:bg-primary/90 transition-all shadow-button hover:shadow-button-hover hover:-translate-y-0.5"
             >
               <Download className="w-4 h-4" />
-              Slayt İndir
-              <ChevronRight className={cn('w-4 h-4 ml-auto transition-transform duration-200', showDownloadMenu && 'rotate-90')} />
+              PDF Olarak İndir
             </button>
+          ) : (
+            /* Original file is PPTX/PPT — show format-selection dropdown */
+            <div ref={downloadMenuRef} className="relative w-full">
+              {/* Toggle button */}
+              <button
+                onClick={() => setShowDownloadMenu((v) => !v)}
+                className="flex items-center justify-center gap-2.5 w-full py-3.5 rounded-2xl bg-primary text-white font-bold text-sm hover:bg-primary/90 transition-all shadow-button hover:shadow-button-hover hover:-translate-y-0.5"
+              >
+                <Download className="w-4 h-4" />
+                Slayt İndir
+                <ChevronRight className={cn('w-4 h-4 ml-auto transition-transform duration-200', showDownloadMenu && 'rotate-90')} />
+              </button>
 
-            {/* Format menu — opens above the button */}
-            {showDownloadMenu && (
-              <div className="absolute bottom-full left-0 right-0 mb-2 rounded-2xl border border-border bg-card shadow-lg overflow-hidden z-50">
-                {hasPdf && (
+              {/* Format menu — opens above the button */}
+              {showDownloadMenu && (
+                <div className="absolute bottom-full left-0 right-0 mb-2 rounded-2xl border border-border bg-card shadow-lg overflow-hidden z-50">
+                  {hasPdf && (
+                    <button
+                      onClick={() => handleDownloadFormat('pdf')}
+                      className="flex items-center gap-2.5 w-full px-4 py-3 text-sm font-semibold hover:bg-muted transition-colors text-left"
+                    >
+                      <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                      PDF Olarak İndir
+                    </button>
+                  )}
                   <button
-                    onClick={() => handleDownloadFormat('pdf')}
+                    onClick={() => handleDownloadFormat('pptx')}
                     className="flex items-center gap-2.5 w-full px-4 py-3 text-sm font-semibold hover:bg-muted transition-colors text-left"
                   >
-                    <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                    PDF Olarak İndir
+                    <Presentation className="w-4 h-4 text-muted-foreground shrink-0" />
+                    {`Slayt Olarak İndir (.${fileExt.toLowerCase()})`}
                   </button>
-                )}
-                <button
-                  onClick={() => handleDownloadFormat('pptx')}
-                  className="flex items-center gap-2.5 w-full px-4 py-3 text-sm font-semibold hover:bg-muted transition-colors text-left"
-                >
-                  <Presentation className="w-4 h-4 text-muted-foreground shrink-0" />
-                  {`Slayt Olarak İndir (.${fileExt.toLowerCase()})`}
-                </button>
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+            </div>
+          )
         ) : (
           <div className="rounded-2xl border-2 border-dashed border-border p-6 text-center">
             <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-3">
