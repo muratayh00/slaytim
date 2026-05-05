@@ -21,6 +21,7 @@ import SlideCard from '@/components/shared/SlideCard';
 import { type SlidePreviewPage } from '@/components/shared/ImageSlideViewer';
 import SlideAnalyticsPanel from '@/components/shared/SlideAnalyticsPanel';
 import SlideFlashcardsPanel from '@/components/shared/SlideFlashcardsPanel';
+import { GuestAuthPrompt } from '@/components/shared/GuestAuthPrompt';
 import { analytics } from '@/lib/analytics';
 import { resolveFileUrl } from '@/lib/pdfRenderer';
 import { buildProfilePath, buildSlideoPath, buildSlidePath, buildTopicPath, splitIdSlug } from '@/lib/url';
@@ -482,6 +483,7 @@ export default function SlideDetailPage() {
   const [retryingConversion, setRetryingConversion] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
+  const [showGuestPrompt, setShowGuestPrompt] = useState(false);
   const [coverSaving, setCoverSaving] = useState(false);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const downloadMenuRef = useRef<HTMLDivElement>(null);
@@ -865,7 +867,7 @@ export default function SlideDetailPage() {
   }, [id, previewMeta?.previewStatus, slide?.conversionStatus]);
 
   const handleLike = async () => {
-    if (!user) return toast.error('Beğenmek için giriş yapmalısın');
+    if (!user) { setShowGuestPrompt(true); return; }
     if (likeBusy) return;
     setLikeBusy(true);
     try {
@@ -879,7 +881,7 @@ export default function SlideDetailPage() {
   };
 
   const handleSave = async () => {
-    if (!user) return toast.error('Kaydetmek için giriş yapmalısın');
+    if (!user) { setShowGuestPrompt(true); return; }
     if (saveBusy) return;
     setSaveBusy(true);
     try {
@@ -1562,6 +1564,9 @@ export default function SlideDetailPage() {
           />
         )}
       </AnimatePresence>
+
+      {/* Guest auth prompt — shown when non-logged-in user clicks like/save */}
+      {showGuestPrompt && <GuestAuthPrompt onClose={() => setShowGuestPrompt(false)} />}
     </div>
   );
 }

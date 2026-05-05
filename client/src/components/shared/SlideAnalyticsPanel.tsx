@@ -5,6 +5,7 @@ import { BarChart3, MessageCircle, Send, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import toast from 'react-hot-toast';
+import { GuestAuthPrompt } from './GuestAuthPrompt';
 import { pushTelemetryEvent, pushSessionSnapshot, flushTelemetry } from '@/lib/telemetryBuffer';
 
 type PageStat = {
@@ -51,6 +52,7 @@ export default function SlideAnalyticsPanel({
   isOwner: boolean;
 }) {
   const { user } = useAuthStore();
+  const [showGuestPrompt, setShowGuestPrompt] = useState(false);
   const [stats, setStats] = useState<PageStat[]>([]);
   const [comments, setComments] = useState<SlideComment[]>([]);
   const [commentText, setCommentText] = useState('');
@@ -210,7 +212,7 @@ export default function SlideAnalyticsPanel({
   const [commentBusy, setCommentBusy] = useState(false);
 
   const submitComment = async () => {
-    if (!user) return toast.error('Yorum için giriş yapmalısın');
+    if (!user) { setShowGuestPrompt(true); return; }
     if (!commentText.trim() || commentBusy) return;
     setCommentBusy(true);
     try {
@@ -247,6 +249,9 @@ export default function SlideAnalyticsPanel({
 
   return (
     <div className="mt-6 space-y-4">
+      {/* Guest auth modal — shown when non-logged-in user tries to comment */}
+      {showGuestPrompt && <GuestAuthPrompt onClose={() => setShowGuestPrompt(false)} />}
+
       <div className="rounded-2xl border border-border bg-card p-4">
         <div className="flex items-center gap-2 mb-3">
           <BarChart3 className="w-4 h-4 text-primary" />
@@ -327,6 +332,13 @@ export default function SlideAnalyticsPanel({
           })}
           {reactionButtons.map((r) => {
             const done = hasReacted(r.key);
+            // Count how many users have sent this reaction on the current page
+            const countMap: Record<string, number> = {
+              confused: currentStat?.confusedCount || 0,
+              summary:  currentStat?.summaryCount  || 0,
+              exam:     currentStat?.examCount     || 0,
+            };
+            const count = countMap[r.key] || 0;
             return (
               <button
                 key={r.key}
@@ -339,6 +351,9 @@ export default function SlideAnalyticsPanel({
                 }`}
               >
                 {done ? '✓ ' : ''}{r.label}
+                {count > 0 && (
+                  <span className="ml-1 opacity-55 font-normal">({count})</span>
+                )}
               </button>
             );
           })}
@@ -348,7 +363,12 @@ export default function SlideAnalyticsPanel({
       <div className="rounded-2xl border border-border bg-card p-4">
         <div className="flex items-center gap-2 mb-3">
           <MessageCircle className="w-4 h-4 text-primary" />
-          <h3 className="font-bold text-sm">Bu Sayfa Yorumları</h3>
+          <h3 className="font-bold text-sm">
+            Bu Sayfa Yorumları
+            {comments.length > 0 && (
+              <span className="ml-1.5 font-normal text-muted-foreground">({comments.length})</span>
+            )}
+          </h3>
         </div>
 
         <div className="flex gap-2 mb-3">
