@@ -138,8 +138,8 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="hidden lg:flex flex-col fixed left-0 top-[72px] bottom-0 w-56 bg-card border-r border-border z-30">
-      <nav className="flex-1 px-2 py-3 overflow-y-auto">
+    <aside className="hidden lg:flex flex-col fixed left-0 top-[72px] bottom-0 w-56 bg-background border-r border-border/60 z-30">
+      <nav className="flex-1 px-2 py-4 overflow-y-auto">
         <div className="space-y-0.5">
           {navItems.map((item) => {
             const active = isActive(item.href);

@@ -28,13 +28,13 @@ export default function DesktopHeader() {
   const router = useRouter();
 
   return (
-    <header className="hidden lg:flex fixed top-0 inset-x-0 h-[72px] z-40 bg-card border-b border-border items-stretch">
+    <header className="hidden lg:flex fixed top-0 inset-x-0 h-[72px] z-40 bg-background/95 backdrop-blur-sm border-b border-border/70 items-stretch">
 
       {/* ── Brand / logo column ─────────────────────────────────────── */}
-      {/* Width matches Sidebar (w-56 = 224px). border-r continues down as sidebar border. */}
-      <div className="w-56 shrink-0 flex items-center px-6 border-r border-border">
+      {/* Width matches Sidebar (w-56 = 224px). border-r aligns with sidebar border. */}
+      <div className="w-56 shrink-0 flex items-center px-6 border-r border-border/60">
         <Link href="/" prefetch={false} className="flex items-center">
-          {/* Light mode: logo on transparent bg. Dark mode: small white pill. */}
+          {/* Light mode: transparent bg. Dark mode: subtle white pill. */}
           <span className="flex items-center rounded-xl dark:bg-white dark:px-2.5 dark:py-1.5 dark:ring-1 dark:ring-black/5 dark:shadow-sm">
             <Image
               src="/logo-wide.png"
@@ -42,7 +42,7 @@ export default function DesktopHeader() {
               width={0}
               height={0}
               sizes="160px"
-              className="h-9 w-auto object-contain"
+              className="h-9 w-auto max-w-[160px] object-contain"
             />
           </span>
         </Link>
@@ -66,7 +66,7 @@ export default function DesktopHeader() {
               name="q"
               type="text"
               placeholder="Konu, slayt veya kullanıcı ara..."
-              className="w-full h-11 pl-10 pr-4 text-sm rounded-2xl border border-border bg-background
+              className="w-full h-10 pl-10 pr-4 text-sm rounded-xl border border-border/70 bg-muted/40
                          focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50
                          placeholder:text-muted-foreground/50 transition-shadow"
             />
