@@ -115,9 +115,8 @@ export default function Navbar() {
         )}
       >
         <div className="max-w-7xl mx-auto px-5 h-full flex items-center justify-between gap-4">
-          <Link href="/" prefetch={false} className="flex items-center gap-2.5 shrink-0">
-            <Image src="/logo.png" width={32} height={32} alt="Slaytim" className="rounded-lg shrink-0" />
-            <span className="font-extrabold text-[1.05rem] tracking-tight hidden sm:block text-foreground">slaytim</span>
+          <Link href="/" prefetch={false} className="flex items-center shrink-0">
+            <Image src="/logo.png" width={44} height={44} alt="Slaytim" className="rounded-xl shrink-0" />
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">
