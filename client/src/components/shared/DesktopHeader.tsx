@@ -16,7 +16,6 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-// Note: logo uses plain <img> tag (SVG, no next/image needed)
 import { useRouter } from 'next/navigation';
 import { Search, Plus, Users } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
@@ -34,12 +33,13 @@ export default function DesktopHeader() {
       {/* ── Brand / logo column ─────────────────────────────────────── */}
       <div className="w-56 shrink-0 flex items-center px-5">
         <Link href="/" prefetch={false} className="flex items-center">
-          {/* SVG logo — transparent bg works on both light/dark */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/slaytimlogo.svg"
+          <Image
+            src="/logo-wide.png"
             alt="Slaytim"
-            className="h-14 w-auto max-w-[200px] object-contain"
+            width={0}
+            height={0}
+            sizes="200px"
+            className="h-12 w-auto max-w-[200px] object-contain"
           />
         </Link>
       </div>

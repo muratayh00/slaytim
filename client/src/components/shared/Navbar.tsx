@@ -116,11 +116,13 @@ export default function Navbar() {
       >
         <div className="max-w-7xl mx-auto px-5 h-full flex items-center justify-between gap-4">
           <Link href="/" prefetch={false} className="flex items-center shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/slaytimlogo.svg"
+            <Image
+              src="/logo-wide.png"
               alt="Slaytim"
-              className="h-10 w-auto max-w-[160px] object-contain"
+              width={0}
+              height={0}
+              sizes="160px"
+              className="h-9 w-auto max-w-[160px] object-contain"
             />
           </Link>
 
