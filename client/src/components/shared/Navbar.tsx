@@ -116,9 +116,7 @@ export default function Navbar() {
       >
         <div className="max-w-7xl mx-auto px-5 h-full flex items-center justify-between gap-4">
           <Link href="/" prefetch={false} className="flex items-center gap-2.5 shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Presentation className="w-[18px] h-[18px] text-white" strokeWidth={2.5} />
-            </div>
+            <Image src="/logo.png" width={32} height={32} alt="Slaytim" className="rounded-lg shrink-0" />
             <span className="font-extrabold text-[1.05rem] tracking-tight hidden sm:block text-foreground">slaytim</span>
           </Link>
 

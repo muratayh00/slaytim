@@ -1,0 +1,25 @@
+{
+  "name": "Slaytim",
+  "short_name": "Slaytim",
+  "description": "Slayt paylaşmanın yeni yolu — yükle, keşfet, kısa formatta paylaş.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#EA580C",
+  "orientation": "portrait-primary",
+  "lang": "tr",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "apple touch icon"
+    }
+  ]
+}

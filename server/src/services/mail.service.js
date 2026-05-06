@@ -117,9 +117,7 @@ function _logoBadge() {
                 </tr></table>
                 <![endif]-->
                 <!--[if !mso]><!-->
-                <div style="width:40px;height:40px;background:linear-gradient(135deg,#C2410C 0%,#FF8C1A 100%);border-radius:10px;text-align:center;line-height:40px;display:inline-block;">
-                  <span style="color:#ffffff;font-size:20px;font-weight:900;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;display:inline-block;line-height:40px;vertical-align:middle;">S</span>
-                </div>
+                <img src="https://slaytim.com/logo.png" width="40" height="40" alt="Slaytim" style="width:40px;height:40px;border-radius:10px;display:inline-block;vertical-align:middle;border:0;outline:none;text-decoration:none;" />
                 <!--<![endif]-->
               </td>`;
 }

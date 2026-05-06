@@ -61,6 +61,15 @@ export const metadata: Metadata = {
     },
   },
   alternates: { canonical: '/' },
+  icons: {
+    icon: [
+      { url: '/icon.png', type: 'image/png', sizes: '1024x1024' },
+      { url: '/icon.png', type: 'image/png', sizes: '32x32' },
+      { url: '/icon.png', type: 'image/png', sizes: '16x16' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '1024x1024', type: 'image/png' }],
+    shortcut: '/icon.png',
+  },
 };
 
 // ── Organization entity ─────────────────────────────────────────────────────
@@ -94,6 +103,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="tr" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#EA580C" />
         {/*
           Organization JSON-LD: emitted once site-wide so search engines and
           AI answer engines (ChatGPT, Perplexity, Gemini) can resolve

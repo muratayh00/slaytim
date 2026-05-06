@@ -141,9 +141,7 @@ export default function Sidebar() {
     <aside className="hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-56 bg-card border-r border-border z-40">
       <div className="px-4 h-14 flex items-center border-b border-border/60 shrink-0">
         <Link href="/" prefetch={false} className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-            <Presentation className="w-[18px] h-[18px] text-white" strokeWidth={2.5} />
-          </div>
+          <Image src="/logo.png" width={32} height={32} alt="Slaytim" className="rounded-lg shrink-0" />
           <span className="font-extrabold text-[1.02rem] tracking-tight text-foreground">slaytim</span>
         </Link>
       </div>

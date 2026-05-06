@@ -21,21 +21,14 @@ export default function OpenGraphImage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div
-            style={{
-              width: '54px',
-              height: '54px',
-              borderRadius: '12px',
-              background: '#3b82f6',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '30px',
-              fontWeight: 700,
-            }}
-          >
-            S
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://slaytim.com/logo.png"
+            width={54}
+            height={54}
+            alt="Slaytim"
+            style={{ borderRadius: '12px', display: 'block' }}
+          />
           <div style={{ fontSize: '34px', fontWeight: 700 }}>Slaytim</div>
         </div>
 
