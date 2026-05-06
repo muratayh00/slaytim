@@ -25,6 +25,7 @@ function UserSearchCard({ user }: { user: any }) {
   const gradient = AVATAR_COLORS[user.id % AVATAR_COLORS.length];
   return (
     <Link href={buildProfilePath(user.username)}
+      prefetch={false}
       className="flex items-center gap-3 p-4 rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-card transition-all group">
       <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center font-bold text-white text-sm shrink-0 overflow-hidden relative`}>
         {user.avatarUrl

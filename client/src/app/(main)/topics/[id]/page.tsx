@@ -355,6 +355,7 @@ export default function TopicDetailPage({ initialTopic }: { initialTopic?: any }
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 mt-5 pt-4 border-t border-border/60">
             <Link
               href={topicUser.username ? buildProfilePath(topicUser.username) : '/'}
+              prefetch={false}
               className="flex items-center gap-2.5 hover:text-primary transition-colors group min-w-0"
             >
               <div className={`w-8 h-8 shrink-0 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-xs font-bold text-white ring-2 ring-white/20 shadow-sm overflow-hidden relative`}>

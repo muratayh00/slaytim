@@ -11,7 +11,11 @@ declare global {
 
 function track(eventName: string, params?: Record<string, unknown>) {
   if (typeof window === 'undefined' || !window.gtag) return;
-  window.gtag('event', eventName, params);
+  try {
+    window.gtag('event', eventName, params);
+  } catch {
+    // GA blocked by adblock/consent/network — silent fail, never crash UI
+  }
 }
 
 export const analytics = {

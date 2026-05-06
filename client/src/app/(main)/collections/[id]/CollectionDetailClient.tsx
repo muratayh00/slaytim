@@ -89,6 +89,7 @@ export default function CollectionDetailClient() {
     <div className="max-w-5xl mx-auto px-4 py-8">
       <Link
         href={isOwner ? '/collections' : buildProfilePath(col.user.username)}
+        prefetch={false}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors group"
       >
         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
@@ -112,7 +113,7 @@ export default function CollectionDetailClient() {
               </div>
               {col.description && <p className="text-muted-foreground text-sm mb-3">{col.description}</p>}
               <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
-                <Link href={buildProfilePath(col.user.username)} className="flex items-center gap-1.5 hover:text-primary transition-colors">
+                <Link href={buildProfilePath(col.user.username)} prefetch={false} className="flex items-center gap-1.5 hover:text-primary transition-colors">
                   <div className={`w-5 h-5 rounded-full ${avatarColor} flex items-center justify-center text-[8px] font-black text-white overflow-hidden relative`}>
                     {col.user.avatarUrl
                       ? <Image src={resolveFileUrl(col.user.avatarUrl)!} alt="" fill className="object-cover" />

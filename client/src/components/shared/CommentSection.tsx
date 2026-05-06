@@ -137,7 +137,7 @@ export default function CommentSection({ topicId }: { topicId: number }) {
               const isOwn = user?.id === comment.user.id;
               return (
                 <div key={comment.id} className="flex gap-3 group">
-                    <Link href={`${buildProfilePath(comment.user.username)}`} className="shrink-0">
+                    <Link href={`${buildProfilePath(comment.user.username)}`} prefetch={false} className="shrink-0">
                       <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-xs font-bold text-white overflow-hidden relative`}>
                         {comment.user.username.slice(0, 2).toUpperCase()}
                         {resolveMediaUrl(comment.user.avatarUrl) && (
@@ -147,7 +147,7 @@ export default function CommentSection({ topicId }: { topicId: number }) {
                     </Link>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2">
-                        <Link href={`${buildProfilePath(comment.user.username)}`} className="text-xs font-bold hover:text-primary transition-colors">
+                        <Link href={`${buildProfilePath(comment.user.username)}`} prefetch={false} className="text-xs font-bold hover:text-primary transition-colors">
                           @{comment.user.username}
                         </Link>
                         <span className="text-[10px] text-muted-foreground">{formatDate(comment.createdAt)}</span>

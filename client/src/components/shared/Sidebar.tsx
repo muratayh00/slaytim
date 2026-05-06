@@ -223,7 +223,7 @@ export default function Sidebar() {
               {profileOpen && (
                 <div className="absolute bottom-full left-0 right-0 mb-1.5 bg-white dark:bg-card border border-border/60 rounded-2xl shadow-lg overflow-hidden z-50">
                   <div className="p-1.5">
-                    <Link href={buildProfilePath(user.username)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-semibold hover:bg-muted transition-colors" onClick={() => setProfileOpen(false)}>
+                    <Link href={buildProfilePath(user.username)} prefetch={false} className="flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-semibold hover:bg-muted transition-colors" onClick={() => setProfileOpen(false)}>
                       <User className="w-4 h-4 text-muted-foreground" />
                       Profilim
                     </Link>

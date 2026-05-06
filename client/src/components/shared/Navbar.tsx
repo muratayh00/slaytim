@@ -202,7 +202,7 @@ export default function Navbar() {
                       </div>
 
                       <div className="p-1.5">
-                        <Link href={buildProfilePath(user.username)} className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-muted transition-colors">
+                        <Link href={buildProfilePath(user.username)} prefetch={false} className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-muted transition-colors">
                           <User className="w-4 h-4 text-muted-foreground" />
                           Profilim
                         </Link>
@@ -298,7 +298,7 @@ export default function Navbar() {
               >
                 <Plus className="w-4 h-4" strokeWidth={2.5} />Konu Aç
               </Link>
-              <Link href={buildProfilePath(user.username)} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><User className="w-4 h-4 text-muted-foreground" />Profilim</Link>
+              <Link href={buildProfilePath(user.username)} prefetch={false} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><User className="w-4 h-4 text-muted-foreground" />Profilim</Link>
               <Link href="/collections" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><Folder className="w-4 h-4 text-muted-foreground" />Koleksiyonlarım</Link>
               <Link href="/settings" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><Settings className="w-4 h-4 text-muted-foreground" />Ayarlar</Link>
               <Link href="/rooms" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><Users className="w-4 h-4 text-muted-foreground" />Odalar</Link>

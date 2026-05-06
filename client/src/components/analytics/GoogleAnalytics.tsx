@@ -38,7 +38,11 @@ interface ConsentParams {
 /** gtag consent update — window.gtag yoksa sessizce atla */
 function gtagConsentUpdate(params: ConsentParams) {
   if (typeof window === 'undefined' || typeof window.gtag !== 'function' || !GA_ID) return;
-  window.gtag('consent', 'update', params);
+  try {
+    window.gtag('consent', 'update', params);
+  } catch {
+    // GA blocked by adblock/consent/network — silent fail
+  }
 }
 
 export default function GoogleAnalytics() {

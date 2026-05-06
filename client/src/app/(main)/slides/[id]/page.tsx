@@ -1344,6 +1344,7 @@ export default function SlideDetailPage() {
           <div className="flex items-center gap-4 pt-4 border-t border-border/60 flex-wrap">
             <Link
               href={buildProfilePath(slide.user.username)}
+              prefetch={false}
               onClick={trackProfileVisit}
               className="flex items-center gap-2.5 hover:text-primary transition-colors group"
             >

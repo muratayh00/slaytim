@@ -92,6 +92,7 @@ export default function DesktopHeader() {
               <NotificationBell />
               <Link
                 href={buildProfilePath(user.username)}
+                prefetch={false}
                 className="flex items-center gap-2 px-2.5 py-2 rounded-xl hover:bg-muted transition-colors"
               >
                 <div className="w-8 h-8 rounded-xl border border-border bg-muted/70 flex items-center
