@@ -153,13 +153,13 @@ export default function HomeClient({
         <section className="border-b border-border bg-gradient-to-b from-card to-background">
           <div className="max-w-4xl mx-auto px-5 pt-14 pb-10 text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-semibold mb-5">
-              <Sparkles className="w-3.5 h-3.5" /> Slayt tabanlı bilgi platformu
+              <Sparkles className="w-3.5 h-3.5" /> Yeni nesil slayt forumu
             </div>
             <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4 leading-[1.1]">
-              Slayt paylaşmanın <span className="text-primary">yeni yolu</span>.
+              Yükle. Keşfedil. <span className="text-primary">Tartış.</span>
             </h1>
             <p className="text-muted-foreground text-base sm:text-[17px] max-w-[560px] mx-auto leading-relaxed mb-8">
-              PPT/PPTX sunumlarını yükle, konularla paylaş ve Slideo akışında kısa slaytları keşfet.
+              Slaytlarını paylaş, ilgini çeken konulara katıl ve Slideo&apos;da kısa içerik akışını keşfet.
             </p>
             <form onSubmit={handleSearch} className="relative max-w-md mx-auto mb-6">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
@@ -174,11 +174,11 @@ export default function HomeClient({
               </button>
             </form>
             <div className="flex items-center justify-center gap-3 flex-wrap">
-              <Link href="/register" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-semibold text-sm hover:opacity-90 transition-opacity min-h-[44px]">
-                Ücretsiz Başla
+              <Link href="/kesfet" prefetch={false} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-semibold text-sm hover:opacity-90 transition-opacity min-h-[44px]">
+                Hemen Keşfet
               </Link>
-              <Link href="/slideo" prefetch={false} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-border bg-background font-semibold text-sm hover:bg-muted transition-colors min-h-[44px]">
-                Slideo&apos;yu Keşfet <ArrowRight className="w-4 h-4" />
+              <Link href={buildTopicCreatePath()} prefetch={false} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-border bg-background font-semibold text-sm hover:bg-muted transition-colors min-h-[44px]">
+                Konu Aç <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
           </div>
@@ -186,9 +186,9 @@ export default function HomeClient({
           {/* 3 mini feature cards */}
           <div className="max-w-4xl mx-auto px-5 pb-12">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <FeatureCard icon={Upload} title="PPT/PPTX yükle" description="PDF + thumbnail otomatik oluşur." />
-              <FeatureCard icon={FileText} title="PDF önizleme" description="Tarayıcıda anında görüntüle." />
-              <FeatureCard icon={Sparkles} title="Slideo'da keşfet" description="Kısa dikey akışta keşfedilebilirlik." />
+              <FeatureCard icon={Upload} title="Slaytını paylaş" description="Bilgini topluluğa aç, içeriklerin daha fazla kişiye ulaşsın." />
+              <FeatureCard icon={FileText} title="Konulara katıl" description="İlgini çeken başlıklarda yorum yap, fikirleri takip et." />
+              <FeatureCard icon={Sparkles} title="Slideo'da keşfet" description="Kısa slayt akışında yeni fikirleri hızlıca yakala." />
             </div>
           </div>
         </section>
