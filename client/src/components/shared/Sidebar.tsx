@@ -138,22 +138,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-56 bg-card border-r border-border z-40">
-      <div className="px-5 h-[72px] flex items-center justify-center border-b border-border shrink-0 bg-card">
-        <Link href="/" prefetch={false} className="flex items-center justify-center">
-          <span className="flex items-center rounded-xl dark:bg-white dark:px-3 dark:py-2 dark:ring-1 dark:ring-black/5">
-            <Image
-              src="/logo-wide.png"
-              alt="Slaytim"
-              width={0}
-              height={0}
-              sizes="160px"
-              className="h-10 w-auto object-contain"
-            />
-          </span>
-        </Link>
-      </div>
-
+    <aside className="hidden lg:flex flex-col fixed left-0 top-[72px] bottom-0 w-56 bg-card border-r border-border z-30">
       <nav className="flex-1 px-2 py-3 overflow-y-auto">
         <div className="space-y-0.5">
           {navItems.map((item) => {
