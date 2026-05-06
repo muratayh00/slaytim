@@ -189,6 +189,7 @@ export default function SlideAnalyticsPanel({
   const sendReaction = async (reactionType: string, emoji?: string) => {
     const key = reactionKey(reactionType, emoji);
     if (reactedKeys.has(key)) return; // already sent this session
+    if (!user) { setShowGuestPrompt(true); return; } // guest → show login modal
 
     try {
       if (reactionType === 'like') interactionsRef.current.likeClicked = true;
@@ -282,11 +283,12 @@ export default function SlideAnalyticsPanel({
 
       <div className="rounded-2xl border border-border bg-card p-4">
         <h3 className="font-bold text-sm mb-3">Sayfa {currentPage} Etkileşimi</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-3">
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-xs mb-3">
           <Stat label="Beğeni" value={currentStat?.likeCount || 0} />
           <Stat label="Kaydetme" value={currentStat?.saveCount || 0} />
           <Stat label="Paylaşım" value={currentStat?.shareCount || 0} />
           <Stat label="Yorum" value={currentStat?.commentCount || 0} />
+          <Stat label="Anlamadım" value={currentStat?.confusedCount || 0} />
         </div>
 
         <div className="flex flex-wrap gap-2">
