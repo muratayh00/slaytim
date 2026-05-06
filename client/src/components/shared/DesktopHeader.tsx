@@ -28,7 +28,7 @@ export default function DesktopHeader() {
   const router = useRouter();
 
   return (
-    <header className="hidden lg:flex fixed top-0 inset-x-0 h-[72px] z-40 bg-background items-stretch">
+    <header className="hidden lg:flex fixed top-0 inset-x-0 h-[72px] z-40 bg-background border-b border-border items-stretch">
 
       {/* ── Brand / logo column ─────────────────────────────────────── */}
       <div className="w-56 shrink-0 flex items-center px-6">
