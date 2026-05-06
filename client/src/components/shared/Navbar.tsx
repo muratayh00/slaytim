@@ -115,8 +115,15 @@ export default function Navbar() {
         )}
       >
         <div className="max-w-7xl mx-auto px-5 h-full flex items-center justify-between gap-4">
-          <Link href="/" prefetch={false} className="flex items-center shrink-0">
-            <Image src="/logo.png" width={44} height={44} alt="Slaytim" className="rounded-xl shrink-0" />
+          <Link href="/" prefetch={false} className="flex items-center shrink-0 rounded-xl overflow-hidden dark:bg-white dark:px-2 dark:py-1">
+            <Image
+              src="/logo-wide.png"
+              alt="Slaytim"
+              width={0}
+              height={0}
+              sizes="180px"
+              className="h-9 w-auto object-contain"
+            />
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">
