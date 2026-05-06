@@ -18,7 +18,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       <Suspense fallback={null}><Navbar /></Suspense>
       <Suspense fallback={null}><TopBar /></Suspense>
       <div className="lg:pl-56">
-        <main className="pt-[62px] lg:pt-14 pb-14 lg:pb-0">
+        <main className="pt-[62px] lg:pt-[72px] pb-14 lg:pb-0">
           {children}
         </main>
         <SiteFooter />

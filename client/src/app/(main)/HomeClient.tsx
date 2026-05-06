@@ -151,7 +151,7 @@ export default function HomeClient({
     <div>
       {!user && (
         <section className="border-b border-border bg-gradient-to-b from-card to-background">
-          <div className="max-w-4xl mx-auto px-5 pt-14 pb-10 text-center">
+          <div className="max-w-4xl mx-auto px-5 pt-8 pb-10 text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-semibold mb-5">
               <Sparkles className="w-3.5 h-3.5" /> Yeni nesil slayt forumu
             </div>
