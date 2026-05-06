@@ -150,7 +150,7 @@ export default function HomeClient({
   return (
     <div>
       {!user && (
-        <section className="border-b border-border/40 bg-gradient-to-b from-background to-background">
+        <section className="bg-background">
           <div className="max-w-4xl mx-auto px-5 pt-8 pb-10 text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-semibold mb-5">
               <Sparkles className="w-3.5 h-3.5" /> Yeni nesil slayt forumu
@@ -195,7 +195,7 @@ export default function HomeClient({
       )}
 
       {categories.length > 0 && (
-        <div className="border-b border-border/30 bg-background">
+        <div className="bg-background">
           <div className="max-w-6xl mx-auto px-5 py-3">
             <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
               {[{ id: 0, slug: '', name: 'Tümü' }, ...categories].map((cat) => (
