@@ -39,7 +39,7 @@ export default function DesktopHeader() {
           <img
             src="/slaytimlogo.svg"
             alt="Slaytim"
-            className="h-11 w-auto max-w-[180px] object-contain"
+            className="h-14 w-auto max-w-[200px] object-contain"
           />
         </Link>
       </div>
