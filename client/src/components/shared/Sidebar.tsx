@@ -138,8 +138,8 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="hidden lg:flex flex-col fixed left-0 top-[72px] bottom-0 w-56 bg-background border-r border-border z-30">
-      <nav className="flex-1 px-2 py-4 overflow-y-auto">
+    <aside className="hidden lg:flex flex-col fixed left-0 top-[72px] bottom-0 w-56 bg-white dark:bg-card border-r border-border/60 z-30 shadow-[1px_0_3px_rgba(0,0,0,0.04)]">
+      <nav className="flex-1 px-2.5 py-4 overflow-y-auto">
         <div className="space-y-0.5">
           {navItems.map((item) => {
             const active = isActive(item.href);
@@ -149,8 +149,8 @@ export default function Sidebar() {
                 href={item.href}
                 prefetch={false}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-semibold transition-colors group',
-                  active ? 'bg-primary/8 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/70'
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-semibold transition-all duration-150 group',
+                  active ? 'bg-primary/10 text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-black/[0.04] dark:hover:bg-white/5'
                 )}
               >
                 <item.icon
@@ -168,8 +168,8 @@ export default function Sidebar() {
         </div>
 
         {user && recentTopics.length > 0 && (
-          <div className="mt-4">
-            <p className="px-3 mb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+          <div className="mt-5">
+            <p className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
               Son Konular
             </p>
             <div className="space-y-0.5">
@@ -181,8 +181,8 @@ export default function Sidebar() {
                     key={topic.id}
                     href={href}
                     className={cn(
-                      'flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12.5px] font-medium transition-colors group',
-                      active ? 'bg-primary/8 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/70'
+                      'flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12.5px] font-medium transition-all duration-150 group',
+                      active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-black/[0.04] dark:hover:bg-white/5'
                     )}
                   >
                     <Clock className={cn('w-3 h-3 shrink-0', active ? 'text-primary' : 'text-muted-foreground/50')} />
@@ -195,7 +195,7 @@ export default function Sidebar() {
         )}
       </nav>
 
-      <div className="px-2 pb-3 pt-3 space-y-1 border-t border-border/60 shrink-0">
+      <div className="px-2.5 pb-3 pt-3 space-y-1 border-t border-border/50 shrink-0 bg-white/80 dark:bg-card/80 backdrop-blur-sm">
         {user ? (
           <>
             <Link href={buildTopicCreatePath()} className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-primary text-white text-[13px] font-bold hover:opacity-90 transition-opacity w-full">
@@ -221,7 +221,7 @@ export default function Sidebar() {
               </button>
 
               {profileOpen && (
-                <div className="absolute bottom-full left-0 right-0 mb-1.5 bg-card border border-border rounded-xl shadow-card overflow-hidden z-50">
+                <div className="absolute bottom-full left-0 right-0 mb-1.5 bg-white dark:bg-card border border-border/60 rounded-2xl shadow-lg overflow-hidden z-50">
                   <div className="p-1.5">
                     <Link href={buildProfilePath(user.username)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-semibold hover:bg-muted transition-colors" onClick={() => setProfileOpen(false)}>
                       <User className="w-4 h-4 text-muted-foreground" />

@@ -16,6 +16,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+// Note: logo uses plain <img> tag (SVG, no next/image needed)
 import { useRouter } from 'next/navigation';
 import { Search, Plus, Users } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
@@ -28,22 +29,18 @@ export default function DesktopHeader() {
   const router = useRouter();
 
   return (
-    <header className="hidden lg:flex fixed top-0 inset-x-0 h-[72px] z-40 bg-background border-b border-border items-stretch">
+    <header className="hidden lg:flex fixed top-0 inset-x-0 h-[72px] z-40 bg-white dark:bg-card border-b border-border/60 items-stretch shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
 
       {/* ── Brand / logo column ─────────────────────────────────────── */}
-      <div className="w-56 shrink-0 flex items-center px-6">
+      <div className="w-56 shrink-0 flex items-center px-5">
         <Link href="/" prefetch={false} className="flex items-center">
-          {/* Light mode: transparent bg. Dark mode: subtle white pill. */}
-          <span className="flex items-center rounded-xl dark:bg-white dark:px-2.5 dark:py-1.5 dark:ring-1 dark:ring-black/5 dark:shadow-sm">
-            <Image
-              src="/logo-wide.png"
-              alt="Slaytim"
-              width={0}
-              height={0}
-              sizes="160px"
-              className="h-9 w-auto max-w-[160px] object-contain"
-            />
-          </span>
+          {/* SVG logo — transparent bg works on both light/dark */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/slaytim-logo.svg"
+            alt="Slaytim"
+            className="h-11 w-auto max-w-[180px] object-contain"
+          />
         </Link>
       </div>
 
