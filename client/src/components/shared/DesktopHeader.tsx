@@ -28,11 +28,10 @@ export default function DesktopHeader() {
   const router = useRouter();
 
   return (
-    <header className="hidden lg:flex fixed top-0 inset-x-0 h-[72px] z-40 bg-background border-b border-border/50 items-stretch">
+    <header className="hidden lg:flex fixed top-0 inset-x-0 h-[72px] z-40 bg-background items-stretch">
 
       {/* ── Brand / logo column ─────────────────────────────────────── */}
-      {/* Width matches Sidebar (w-56 = 224px). border-r continues as sidebar border-r. */}
-      <div className="w-56 shrink-0 flex items-center px-6 border-r border-border/50">
+      <div className="w-56 shrink-0 flex items-center px-6">
         <Link href="/" prefetch={false} className="flex items-center">
           {/* Light mode: transparent bg. Dark mode: subtle white pill. */}
           <span className="flex items-center rounded-xl dark:bg-white dark:px-2.5 dark:py-1.5 dark:ring-1 dark:ring-black/5 dark:shadow-sm">
