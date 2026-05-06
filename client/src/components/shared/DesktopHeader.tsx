@@ -37,7 +37,7 @@ export default function DesktopHeader() {
           {/* SVG logo — transparent bg works on both light/dark */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/slaytim-logo.svg"
+            src="/slaytimlogo.svg"
             alt="Slaytim"
             className="h-11 w-auto max-w-[180px] object-contain"
           />
