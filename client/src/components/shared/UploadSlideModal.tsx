@@ -168,12 +168,26 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
     const MAX_RETRIES = 20;  // up to 20 × 4 s = 80 s total wait
     const RETRY_DELAY = 4_000;
     let pages: Array<{ pageNumber: number; url: string }> = [];
+    let firstPageShown = false;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
         const res = await api.get(`/slides/${id}/preview-meta`);
         const fetched = Array.isArray(res?.data?.pages) ? res.data.pages : [];
-        if (fetched.length > 0) { pages = fetched.slice(0, 12); break; }
-        // 200 but empty — thumbnails still generating, keep retrying
+        const previewStatus = res?.data?.previewStatus as string | undefined;
+        if (fetched.length > 0) {
+          pages = fetched.slice(0, 12);
+          if (!firstPageShown) {
+            // İlk sayfa geldi: spinner'ı kapat, kullanıcı hemen seçim yapabilsin
+            setCoverPages(pages);
+            setCoverPagesLoading(false);
+            firstPageShown = true;
+          } else {
+            // Sonraki poll'lar: grid'i sessizce güncelle
+            setCoverPages(pages);
+          }
+          if (previewStatus === 'ready') break; // Tüm sayfalar hazır, poll dur
+          // previewStatus='processing' → daha fazla sayfa gelecek, bekle
+        }
       } catch (err: any) {
         const status = err?.response?.status;
         if (status === 404 || status === 403) { break; } // resource gone, stop
@@ -184,6 +198,7 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
         await new Promise((r) => setTimeout(r, RETRY_DELAY));
       }
     }
+    // Final: loading'i kapat ve son durumu yaz
     setCoverPages(pages);
     setCoverPagesLoading(false);
   }, []);

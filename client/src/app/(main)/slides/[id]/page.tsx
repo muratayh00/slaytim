@@ -1199,146 +1199,154 @@ export default function SlideDetailPage() {
 
         {/* Info card */}
         <div className="bg-card border border-border rounded-2xl p-6 mb-4 shadow-card">
-          <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl font-extrabold mb-2 leading-tight tracking-tight">{slide.title}</h1>
-              {slide.description && (
-                <p className="text-muted-foreground leading-relaxed text-[15px]">{slide.description}</p>
-              )}
-              {slide.isSponsored && (
-                <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
-                  <p className="font-bold">Sponsorlu Icerik</p>
-                  <p>{slide.sponsorDisclosure || 'Bu icerik sponsorlu is birligi kapsaminda yayinlanmistir.'}</p>
-                  {slide.sponsorName && (
-                    <p className="mt-1">
-                      Sponsor: <span className="font-semibold">{slide.sponsorName}</span>
-                      {slide.sponsorUrl && (
-                        <>
-                          {' '}·{' '}
-                          <a
-                            href={slide.sponsorUrl}
-                            target="_blank"
-                            rel="noopener noreferrer sponsored"
-                            className="underline"
-                            onClick={() =>
-                              analytics.sponsoredClick({
-                                content_type: 'slide',
-                                content_id: Number(slide.id),
-                                sponsor_name: String(slide.sponsorName || ''),
-                                campaign_id: String(slide.sponsorCampaignId || ''),
-                              })
-                            }
-                          >
-                            Sponsor Linki
-                          </a>
-                        </>
-                      )}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {/* Başlık — full width */}
+          <div className="mb-4">
+            <h1 className="text-2xl font-extrabold leading-tight tracking-tight mb-2">{slide.title}</h1>
+            {slide.description && (
+              <p className="text-muted-foreground leading-relaxed text-[15px]">{slide.description}</p>
+            )}
+            {slide.isSponsored && (
+              <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+                <p className="font-bold">Sponsorlu İçerik</p>
+                <p>{slide.sponsorDisclosure || 'Bu içerik sponsorlu iş birliği kapsamında yayınlanmıştır.'}</p>
+                {slide.sponsorName && (
+                  <p className="mt-1">
+                    Sponsor: <span className="font-semibold">{slide.sponsorName}</span>
+                    {slide.sponsorUrl && (
+                      <>
+                        {' '}·{' '}
+                        <a
+                          href={slide.sponsorUrl}
+                          target="_blank"
+                          rel="noopener noreferrer sponsored"
+                          className="underline"
+                          onClick={() =>
+                            analytics.sponsoredClick({
+                              content_type: 'slide',
+                              content_id: Number(slide.id),
+                              sponsor_name: String(slide.sponsorName || ''),
+                              campaign_id: String(slide.sponsorCampaignId || ''),
+                            })
+                          }
+                        >
+                          Sponsor Linki
+                        </a>
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Action bar — birincil (sayılı) + ikincil (ikon-only) + paylaşım */}
+          <div className="flex items-center gap-1.5 flex-wrap mb-5">
+            {/* Birincil: Beğen + Kaydet */}
+            <button
+              onClick={handleLike}
+              disabled={likeBusy}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl border font-bold text-sm transition-all ${
+                liked
+                  ? 'bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/15'
+                  : 'border-border hover:bg-muted hover:border-primary/30'
+              } disabled:opacity-60`}
+            >
+              <Heart className={`w-4 h-4 ${liked ? 'fill-current' : ''}`} />
+              {slide.likesCount}
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saveBusy}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl border font-bold text-sm transition-all ${
+                saved
+                  ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/15'
+                  : 'border-border hover:bg-muted hover:border-primary/30'
+              } disabled:opacity-60`}
+            >
+              <Bookmark className={`w-4 h-4 ${saved ? 'fill-current' : ''}`} />
+              {slide.savesCount}
+            </button>
+
+            {/* Ayraç */}
+            <div className="w-px h-6 bg-border mx-0.5" />
+
+            {/* İkincil: ikon-only */}
+            {user && (
               <button
-                onClick={handleLike}
-                disabled={likeBusy}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border font-bold text-sm transition-all ${
-                  liked
-                    ? 'bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/15'
-                    : 'border-border hover:bg-muted hover:border-primary/30'
-                } disabled:opacity-60`}
-              >
-                <Heart className={`w-4 h-4 ${liked ? 'fill-current' : ''}`} />
-                {slide.likesCount}
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saveBusy}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border font-bold text-sm transition-all ${
-                  saved
-                    ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/15'
-                    : 'border-border hover:bg-muted hover:border-primary/30'
-                } disabled:opacity-60`}
-              >
-                <Bookmark className={`w-4 h-4 ${saved ? 'fill-current' : ''}`} />
-                {slide.savesCount}
-              </button>
-              {user && (
-                <button
-                  onClick={() => setShowCollectionModal(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border font-bold text-sm hover:bg-muted hover:border-primary/30 transition-all"
-                  title="Koleksiyona ekle"
-                >
-                  <FolderPlus className="w-4 h-4" />
-                  Koleksiyon
-                </button>
-              )}
-              {user && hasPdf && (
-                <button
-                  onClick={openSlideoComposer}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border font-bold text-sm hover:bg-muted hover:border-primary/30 transition-all"
-                  title="Slideo oluştur"
-                >
-                  <Play className="w-4 h-4" fill="currentColor" />
-                  Slideo
-                </button>
-              )}
-              {user && hasPdf && isSlideOwner && (
-                <button
-                  onClick={handleSetCoverFromCurrentPage}
-                  disabled={coverSaving}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border font-bold text-sm hover:bg-muted hover:border-primary/30 transition-all disabled:opacity-60"
-                  title="Açık sayfayı kapak olarak kaydet"
-                >
-                  {coverSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Presentation className="w-4 h-4" />}
-                  {coverSaving ? 'Kaydediliyor...' : `Sayfa ${currentPage} kapak yap`}
-                </button>
-              )}
-              {/* Share buttons */}
-              <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(slide?.title || '')}&url=${encodeURIComponent(`${SITE_URL}${buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title })}`)}`}
-                target="_blank" rel="noopener noreferrer"
+                onClick={() => setShowCollectionModal(true)}
+                title="Koleksiyona ekle"
                 className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-                title="X / Twitter'da paylaş"
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.262 5.638L18.243 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-              </a>
-              <a
-                href={`https://wa.me/?text=${encodeURIComponent(`${slide?.title || ''} – ${SITE_URL}${buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title })}`)}`}
-                target="_blank" rel="noopener noreferrer"
-                className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-green-500 hover:border-green-500/30 hover:bg-green-500/5 transition-all"
-                title="WhatsApp'ta paylaş"
-              >
-                <Share2 className="w-4 h-4" />
-              </a>
-              <button
-                onClick={() => setShowEmbed(true)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border font-bold text-sm hover:bg-muted hover:border-primary/30 transition-all"
-                title="Gömme kodu al"
-              >
-                <Code2 className="w-4 h-4" />
-                Göm
+                <FolderPlus className="w-4 h-4" />
               </button>
-              {user && (
-                <button
-                  onClick={() => setShowReport(true)}
-                  className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-red-500 hover:border-red-500/30 hover:bg-red-500/5 transition-all"
-                  title="Raporla"
-                >
-                  <Flag className="w-4 h-4" />
-                </button>
-              )}
-              {canDeleteSlide && (
-                <button
-                  onClick={() => setShowDeleteSlideModal(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/30 text-red-500 font-bold text-sm hover:bg-red-500/8 transition-all"
-                  title="Slayti sil"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Sil
-                </button>
-              )}
-            </div>
+            )}
+            {user && hasPdf && (
+              <button
+                onClick={openSlideoComposer}
+                title="Slideo oluştur"
+                className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+              >
+                <Play className="w-4 h-4" fill="currentColor" />
+              </button>
+            )}
+            {user && hasPdf && isSlideOwner && (
+              <button
+                onClick={handleSetCoverFromCurrentPage}
+                disabled={coverSaving}
+                title={coverSaving ? 'Kaydediliyor…' : `Sayfa ${currentPage} kapak yap`}
+                className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all disabled:opacity-60"
+              >
+                {coverSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Presentation className="w-4 h-4" />}
+              </button>
+            )}
+
+            {/* Ayraç */}
+            <div className="w-px h-6 bg-border mx-0.5" />
+
+            {/* Paylaşım */}
+            <a
+              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(slide?.title || '')}&url=${encodeURIComponent(`${SITE_URL}${buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title })}`)}`}
+              target="_blank" rel="noopener noreferrer"
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+              title="X / Twitter'da paylaş"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.262 5.638L18.243 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </a>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(`${slide?.title || ''} – ${SITE_URL}${buildSlidePath({ id: slide.id, slug: slide.slug, title: slide.title })}`)}`}
+              target="_blank" rel="noopener noreferrer"
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-green-500 hover:border-green-500/30 hover:bg-green-500/5 transition-all"
+              title="WhatsApp'ta paylaş"
+            >
+              <Share2 className="w-4 h-4" />
+            </a>
+            <button
+              onClick={() => setShowEmbed(true)}
+              title="Gömme kodu al"
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+            >
+              <Code2 className="w-4 h-4" />
+            </button>
+
+            {/* Raporla / Sil */}
+            {user && (
+              <button
+                onClick={() => setShowReport(true)}
+                title="Raporla"
+                className="w-9 h-9 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-red-500 hover:border-red-500/30 hover:bg-red-500/5 transition-all"
+              >
+                <Flag className="w-4 h-4" />
+              </button>
+            )}
+            {canDeleteSlide && (
+              <button
+                onClick={() => setShowDeleteSlideModal(true)}
+                title="Slaytı sil"
+                className="w-9 h-9 flex items-center justify-center rounded-xl border border-red-500/30 text-red-500 hover:bg-red-500/8 transition-all"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-4 pt-4 border-t border-border/60 flex-wrap">
