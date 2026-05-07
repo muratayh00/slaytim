@@ -111,7 +111,6 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
   const [coverPages, setCoverPages] = useState<Array<{ pageNumber: number; url: string }>>([]);
   const [coverPagesLoading, setCoverPagesLoading] = useState(false);
   const [selectedCover, setSelectedCover] = useState<string | null>(null);
-  const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
   const [coverError, setCoverError] = useState('');
 
   // Rotate motivational message every 3s while converting
@@ -159,13 +158,15 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
 
   // Fetch preview pages for cover selection.
   // Retry logic:
-  //   • 200 with empty pages  → thumbnail generation still in progress, retry
-  //   • 409 / 404 / 403       → conversion not done or access denied; stop immediately
-  //   • other network errors  → transient, retry
+  //   • 200 with pages        → done, show grid
+  //   • 200 with empty pages  → thumbnails still generating, retry
+  //   • 409                   → conversion still running (not done), retry — it will finish soon
+  //   • 404 / 403             → resource missing or forbidden, abort
+  //   • other errors          → transient, retry
   const fetchCoverPages = useCallback(async (id: number) => {
     setCoverPagesLoading(true);
-    const MAX_RETRIES = 6;
-    const RETRY_DELAY = 3_000;
+    const MAX_RETRIES = 20;  // up to 20 × 4 s = 80 s total wait
+    const RETRY_DELAY = 4_000;
     let pages: Array<{ pageNumber: number; url: string }> = [];
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
@@ -175,11 +176,9 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
         // 200 but empty — thumbnails still generating, keep retrying
       } catch (err: any) {
         const status = err?.response?.status;
-        if (status === 409 || status === 404 || status === 403) {
-          // 409 = conversion not done / no pdfUrl → retrying won't help, abort now
-          break;
-        }
-        // Other errors (network, 5xx) → retry
+        if (status === 404 || status === 403) { break; } // resource gone, stop
+        // 409 = conversion still processing → wait and retry
+        // other errors (5xx, network) → retry
       }
       if (attempt < MAX_RETRIES) {
         await new Promise((r) => setTimeout(r, RETRY_DELAY));
@@ -295,27 +294,18 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
   };
 
   // Called when user confirms cover selection.
-  // Cover is required when slide pages were loaded (user can see and pick one).
-  // Cover is optional when no pages loaded (conversion not done / 409) — user can skip.
+  // Requires a page selection when pages are available.
+  // If pages never loaded (rare/large file), allows proceeding without a cover.
   const handleCoverConfirm = async () => {
-    const pagesAvailable = !coverPagesLoading && coverPages.length > 0;
-    if (pagesAvailable && !selectedCover) {
-      setCoverError('Devam etmek için bir kapak seçmelisin veya özel görsel yükle.');
+    if (coverPages.length > 0 && !selectedCover) {
+      setCoverError('Devam etmek için slaytından bir sayfa seç.');
       return;
     }
     setCoverError('');
     setLoading(true);
 
     try {
-      if (selectedCoverFile) {
-        // Custom file upload
-        const fd = new FormData();
-        fd.append('file', selectedCoverFile);
-        await api.patch(`/slides/${savedSlideId}/thumbnail`, fd).catch(() => {});
-      } else {
-        // Page URL selection
-        await api.patch(`/slides/${savedSlideId}/thumbnail`, { thumbnailUrl: selectedCover }).catch(() => {});
-      }
+      await api.patch(`/slides/${savedSlideId}/thumbnail`, { thumbnailUrl: selectedCover }).catch(() => {});
     } catch { /* PATCH hata olsa bile devam et */ }
 
     // Save tags
@@ -399,36 +389,34 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
         {phase === 'cover' ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground -mt-3">
-              Slaytın için bir kapak seç — kartlarda ve listelerde gösterilecek.
+              Slaytının bir sayfasını kapak olarak seç — kartlarda gösterilecek.
             </p>
 
             {/* Page thumbnail grid */}
             {coverPagesLoading ? (
-              <div className="text-center py-6 space-y-2">
-                <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto" />
-                <p className="text-sm text-muted-foreground">
-                  Slayt sayfaları yükleniyor, az kaldı…
-                </p>
-                <p className="text-xs text-muted-foreground/60">
-                  Hazır olunca otomatik görünür. İstersen aşağıdan kapak yükleyebilirsin.
+              <div className="text-center py-10 space-y-3">
+                <Loader2 className="w-7 h-7 animate-spin text-primary mx-auto" />
+                <p className="text-sm font-medium text-foreground">Sayfalar hazırlanıyor…</p>
+                <p className="text-xs text-muted-foreground">
+                  Dönüşüm devam ediyor, az kaldı!
                 </p>
               </div>
             ) : coverPages.length > 0 ? (
-              <div className="grid grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
+              <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1 scrollbar-thin">
                 {coverPages.map((page) => (
                   <button
                     key={page.pageNumber}
                     type="button"
-                    onClick={() => { setSelectedCover(page.url); setSelectedCoverFile(null); setCoverError(''); }}
+                    onClick={() => { setSelectedCover(page.url); setCoverError(''); }}
                     className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all focus-visible:ring-2 focus-visible:ring-primary ${
-                      selectedCover === page.url && !selectedCoverFile
+                      selectedCover === page.url
                         ? 'border-primary ring-2 ring-primary/30'
                         : 'border-border hover:border-primary/50'
                     }`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={page.url} alt={`Sayfa ${page.pageNumber}`} className="w-full h-full object-cover" loading="lazy" />
-                    {selectedCover === page.url && !selectedCoverFile && (
+                    {selectedCover === page.url && (
                       <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
                         <CheckCircle className="w-5 h-5 text-primary drop-shadow" />
                       </div>
@@ -439,51 +427,12 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
                   </button>
                 ))}
               </div>
-            ) : null}
-
-            {/* Info banner when no pages loaded (conversion not done / 409) */}
-            {!coverPagesLoading && coverPages.length === 0 && (
-              <div className="p-3 rounded-xl bg-muted/50 border border-border/50 text-sm text-muted-foreground leading-relaxed">
-                Slayt önizlemesi henüz hazır değil — dönüşüm arka planda devam ediyor.
-                <br />
-                Aşağıdan bir kapak görseli yükleyebilir veya <strong>şimdilik geçebilirsin</strong>.
+            ) : (
+              /* Pages never arrived — very large file or server issue */
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                <p>Sayfalar yüklenemedi. Lütfen daha sonra slayt sayfasından kapak seçebilirsin.</p>
               </div>
             )}
-
-            {/* Custom cover upload */}
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                {coverPages.length > 0 ? 'Veya özel kapak yükle' : 'Özel kapak yükle'}
-              </p>
-              <label className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-dashed cursor-pointer transition-all ${
-                selectedCoverFile ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40 hover:bg-muted/40'
-              }`}>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="sr-only"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    if (f.size > 5 * 1024 * 1024) { toast.error('Kapak görseli 5MB sınırını aşıyor'); return; }
-                    setSelectedCoverFile(f);
-                    setSelectedCover(URL.createObjectURL(f));
-                    setCoverError('');
-                  }}
-                />
-                <Upload className="w-4 h-4 text-muted-foreground shrink-0" />
-                {selectedCoverFile
-                  ? <span className="text-sm font-medium text-primary truncate">{selectedCoverFile.name}</span>
-                  : <span className="text-sm text-muted-foreground">JPG, PNG veya WebP · Maks. 5MB</span>
-                }
-              </label>
-              {selectedCoverFile && selectedCover && (
-                <div className="aspect-video rounded-xl overflow-hidden border border-border">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={selectedCover} alt="Kapak önizleme" className="w-full h-full object-cover" />
-                </div>
-              )}
-            </div>
 
             {coverError && (
               <p className="text-sm text-red-500 font-medium">{coverError}</p>
@@ -501,13 +450,11 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
               <button
                 type="button"
                 onClick={handleCoverConfirm}
-                disabled={loading}
+                disabled={loading || coverPagesLoading}
                 className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition disabled:opacity-60 flex items-center justify-center gap-2 text-sm"
               >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                {!coverPagesLoading && coverPages.length === 0 && !selectedCover
-                  ? 'Şimdilik Geç'
-                  : 'Devam Et'}
+                {coverPages.length === 0 && !coverPagesLoading ? 'Tamam' : 'Devam Et'}
               </button>
             </div>
           </div>
