@@ -17,7 +17,7 @@ interface Props {
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const CONVERSION_TIMEOUT_MS = 45_000;
-const POLL_INTERVAL_MS = 1_000; // Was 1500ms — tighter loop for faster "done" detection
+const POLL_INTERVAL_MS = 2_000; // 2 s — half the XHR spam vs 1 s, still fast enough
 
 // Rotating messages shown during conversion — cheerful, not technical
 const CONVERSION_MESSAGES = [
@@ -158,11 +158,13 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
   });
 
   // Fetch preview pages for cover selection.
-  // Preview thumbnail generation is async AFTER conversion completes, so we
-  // retry up to MAX_RETRIES times (3 s apart) until pages arrive.
+  // Retry logic:
+  //   • 200 with empty pages  → thumbnail generation still in progress, retry
+  //   • 409 / 404 / 403       → conversion not done or access denied; stop immediately
+  //   • other network errors  → transient, retry
   const fetchCoverPages = useCallback(async (id: number) => {
     setCoverPagesLoading(true);
-    const MAX_RETRIES = 7;
+    const MAX_RETRIES = 6;
     const RETRY_DELAY = 3_000;
     let pages: Array<{ pageNumber: number; url: string }> = [];
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -170,7 +172,15 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
         const res = await api.get(`/slides/${id}/preview-meta`);
         const fetched = Array.isArray(res?.data?.pages) ? res.data.pages : [];
         if (fetched.length > 0) { pages = fetched.slice(0, 12); break; }
-      } catch { /* keep retrying */ }
+        // 200 but empty — thumbnails still generating, keep retrying
+      } catch (err: any) {
+        const status = err?.response?.status;
+        if (status === 409 || status === 404 || status === 403) {
+          // 409 = conversion not done / no pdfUrl → retrying won't help, abort now
+          break;
+        }
+        // Other errors (network, 5xx) → retry
+      }
       if (attempt < MAX_RETRIES) {
         await new Promise((r) => setTimeout(r, RETRY_DELAY));
       }
@@ -284,10 +294,13 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
     }
   };
 
-  // Called when user confirms cover selection
+  // Called when user confirms cover selection.
+  // Cover is required when slide pages were loaded (user can see and pick one).
+  // Cover is optional when no pages loaded (conversion not done / 409) — user can skip.
   const handleCoverConfirm = async () => {
-    if (!selectedCover) {
-      setCoverError('Devam etmek için bir kapak seçmelisin.');
+    const pagesAvailable = !coverPagesLoading && coverPages.length > 0;
+    if (pagesAvailable && !selectedCover) {
+      setCoverError('Devam etmek için bir kapak seçmelisin veya özel görsel yükle.');
       return;
     }
     setCoverError('');
@@ -428,6 +441,15 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
               </div>
             ) : null}
 
+            {/* Info banner when no pages loaded (conversion not done / 409) */}
+            {!coverPagesLoading && coverPages.length === 0 && (
+              <div className="p-3 rounded-xl bg-muted/50 border border-border/50 text-sm text-muted-foreground leading-relaxed">
+                Slayt önizlemesi henüz hazır değil — dönüşüm arka planda devam ediyor.
+                <br />
+                Aşağıdan bir kapak görseli yükleyebilir veya <strong>şimdilik geçebilirsin</strong>.
+              </div>
+            )}
+
             {/* Custom cover upload */}
             <div className="space-y-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -483,7 +505,9 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
                 className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition disabled:opacity-60 flex items-center justify-center gap-2 text-sm"
               >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                Devam Et
+                {!coverPagesLoading && coverPages.length === 0 && !selectedCover
+                  ? 'Şimdilik Geç'
+                  : 'Devam Et'}
               </button>
             </div>
           </div>
