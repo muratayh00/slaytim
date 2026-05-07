@@ -1082,7 +1082,14 @@ const getPreviewMeta = async (req, res) => {
             || (String(slide.pdfUrl || '').startsWith('/uploads/') && isRemoteEnabled() && (!localCandidatePath || !fs.existsSync(localCandidatePath)));
           if (isRemote) {
             const readUrl = await resolveStorageReadUrl(slide.pdfUrl);
-            const upstream = await fetch(readUrl);
+            const controller = new AbortController();
+            const fetchTimeout = setTimeout(() => controller.abort(), 5_000);
+            let upstream;
+            try {
+              upstream = await fetch(readUrl, { signal: controller.signal });
+            } finally {
+              clearTimeout(fetchTimeout);
+            }
             if (!upstream.ok) throw new Error('Remote PDF fetch failed');
             const raw = await upstream.arrayBuffer();
             pdfBuffer = Buffer.from(raw);
@@ -1096,6 +1103,8 @@ const getPreviewMeta = async (req, res) => {
           if (pageCount > 0) break;
         } catch (err) {
           lastError = err;
+          // Ağ/timeout hataları için retry fayda vermez — hemen çık
+          if (err?.name === 'AbortError' || err?.message?.includes('fetch failed')) break;
           if (attempt < 4) await sleep(300 * attempt);
         }
       }

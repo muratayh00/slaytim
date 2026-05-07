@@ -415,6 +415,28 @@ async function generateSummaryForSlide(slideId, options = {}) {
     },
   });
 
+  // Highlights → SlideTag sync (fire-and-forget, sessiz hata)
+  if (Array.isArray(finalSummary.highlights) && finalSummary.highlights.length > 0) {
+    const { toSlug } = require('../lib/slug');
+    for (const highlight of finalSummary.highlights.slice(0, 5)) {
+      try {
+        const tagName = String(highlight).slice(0, 36).trim();
+        const tagSlug = toSlug(tagName);
+        if (!tagSlug || tagSlug.length < 2) continue;
+        const tag = await prisma.tag.upsert({
+          where:  { slug: tagSlug },
+          update: { name: tagName },
+          create: { name: tagName, slug: tagSlug },
+        });
+        await prisma.slideTag.upsert({
+          where:  { slideId_tagId: { slideId: id, tagId: tag.id } },
+          update: {},
+          create: { slideId: id, tagId: tag.id, source: 'ai', confidence: 0.8 },
+        });
+      } catch { /* tekil etiket hatası tüm akışı bozmaz */ }
+    }
+  }
+
   return { ok: true, status: 'done', summary: finalSummary };
 }
 
