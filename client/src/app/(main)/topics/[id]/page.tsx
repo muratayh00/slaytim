@@ -17,6 +17,7 @@ import toast from 'react-hot-toast';
 import { resolveFileUrl } from '@/lib/pdfRenderer';
 import { buildCategoryPath, buildProfilePath, buildTopicPath, splitIdSlug } from '@/lib/url';
 import { analytics } from '@/lib/analytics';
+import { motion } from 'framer-motion';
 
 const AVATAR_COLORS = [
   'from-indigo-500 to-violet-500',
@@ -212,7 +213,7 @@ export default function TopicDetailPage({ initialTopic }: { initialTopic?: any }
     try {
       const { data } = await api.patch(`/topics/${resolvedTopicId}/pin-slide`, { slideId });
       setTopic((prev: any) => ({ ...(prev || {}), ...data }));
-      toast.success(slideId ? 'Slayt konuya sabitlendi' : 'Sabitlenen slayt kaldirildi');
+      toast.success(slideId ? 'Slayt konuya sabitlendi' : 'Sabitlenen slayt kaldırıldı');
     } catch {
       toast.error('Sabitlenemedi');
     } finally {
@@ -429,18 +430,24 @@ export default function TopicDetailPage({ initialTopic }: { initialTopic?: any }
               onClick={() => setShowUpload(true)}
               className="px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors shadow-button"
             >
-              Slayt Yukle
+              Slayt Yükle
             </button>
           ) : (
             <Link href="/register" className="px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors shadow-button">
-              Kayit Ol ve Yukle
+              Kayıt Ol ve Yükle
             </Link>
           )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {visibleSlides.map((slide: any, i: number) => (
-            <div key={slide.id || `${i}-${slide.title || 'slide'}`} className="relative">
+            <motion.div
+              key={slide.id || `${i}-${slide.title || 'slide'}`}
+              className="relative"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.28, ease: 'easeOut', delay: Math.min(i * 0.04, 0.2) }}
+            >
               {canPinSlides && (
                 <button
                   type="button"
@@ -456,14 +463,14 @@ export default function TopicDetailPage({ initialTopic }: { initialTopic?: any }
                       ? 'bg-primary text-white border-primary'
                       : 'bg-black/55 text-white border-white/20 hover:bg-black/70'
                   } disabled:opacity-60`}
-                  title={Number(slide?.id) === pinnedSlideId ? 'Sabitlenmeyi kaldir' : 'Konuya sabitle'}
+                  title={Number(slide?.id) === pinnedSlideId ? 'Sabitlenmeyi kaldır' : 'Konuya sabitle'}
                 >
                   {Number(slide?.id) === pinnedSlideId ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
                   {Number(slide?.id) === pinnedSlideId ? 'Sabitli' : 'Sabitle'}
                 </button>
               )}
               <SlideCard slide={slide} />
-            </div>
+            </motion.div>
           ))}
         </div>
       )}

@@ -68,9 +68,9 @@ export default async function TagPage({ params }: { params: { slug: string } }) 
 
       {data.totals.all === 0 && (
         <div className="text-sm text-muted-foreground">
-          Bu etiket icin icerik yok.{' '}
+          Bu etiket için içerik yok.{' '}
           <Link href="/kesfet" className="text-primary">
-            Kesfet sayfasina don
+            Keşfet sayfasına dön
           </Link>
           .
         </div>

@@ -119,6 +119,11 @@
 }
 
 @layer utilities {
+  /* Ensure fade-up animation persists after completion */
+  .animate-fade-up {
+    animation-fill-mode: both;
+  }
+
   .viewer-overlay {
     background: rgba(0, 0, 0, 0.35);
     backdrop-filter: blur(2px);

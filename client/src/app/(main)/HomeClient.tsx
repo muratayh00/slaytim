@@ -17,6 +17,7 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { resolveFileUrl } from '@/lib/pdfRenderer';
 import { buildSlideoPath, buildTopicCreatePath } from '@/lib/url';
+import { motion } from 'framer-motion';
 
 const CAT_ICONS: Record<string, string> = {
   'teknoloji': 'T', 'is-Girişimcilik': 'G', 'egitim': 'E',
@@ -269,7 +270,13 @@ export default function HomeClient({
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {trending.map((topic) => <TopicCard key={topic.id} topic={topic} />)}
+                    {trending.map((topic, i) => (
+                      <motion.div key={topic.id}
+                        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.28, ease: 'easeOut', delay: Math.min(i * 0.04, 0.2) }}>
+                        <TopicCard topic={topic} />
+                      </motion.div>
+                    ))}
                   </div>
                 )}
               </section>
@@ -284,7 +291,13 @@ export default function HomeClient({
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {popular.slice(0, 8).map((slide) => <SlideCard key={slide.id} slide={slide} />)}
+                    {popular.slice(0, 8).map((slide, i) => (
+                      <motion.div key={slide.id}
+                        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.28, ease: 'easeOut', delay: Math.min(i * 0.04, 0.2) }}>
+                        <SlideCard slide={slide} />
+                      </motion.div>
+                    ))}
                   </div>
                 )}
               </section>

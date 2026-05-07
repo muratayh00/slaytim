@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
@@ -18,7 +18,7 @@ interface Props {
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const CONVERSION_TIMEOUT_MS = 45_000; // Kullanıcıyı bekletmemek için kısa polling, sonrası arka planda devam eder
 
-type UploadPhase = 'uploading' | 'converting';
+type UploadPhase = 'uploading' | 'converting' | 'cover';
 const TAG_STOPWORDS = new Set([
   've',
   'ile',
@@ -90,6 +90,16 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
   const [tagInput, setTagInput] = useState('');
   const [manualTags, setManualTags] = useState<string[]>([]);
 
+  // Cover selection state
+  const [savedSlideId, setSavedSlideId] = useState<number | null>(null);
+  const [savedSlideData, setSavedSlideData] = useState<any>(null);
+  const [savedConverted, setSavedConverted] = useState(false);
+  const [coverPages, setCoverPages] = useState<Array<{ pageNumber: number; url: string }>>([]);
+  const [coverPagesLoading, setCoverPagesLoading] = useState(false);
+  const [selectedCover, setSelectedCover] = useState<string | null>(null);
+  const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
+  const [coverError, setCoverError] = useState('');
+
   const suggestedTags = extractTagCandidates(form.title, form.description).filter((tag) => !manualTags.includes(tag));
 
   const validateAndSetFile = useCallback((picked: File | null) => {
@@ -125,6 +135,20 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
     maxFiles: 1,
     maxSize: MAX_FILE_SIZE,
   });
+
+  // Fetch preview pages for cover selection
+  const fetchCoverPages = useCallback(async (id: number) => {
+    setCoverPagesLoading(true);
+    try {
+      const res = await api.get(`/slides/${id}/preview-meta`);
+      const pages = Array.isArray(res?.data?.pages) ? res.data.pages : [];
+      setCoverPages(pages.slice(0, 12));
+    } catch {
+      setCoverPages([]);
+    } finally {
+      setCoverPagesLoading(false);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,41 +231,74 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
           await new Promise((resolve) => setTimeout(resolve, 1500));
         }
         if (!converted) {
-          // Timeout — dönüşüm hâlâ devam ediyor olabilir, yine de yönlendir
-          toast('Dönüşüm devam ediyor, slayt sayfasına yönlendiriliyorsunuz…', { icon: '⏳' });
+          // Timeout — dönüşüm hâlâ devam ediyor olabilir
+          toast('Dönüşüm devam ediyor, kapak seçimini yapabilirsiniz…', { icon: '⏳' });
         }
       }
 
-      analytics.uploadComplete({ slide_id: data.id, title: data.title });
-
-      const allTags = [...manualTags]
-        .map((tag) => normalizeTag(tag))
-        .filter((tag, index, arr) => tag.length >= 2 && arr.indexOf(tag) === index)
-        .slice(0, 8);
-      if (allTags.length > 0 && Number.isInteger(Number(data?.id))) {
-        await api.patch(`/slides/${data.id}/metadata`, {
-          tags: allTags,
-          tagSource: 'manual',
-        }).catch(() => {});
-      }
-
-      if (converted) toast.success('Slayt yüklendi!');
-      onSuccess(data);
-      onClose();
-      if (data?.id) {
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem(`slideo:prompt:${data.id}`, '1');
-        }
-        const slidePath = buildSlidePath({ id: data.id, slug: data.slug, title: data.title });
-        navigateSafely(router, `${slidePath}?fromUpload=1`);
+      // Conversion done (or timeout) → move to cover selection step
+      setSavedSlideId(slideId);
+      setSavedSlideData(data);
+      setSavedConverted(converted);
+      setPhase('cover');
+      setLoading(false);
+      // Fetch preview pages in background
+      if (Number.isInteger(slideId) && slideId > 0) {
+        fetchCoverPages(slideId);
       }
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.message || 'Yükleme başarısız';
       toast.error(msg);
-    } finally {
+      setLoading(false);
       setUploadPercent(0);
       setConversionPercent(0);
-      setLoading(false);
+    }
+  };
+
+  // Called when user confirms cover selection
+  const handleCoverConfirm = async () => {
+    if (!selectedCover) {
+      setCoverError('Devam etmek için bir kapak seçmelisin.');
+      return;
+    }
+    setCoverError('');
+    setLoading(true);
+
+    try {
+      if (selectedCoverFile) {
+        // Custom file upload
+        const fd = new FormData();
+        fd.append('file', selectedCoverFile);
+        await api.patch(`/slides/${savedSlideId}/thumbnail`, fd).catch(() => {});
+      } else {
+        // Page URL selection
+        await api.patch(`/slides/${savedSlideId}/thumbnail`, { thumbnailUrl: selectedCover }).catch(() => {});
+      }
+    } catch { /* PATCH hata olsa bile devam et */ }
+
+    // Save tags
+    const allTags = [...manualTags]
+      .map((tag) => normalizeTag(tag))
+      .filter((tag, index, arr) => tag.length >= 2 && arr.indexOf(tag) === index)
+      .slice(0, 8);
+    if (allTags.length > 0 && savedSlideData?.id) {
+      await api.patch(`/slides/${savedSlideData.id}/metadata`, {
+        tags: allTags,
+        tagSource: 'manual',
+      }).catch(() => {});
+    }
+
+    analytics.uploadComplete({ slide_id: savedSlideData.id, title: savedSlideData.title });
+
+    if (savedConverted) toast.success('Slayt yüklendi!');
+    onSuccess(savedSlideData);
+    onClose();
+    if (savedSlideData?.id) {
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`slideo:prompt:${savedSlideData.id}`, '1');
+      }
+      const slidePath = buildSlidePath({ id: savedSlideData.id, slug: savedSlideData.slug, title: savedSlideData.title });
+      navigateSafely(router, `${slidePath}?fromUpload=1`);
     }
   };
 
@@ -283,9 +340,11 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={!loading ? onClose : undefined}
       />
-      <div className="relative w-full max-w-lg bg-card border border-border rounded-2xl shadow-xl p-6">
+      <div className="relative w-full max-w-lg bg-card border border-border rounded-2xl shadow-xl p-6 max-h-[90vh] overflow-y-auto scrollbar-thin">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold">Slayt Yükle</h2>
+          <h2 className="text-xl font-bold">
+            {phase === 'cover' ? 'Kapak Seç' : 'Slayt Yükle'}
+          </h2>
           <button
             type="button"
             onClick={!loading ? onClose : undefined}
@@ -296,152 +355,254 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div
-            {...getRootProps()}
-            className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition ${
-              isDragActive
-                ? 'border-primary bg-primary/5'
-                : file
-                ? 'border-green-500 bg-green-500/5'
-                : 'border-border hover:border-primary/50 hover:bg-muted/50'
-            }`}
-          >
-            <input {...getInputProps()} />
-            {file ? (
-              <div className="flex flex-col items-center gap-2 text-green-600 dark:text-green-400">
-                <CheckCircle className="w-10 h-10" />
-                <p className="font-medium text-sm">{file.name}</p>
-                <p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                <Upload className="w-10 h-10" />
-                <div>
-                  <p className="font-medium text-sm">
-                    {isDragActive ? 'Dosyayı bırak' : 'Dosyayı sürükle veya tıkla'}
-                  </p>
-                  <p className="text-xs mt-1">.ppt, .pptx ve .pdf desteklenir · Maks. 50MB</p>
-                </div>
-              </div>
-            )}
-          </div>
+        {/* ── Cover selection phase ───────────────────────────────── */}
+        {phase === 'cover' ? (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground -mt-3">
+              Slaytın için bir kapak seç — kartlarda ve listelerde gösterilecek.
+            </p>
 
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">
-              Başlık <span className="text-primary">*</span>
-            </label>
-            <input
-              name="title"
-              required
-              maxLength={200}
-              placeholder="Slayt başlığı..."
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Açıklama</label>
-            <textarea
-              name="description"
-              rows={3}
-              placeholder="Slaytı kısaca anlat..."
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm resize-none"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Etiketler (opsiyonel)</label>
-            <div className="flex flex-wrap gap-2">
-              {manualTags.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => removeTag(tag)}
-                  className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary"
-                  title="Kaldirmak icin tikla"
-                >
-                  {tag} ×
-                </button>
-              ))}
-            </div>
-            <input
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ',') {
-                  e.preventDefault();
-                  addTag(tagInput);
-                } else if (e.key === 'Backspace' && !tagInput && manualTags.length > 0) {
-                  removeTag(manualTags[manualTags.length - 1]);
-                }
-              }}
-              placeholder="Etiket ekle ve Enter'a bas..."
-              className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-            />
-            {suggestedTags.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {suggestedTags.slice(0, 6).map((tag) => (
+            {/* Page thumbnail grid */}
+            {coverPagesLoading ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                Kapak seçenekleri hazırlanıyor…
+              </p>
+            ) : coverPages.length > 0 ? (
+              <div className="grid grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
+                {coverPages.map((page) => (
                   <button
-                    key={`s-${tag}`}
+                    key={page.pageNumber}
                     type="button"
-                    onClick={() => addTag(tag)}
-                    className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-border/80"
+                    onClick={() => { setSelectedCover(page.url); setSelectedCoverFile(null); setCoverError(''); }}
+                    className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all focus-visible:ring-2 focus-visible:ring-primary ${
+                      selectedCover === page.url && !selectedCoverFile
+                        ? 'border-primary ring-2 ring-primary/30'
+                        : 'border-border hover:border-primary/50'
+                    }`}
                   >
-                    + {tag}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={page.url} alt={`Sayfa ${page.pageNumber}`} className="w-full h-full object-cover" loading="lazy" />
+                    {selectedCover === page.url && !selectedCoverFile && (
+                      <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
+                        <CheckCircle className="w-5 h-5 text-primary drop-shadow" />
+                      </div>
+                    )}
+                    <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] px-1 py-0.5 rounded font-bold">
+                      {page.pageNumber}
+                    </span>
                   </button>
                 ))}
               </div>
-            )}
-          </div>
+            ) : null}
 
-          {loading && (
-            <div className="space-y-2 bg-muted/40 rounded-xl px-4 py-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-foreground">{phaseLabel}</span>
-                <span className="text-muted-foreground tabular-nums">{shownPercent}%</span>
-              </div>
-              <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${shownPercent}%` }}
+            {/* Custom cover upload */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                {coverPages.length > 0 ? 'Veya özel kapak yükle' : 'Özel kapak yükle'}
+              </p>
+              <label className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-dashed cursor-pointer transition-all ${
+                selectedCoverFile ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40 hover:bg-muted/40'
+              }`}>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    if (f.size > 5 * 1024 * 1024) { toast.error('Kapak görseli 5MB sınırını aşıyor'); return; }
+                    setSelectedCoverFile(f);
+                    setSelectedCover(URL.createObjectURL(f));
+                    setCoverError('');
+                  }}
                 />
-              </div>
-              {phase === 'converting' && (
-                <p className="text-[11px] text-muted-foreground text-center mt-1">
-                  {conversionStatus === 'processing'
-                    ? 'LibreOffice ile PPTX → PDF dönüşümü devam ediyor…'
-                    : 'Dönüşüm kuyruğuna alındı, bekleniyor…'}
-                </p>
+                <Upload className="w-4 h-4 text-muted-foreground shrink-0" />
+                {selectedCoverFile
+                  ? <span className="text-sm font-medium text-primary truncate">{selectedCoverFile.name}</span>
+                  : <span className="text-sm text-muted-foreground">JPG, PNG veya WebP · Maks. 5MB</span>
+                }
+              </label>
+              {selectedCoverFile && selectedCover && (
+                <div className="aspect-video rounded-xl overflow-hidden border border-border">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={selectedCover} alt="Kapak önizleme" className="w-full h-full object-cover" />
+                </div>
               )}
             </div>
-          )}
 
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="flex-1 py-3 rounded-xl border border-border font-medium hover:bg-muted transition text-sm disabled:opacity-50"
-            >
-              İptal
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition disabled:opacity-60 flex items-center justify-center gap-2 text-sm"
-            >
-              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {loading
-                ? phase === 'uploading' ? 'Yükleniyor…' : 'Dönüştürülüyor…'
-                : 'Yükle'}
-            </button>
+            {coverError && (
+              <p className="text-sm text-red-500 font-medium">{coverError}</p>
+            )}
+
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={loading}
+                className="flex-1 py-3 rounded-xl border border-border font-medium hover:bg-muted transition text-sm disabled:opacity-50"
+              >
+                İptal
+              </button>
+              <button
+                type="button"
+                onClick={handleCoverConfirm}
+                disabled={loading}
+                className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition disabled:opacity-60 flex items-center justify-center gap-2 text-sm"
+              >
+                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                Devam Et
+              </button>
+            </div>
           </div>
-        </form>
+        ) : (
+          /* ── Upload / converting phase ───────────────────────── */
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div
+              {...getRootProps()}
+              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition ${
+                isDragActive
+                  ? 'border-primary bg-primary/5'
+                  : file
+                  ? 'border-green-500 bg-green-500/5'
+                  : 'border-border hover:border-primary/50 hover:bg-muted/50'
+              }`}
+            >
+              <input {...getInputProps()} />
+              {file ? (
+                <div className="flex flex-col items-center gap-2 text-green-600 dark:text-green-400">
+                  <CheckCircle className="w-10 h-10" />
+                  <p className="font-medium text-sm">{file.name}</p>
+                  <p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                  <Upload className="w-10 h-10" />
+                  <div>
+                    <p className="font-medium text-sm">
+                      {isDragActive ? 'Dosyayı bırak' : 'Dosyayı sürükle veya tıkla'}
+                    </p>
+                    <p className="text-xs mt-1">.ppt, .pptx ve .pdf desteklenir · Maks. 50MB</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">
+                Başlık <span className="text-primary">*</span>
+              </label>
+              <input
+                name="title"
+                required
+                maxLength={200}
+                placeholder="Slayt başlığı..."
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Açıklama</label>
+              <textarea
+                name="description"
+                rows={3}
+                placeholder="Slaytı kısaca anlat..."
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm resize-none"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Etiketler (opsiyonel)</label>
+              <div className="flex flex-wrap gap-2">
+                {manualTags.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => removeTag(tag)}
+                    className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary"
+                    title="Kaldırmak için tıkla"
+                  >
+                    {tag} ×
+                  </button>
+                ))}
+              </div>
+              <input
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ',') {
+                    e.preventDefault();
+                    addTag(tagInput);
+                  } else if (e.key === 'Backspace' && !tagInput && manualTags.length > 0) {
+                    removeTag(manualTags[manualTags.length - 1]);
+                  }
+                }}
+                placeholder="Etiket ekle ve Enter'a bas..."
+                className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
+              />
+              {suggestedTags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {suggestedTags.slice(0, 6).map((tag) => (
+                    <button
+                      key={`s-${tag}`}
+                      type="button"
+                      onClick={() => addTag(tag)}
+                      className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-border/80"
+                    >
+                      + {tag}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {loading && (
+              <div className="space-y-2 bg-muted/40 rounded-xl px-4 py-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-foreground">{phaseLabel}</span>
+                  <span className="text-muted-foreground tabular-nums">{shownPercent}%</span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${shownPercent}%` }}
+                  />
+                </div>
+                {phase === 'converting' && (
+                  <p className="text-[11px] text-muted-foreground text-center mt-1">
+                    {conversionStatus === 'processing'
+                      ? 'LibreOffice ile PPTX → PDF dönüşümü devam ediyor…'
+                      : 'Dönüşüm kuyruğuna alındı, bekleniyor…'}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={loading}
+                className="flex-1 py-3 rounded-xl border border-border font-medium hover:bg-muted transition text-sm disabled:opacity-50"
+              >
+                İptal
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition disabled:opacity-60 flex items-center justify-center gap-2 text-sm"
+              >
+                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                {loading
+                  ? phase === 'uploading' ? 'Yükleniyor…' : 'Dönüştürülüyor…'
+                  : 'Yükle'}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

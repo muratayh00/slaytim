@@ -319,7 +319,7 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
       }
       startPolling(createdSessionId, createdSlideId);
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Yukleme basarisiz');
+      toast.error(err?.response?.data?.error || 'Yükleme başarısız');
       setStep('upload');
     } finally {
       setUploading(false);
@@ -423,9 +423,9 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
               Slideo Olustur
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
-              {step === 'upload' && 'PPT/PPTX yukle'}
-              {step === 'converting' && 'LibreOffice ile sayfa onizlemeleri hazirlaniyor'}
-              {step === 'select' && '3-7 sayfa sec ve Slideo olustur'}
+              {step === 'upload' && 'PPT/PPTX yükle'}
+              {step === 'converting' && 'LibreOffice ile sayfa önizlemeleri hazırlanıyor'}
+              {step === 'select' && '3-7 sayfa seç ve Slideo oluştur'}
               {step === 'select' && stillGenerating && (
                 <span className="text-amber-500 inline-flex items-center gap-1">
                   <Loader2 className="w-3 h-3 animate-spin" />
@@ -769,7 +769,7 @@ export default function UploadSlideoModal({ onClose, onCreated }: Props) {
                 </>
               ) : (
                 <>
-                  <ChevronRight className="w-4 h-4" /> Yukle ve devam et
+                  <ChevronRight className="w-4 h-4" /> Yükle ve devam et
                 </>
               )}
             </button>

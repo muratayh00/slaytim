@@ -120,7 +120,7 @@ export default function Sidebar() {
   const handleLogout = () => {
     setRecentTopics([]);
     logout();
-    toast.success('Çıkış Yapildi');
+    toast.success('Çıkış Yapıldı');
     router.push('/');
   };
 

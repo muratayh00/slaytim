@@ -9,6 +9,15 @@ import { buildSlidePath } from '@/lib/url';
 
 const AVATAR_COLORS = ['bg-violet-500', 'bg-blue-500', 'bg-emerald-500', 'bg-orange-500', 'bg-pink-500', 'bg-cyan-500'];
 
+// Gradient fallback for slides without a thumbnail — consistent per slide id
+const COVER_GRADIENTS = [
+  'from-indigo-500/15 to-violet-500/10',
+  'from-orange-500/15 to-amber-500/10',
+  'from-emerald-500/15 to-teal-500/10',
+  'from-blue-500/15 to-cyan-500/10',
+  'from-rose-500/15 to-pink-500/10',
+];
+
 interface SlideCardProps {
   slide: {
     id: number;
@@ -33,6 +42,7 @@ interface SlideCardProps {
 export default function SlideCard({ slide, priority = false }: SlideCardProps) {
   const { user } = useAuthStore();
   const avatarColor = AVATAR_COLORS[slide.user.id % AVATAR_COLORS.length];
+  const coverGrad = COVER_GRADIENTS[slide.id % COVER_GRADIENTS.length];
   const fileExt = slide.fileUrl?.split('.').pop()?.toUpperCase() || 'PPTX';
   const [thumbError, setThumbError] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
@@ -64,16 +74,16 @@ export default function SlideCard({ slide, priority = false }: SlideCardProps) {
               onError={() => setThumbError(true)}
             />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground">
-              <Presentation className="w-7 h-7" strokeWidth={1.8} />
-              <span className="text-[10px] font-semibold tracking-wide">{fileExt}</span>
+            <div className={`w-full h-full bg-gradient-to-br ${coverGrad} flex flex-col items-center justify-center gap-2`}>
+              <Presentation className="w-8 h-8 text-foreground/20" strokeWidth={1.5} />
+              <span className="text-[10px] font-bold tracking-widest uppercase text-foreground/25">{fileExt}</span>
             </div>
           )}
 
           {!user && (
             <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 bg-black/70 text-white rounded-md px-2 py-1">
               <Lock className="w-3 h-3" />
-              <span className="text-[10px] font-semibold">Uye ol</span>
+              <span className="text-[10px] font-semibold">Üye ol</span>
             </div>
           )}
         </div>
