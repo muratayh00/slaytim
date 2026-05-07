@@ -180,6 +180,7 @@ export default function Sidebar() {
                   <Link
                     key={topic.id}
                     href={href}
+                    prefetch={false}
                     className={cn(
                       'flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12.5px] font-medium transition-all duration-150 group',
                       active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-black/[0.04] dark:hover:bg-white/5'
@@ -198,7 +199,7 @@ export default function Sidebar() {
       <div className="px-2.5 pb-3 pt-3 space-y-1 border-t border-border/50 shrink-0 bg-white/80 dark:bg-card/80 backdrop-blur-sm">
         {user ? (
           <>
-            <Link href={buildTopicCreatePath()} className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-primary text-white text-[13px] font-bold hover:opacity-90 transition-opacity w-full">
+            <Link href={buildTopicCreatePath()} prefetch={false} className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-primary text-white text-[13px] font-bold hover:opacity-90 transition-opacity w-full">
               <Plus className="w-4 h-4 shrink-0" strokeWidth={2.5} />
               Konu Aç
             </Link>
@@ -227,16 +228,16 @@ export default function Sidebar() {
                       <User className="w-4 h-4 text-muted-foreground" />
                       Profilim
                     </Link>
-                    <Link href="/collections" className="flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-semibold hover:bg-muted transition-colors" onClick={() => setProfileOpen(false)}>
+                    <Link href="/collections" prefetch={false} className="flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-semibold hover:bg-muted transition-colors" onClick={() => setProfileOpen(false)}>
                       <FolderOpen className="w-4 h-4 text-muted-foreground" />
                       Koleksiyonlarım
                     </Link>
-                    <Link href="/rooms" className="flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-semibold hover:bg-muted transition-colors" onClick={() => setProfileOpen(false)}>
+                    <Link href="/rooms" prefetch={false} className="flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-semibold hover:bg-muted transition-colors" onClick={() => setProfileOpen(false)}>
                       <Users className="w-4 h-4 text-muted-foreground" />
                       Odalar
                     </Link>
                     {(user as any).isAdmin && (
-                      <Link href="/admin" className="flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-semibold hover:bg-muted transition-colors" onClick={() => setProfileOpen(false)}>
+                      <Link href="/admin" prefetch={false} className="flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-semibold hover:bg-muted transition-colors" onClick={() => setProfileOpen(false)}>
                         <Shield className="w-4 h-4 text-muted-foreground" />
                         Admin Paneli
                       </Link>
@@ -254,10 +255,10 @@ export default function Sidebar() {
           </>
         ) : (
           <div className="space-y-1.5">
-            <Link href="/register" className="flex items-center justify-center py-2.5 rounded-lg bg-primary text-white text-[13px] font-bold hover:opacity-90 transition-opacity w-full">
+            <Link href="/register" prefetch={false} className="flex items-center justify-center py-2.5 rounded-lg bg-primary text-white text-[13px] font-bold hover:opacity-90 transition-opacity w-full">
               Kayıt Ol
             </Link>
-            <Link href="/login" className="flex items-center justify-center py-2 rounded-lg border border-border text-[13px] font-semibold hover:bg-muted transition-colors w-full">
+            <Link href="/login" prefetch={false} className="flex items-center justify-center py-2 rounded-lg border border-border text-[13px] font-semibold hover:bg-muted transition-colors w-full">
               Giriş Yap
             </Link>
           </div>

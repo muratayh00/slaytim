@@ -105,9 +105,9 @@ export default function CommentSection({ topicId }: { topicId: number }) {
         ) : (
           <div className="mb-6 p-4 rounded-xl bg-muted/60 text-sm text-muted-foreground text-center border border-border/50">
             Yorum yapmak için{' '}
-            <Link href="/login" className="text-primary font-bold hover:underline">giriş yap</Link>
+            <Link href="/login" prefetch={false} className="text-primary font-bold hover:underline">giriş yap</Link>
             {' '}veya{' '}
-            <Link href="/register" className="text-primary font-bold hover:underline">kayıt ol</Link>
+            <Link href="/register" prefetch={false} className="text-primary font-bold hover:underline">kayıt ol</Link>
           </div>
         )}
 

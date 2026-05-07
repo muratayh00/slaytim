@@ -48,6 +48,7 @@ export function GuestAuthPrompt({ onClose }: Props) {
           <div className="flex flex-col gap-2">
             <Link
               href="/login"
+              prefetch={false}
               onClick={onClose}
               className="w-full py-2.5 rounded-xl bg-primary text-white font-bold text-sm
                          text-center hover:bg-primary/90 transition-colors shadow-button"
@@ -56,6 +57,7 @@ export function GuestAuthPrompt({ onClose }: Props) {
             </Link>
             <Link
               href="/register"
+              prefetch={false}
               onClick={onClose}
               className="w-full py-2.5 rounded-xl border border-border font-semibold text-sm
                          text-center hover:bg-muted transition-colors"

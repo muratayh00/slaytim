@@ -317,7 +317,7 @@ export default function RoomDetailClient() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      <Link href="/rooms" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-5">
+      <Link href="/rooms" prefetch={false} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-5">
         <ArrowLeft className="w-4 h-4" /> Odalara Dön
       </Link>
 
@@ -368,7 +368,7 @@ export default function RoomDetailClient() {
             <Share2 className="w-4 h-4" /> Odayı Paylaş
           </button>
           {isMember && (
-            <Link href={buildTopicCreatePath(numericRoomId ?? undefined)} className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold inline-flex items-center gap-2">
+            <Link href={buildTopicCreatePath(numericRoomId ?? undefined)} prefetch={false} className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold inline-flex items-center gap-2">
               <Plus className="w-4 h-4" /> Bu Odada Konu Aç
             </Link>
           )}
@@ -406,11 +406,11 @@ export default function RoomDetailClient() {
                         <div className="text-xs text-muted-foreground">{Number(t?._count?.slides || 0)} slayt</div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Link href={buildTopicPath({ id: t.id, slug: t.slug, title: t.title })} className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold hover:bg-muted">
+                        <Link href={buildTopicPath({ id: t.id, slug: t.slug, title: t.title })} prefetch={false} className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold hover:bg-muted">
                           Konuya Git
                         </Link>
                         {isMember && (
-                          <Link href={buildTopicPath({ id: t.id, slug: t.slug, title: t.title })} className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold">
+                          <Link href={buildTopicPath({ id: t.id, slug: t.slug, title: t.title })} prefetch={false} className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold">
                             Slayt Yükle
                           </Link>
                         )}

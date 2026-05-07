@@ -75,6 +75,7 @@ export default function DesktopHeader() {
             <>
               <Link
                 href={buildTopicCreatePath()}
+                prefetch={false}
                 className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-bold rounded-xl
                            bg-primary text-white hover:opacity-90 transition-opacity shadow-sm"
               >
@@ -83,6 +84,7 @@ export default function DesktopHeader() {
               </Link>
               <Link
                 href="/rooms"
+                prefetch={false}
                 className="flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-semibold
                            rounded-xl border border-border hover:bg-muted transition-colors"
               >
@@ -114,6 +116,7 @@ export default function DesktopHeader() {
             <>
               <Link
                 href="/login"
+                prefetch={false}
                 className="px-4 py-2.5 text-sm font-semibold text-muted-foreground
                            hover:text-foreground hover:bg-muted rounded-xl transition-colors"
               >
@@ -121,6 +124,7 @@ export default function DesktopHeader() {
               </Link>
               <Link
                 href="/register"
+                prefetch={false}
                 className="px-5 py-2.5 text-sm font-bold rounded-xl bg-primary text-white
                            hover:opacity-90 transition-opacity shadow-sm"
               >

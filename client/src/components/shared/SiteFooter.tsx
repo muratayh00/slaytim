@@ -88,6 +88,7 @@ function FooterColumn({
           <li key={link.href}>
             <Link
               href={link.href}
+              prefetch={false}
               className="text-sm text-foreground/80 hover:text-primary transition-colors"
             >
               {link.label}

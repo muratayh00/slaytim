@@ -53,6 +53,7 @@ export default function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={false}
               className={cn('flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 transition-colors', active ? 'text-primary' : 'text-muted-foreground')}
             >
               <item.icon className={cn('w-5 h-5', (item as any).fill ? 'fill-current' : '')} strokeWidth={active ? 2.5 : 2} />

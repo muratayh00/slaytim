@@ -246,7 +246,7 @@ export default function HomeClient({
                 <Rss className="w-10 h-10 mx-auto mb-3 opacity-20" />
                 <p className="font-semibold mb-1">Akışın boş</p>
                 <p className="text-sm opacity-70 mb-5">Kullanıcıları ve kategorileri takip ederek kişisel akışını oluştur.</p>
-                <Link href="/kesfet" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity">
+                <Link href="/kesfet" prefetch={false} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity">
                   Konuları Keşfet <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
@@ -318,7 +318,7 @@ export default function HomeClient({
                   </div>
                 </div>
                 {user && (
-                  <Link href={buildTopicCreatePath()} className="flex items-center gap-1.5 text-[13px] text-primary font-semibold hover:underline underline-offset-2">
+                  <Link href={buildTopicCreatePath()} prefetch={false} className="flex items-center gap-1.5 text-[13px] text-primary font-semibold hover:underline underline-offset-2">
                     <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
                     Konu Aç
                   </Link>
@@ -351,7 +351,7 @@ export default function HomeClient({
                   <p className="font-semibold text-lg mb-1">Konu bulunamadı</p>
                   <p className="text-sm mb-6 opacity-70">Filtreni değiştir veya ilk konuyu aç.</p>
                   {user && (
-                    <Link href={buildTopicCreatePath()} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity">
+                    <Link href={buildTopicCreatePath()} prefetch={false} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity">
                       Konu Aç
                     </Link>
                   )}

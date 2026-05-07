@@ -450,7 +450,7 @@ export default function NotificationBell() {
                   );
 
                   return notif.link ? (
-                    <Link key={notif.id} href={notif.link}>{content}</Link>
+                    <Link key={notif.id} href={notif.link} prefetch={false}>{content}</Link>
                   ) : (
                     <div key={notif.id}>{content}</div>
                   );

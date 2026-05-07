@@ -176,6 +176,7 @@ export default function Navbar() {
               <>
                 <Link
                   href={buildTopicCreatePath()}
+                  prefetch={false}
                   className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-lg bg-primary text-white hover:opacity-90 transition-opacity"
                 >
                   <Plus className="w-4 h-4" strokeWidth={2.5} />
@@ -206,20 +207,20 @@ export default function Navbar() {
                           <User className="w-4 h-4 text-muted-foreground" />
                           Profilim
                         </Link>
-                        <Link href="/collections" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-muted transition-colors">
+                        <Link href="/collections" prefetch={false} className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-muted transition-colors">
                           <Folder className="w-4 h-4 text-muted-foreground" />
                           Koleksiyonlarım
                         </Link>
-                        <Link href="/rooms" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-muted transition-colors">
+                        <Link href="/rooms" prefetch={false} className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-muted transition-colors">
                           <Users className="w-4 h-4 text-muted-foreground" />
                           Odalar
                         </Link>
-                        <Link href="/settings" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-muted transition-colors">
+                        <Link href="/settings" prefetch={false} className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-muted transition-colors">
                           <Settings className="w-4 h-4 text-muted-foreground" />
                           Ayarlar
                         </Link>
                         {(user as any).isAdmin && (
-                          <Link href="/admin" className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-muted transition-colors">
+                          <Link href="/admin" prefetch={false} className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-muted transition-colors">
                             <Shield className="w-4 h-4 text-muted-foreground" />
                             Admin Paneli
                           </Link>
@@ -241,10 +242,10 @@ export default function Navbar() {
               </>
             ) : (
               <>
-                <Link href="/login" className="px-3.5 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
+                <Link href="/login" prefetch={false} className="px-3.5 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
                   Giriş
                 </Link>
-                <Link href="/register" className="px-4 py-2 text-sm font-bold rounded-lg bg-primary text-white hover:opacity-90 transition-opacity">
+                <Link href="/register" prefetch={false} className="px-4 py-2 text-sm font-bold rounded-lg bg-primary text-white hover:opacity-90 transition-opacity">
                   Kayıt Ol
                 </Link>
               </>
@@ -293,17 +294,18 @@ export default function Navbar() {
             <>
               <Link
                 href={buildTopicCreatePath()}
+                prefetch={false}
                 onClick={() => setMobileOpen(false)}
                 className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary text-white text-sm font-bold hover:opacity-90 transition-opacity min-h-[44px] mb-1"
               >
                 <Plus className="w-4 h-4" strokeWidth={2.5} />Konu Aç
               </Link>
               <Link href={buildProfilePath(user.username)} prefetch={false} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><User className="w-4 h-4 text-muted-foreground" />Profilim</Link>
-              <Link href="/collections" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><Folder className="w-4 h-4 text-muted-foreground" />Koleksiyonlarım</Link>
-              <Link href="/settings" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><Settings className="w-4 h-4 text-muted-foreground" />Ayarlar</Link>
-              <Link href="/rooms" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><Users className="w-4 h-4 text-muted-foreground" />Odalar</Link>
+              <Link href="/collections" prefetch={false} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><Folder className="w-4 h-4 text-muted-foreground" />Koleksiyonlarım</Link>
+              <Link href="/settings" prefetch={false} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><Settings className="w-4 h-4 text-muted-foreground" />Ayarlar</Link>
+              <Link href="/rooms" prefetch={false} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><Users className="w-4 h-4 text-muted-foreground" />Odalar</Link>
               {(user as any).isAdmin && (
-                <Link href="/admin" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><Shield className="w-4 h-4 text-muted-foreground" />Admin Paneli</Link>
+                <Link href="/admin" prefetch={false} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"><Shield className="w-4 h-4 text-muted-foreground" />Admin Paneli</Link>
               )}
               <button onClick={() => { handleLogout(); setMobileOpen(false); }} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors min-h-[44px]"><LogOut className="w-4 h-4" />Çıkış Yap</button>
             </>
@@ -311,6 +313,7 @@ export default function Navbar() {
             <>
               <Link
                 href="/register"
+                prefetch={false}
                 onClick={() => setMobileOpen(false)}
                 className="flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-white text-sm font-bold hover:opacity-90 transition-opacity min-h-[44px]"
               >
@@ -319,6 +322,7 @@ export default function Navbar() {
               </Link>
               <Link
                 href="/login"
+                prefetch={false}
                 onClick={() => setMobileOpen(false)}
                 className="flex items-center justify-center py-3 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors min-h-[44px]"
               >
