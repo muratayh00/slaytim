@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { X, Upload, Loader2, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -16,7 +16,20 @@ interface Props {
 }
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
-const CONVERSION_TIMEOUT_MS = 45_000; // Kullanıcıyı bekletmemek için kısa polling, sonrası arka planda devam eder
+const CONVERSION_TIMEOUT_MS = 45_000;
+const POLL_INTERVAL_MS = 1_000; // Was 1500ms — tighter loop for faster "done" detection
+
+// Rotating messages shown during conversion — cheerful, not technical
+const CONVERSION_MESSAGES = [
+  'Sayfalar hazırlanıyor, az kaldı!',
+  'İnsanlara yardımcı olmak çok güzel ✨',
+  'Slaytın yakında yayında olacak!',
+  'Biraz daha bekle, neredeyse tamam…',
+  'Bilgin başkalarına ilham verecek 💡',
+  'Her slayt bir keşif kapısıdır 🚀',
+  'Harika içerik geliyor, sabırlı ol!',
+  'Dönüşüm devam ediyor, bitmek üzere…',
+];
 
 type UploadPhase = 'uploading' | 'converting' | 'cover';
 const TAG_STOPWORDS = new Set([
@@ -87,6 +100,7 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
   const [conversionPercent, setConversionPercent] = useState(0);
   const [phase, setPhase] = useState<UploadPhase>('uploading');
   const [conversionStatus, setConversionStatus] = useState<string>('');
+  const [convMsgIdx, setConvMsgIdx] = useState(0);
   const [tagInput, setTagInput] = useState('');
   const [manualTags, setManualTags] = useState<string[]>([]);
 
@@ -99,6 +113,13 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
   const [selectedCover, setSelectedCover] = useState<string | null>(null);
   const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
   const [coverError, setCoverError] = useState('');
+
+  // Rotate motivational message every 3s while converting
+  useEffect(() => {
+    if (phase !== 'converting' || !loading) return;
+    const id = setInterval(() => setConvMsgIdx((i) => (i + 1) % CONVERSION_MESSAGES.length), 3000);
+    return () => clearInterval(id);
+  }, [phase, loading]);
 
   const suggestedTags = extractTagCandidates(form.title, form.description).filter((tag) => !manualTags.includes(tag));
 
@@ -136,18 +157,26 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
     maxSize: MAX_FILE_SIZE,
   });
 
-  // Fetch preview pages for cover selection
+  // Fetch preview pages for cover selection.
+  // Preview thumbnail generation is async AFTER conversion completes, so we
+  // retry up to MAX_RETRIES times (3 s apart) until pages arrive.
   const fetchCoverPages = useCallback(async (id: number) => {
     setCoverPagesLoading(true);
-    try {
-      const res = await api.get(`/slides/${id}/preview-meta`);
-      const pages = Array.isArray(res?.data?.pages) ? res.data.pages : [];
-      setCoverPages(pages.slice(0, 12));
-    } catch {
-      setCoverPages([]);
-    } finally {
-      setCoverPagesLoading(false);
+    const MAX_RETRIES = 7;
+    const RETRY_DELAY = 3_000;
+    let pages: Array<{ pageNumber: number; url: string }> = [];
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const res = await api.get(`/slides/${id}/preview-meta`);
+        const fetched = Array.isArray(res?.data?.pages) ? res.data.pages : [];
+        if (fetched.length > 0) { pages = fetched.slice(0, 12); break; }
+      } catch { /* keep retrying */ }
+      if (attempt < MAX_RETRIES) {
+        await new Promise((r) => setTimeout(r, RETRY_DELAY));
+      }
     }
+    setCoverPages(pages);
+    setCoverPagesLoading(false);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -228,7 +257,7 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
           if (status === 'unsupported') {
             throw new Error('Bu dosya formatı için önizleme desteklenmiyor.');
           }
-          await new Promise((resolve) => setTimeout(resolve, 1500));
+          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
         }
         if (!converted) {
           // Timeout — dönüşüm hâlâ devam ediyor olabilir
@@ -330,9 +359,7 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
 
   const phaseLabel = phase === 'uploading'
     ? `Yükleniyor %${shownPercent}`
-    : conversionStatus === 'processing'
-      ? `PPTX → PDF dönüştürülüyor %${shownPercent}`
-      : `Önizleme hazırlanıyor %${shownPercent}`;
+    : `Önizleme hazırlanıyor %${shownPercent}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -364,9 +391,15 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
 
             {/* Page thumbnail grid */}
             {coverPagesLoading ? (
-              <p className="text-sm text-muted-foreground text-center py-6">
-                Kapak seçenekleri hazırlanıyor…
-              </p>
+              <div className="text-center py-6 space-y-2">
+                <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto" />
+                <p className="text-sm text-muted-foreground">
+                  Slayt sayfaları yükleniyor, az kaldı…
+                </p>
+                <p className="text-xs text-muted-foreground/60">
+                  Hazır olunca otomatik görünür. İstersen aşağıdan kapak yükleyebilirsin.
+                </p>
+              </div>
             ) : coverPages.length > 0 ? (
               <div className="grid grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1 scrollbar-thin">
                 {coverPages.map((page) => (
@@ -572,10 +605,8 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
                   />
                 </div>
                 {phase === 'converting' && (
-                  <p className="text-[11px] text-muted-foreground text-center mt-1">
-                    {conversionStatus === 'processing'
-                      ? 'LibreOffice ile PPTX → PDF dönüşümü devam ediyor…'
-                      : 'Dönüşüm kuyruğuna alındı, bekleniyor…'}
+                  <p className="text-[11px] text-muted-foreground text-center mt-1 transition-all">
+                    {CONVERSION_MESSAGES[convMsgIdx]}
                   </p>
                 )}
               </div>

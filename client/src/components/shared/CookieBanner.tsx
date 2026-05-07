@@ -30,6 +30,8 @@ export default function CookieBanner() {
   }, [analytics, advertising, panelOpen]);
 
   if (!hasHydrated || isLoading) return null;
+  // Logged-in users: only show when panel is explicitly opened (they get
+  // auto-consent via GoogleAnalytics component — no need to interrupt UX).
   if (user && !panelOpen) return null;
   if (!panelOpen && decided) return null;
 

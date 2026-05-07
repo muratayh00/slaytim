@@ -23,6 +23,7 @@ import { useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useConsentStore } from '@/store/consent';
 import { analytics } from '@/lib/analytics';
+import { useAuthStore } from '@/store/auth';
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
@@ -46,21 +47,31 @@ function gtagConsentUpdate(params: ConsentParams) {
 }
 
 export default function GoogleAnalytics() {
-  const analyticsConsent  = useConsentStore((s) => s.analytics);
+  const analyticsConsent   = useConsentStore((s) => s.analytics);
   const advertisingConsent = useConsentStore((s) => s.advertising);
   const decided            = useConsentStore((s) => s.decided);
+  const setConsent         = useConsentStore((s) => s.setConsent);
   const pathname           = usePathname();
   const searchParams       = useSearchParams();
   const query              = searchParams?.toString() || '';
+  const user               = useAuthStore((s) => s.user);
 
-  const lastTrackedUrl = useRef<string | null>(null);
-  const isFirstRender  = useRef(true);
+  const lastTrackedUrl  = useRef<string | null>(null);
+  const prevDecided     = useRef(decided);
+  const isFirstRender   = useRef(true);
+
+  // ── Auto-grant analytics for authenticated users who haven't seen the banner
+  // Logged-in users bypass the cookie banner, so `decided` stays false and GA
+  // never fires for them. Grant analytics-only consent on their behalf (no ads).
+  useEffect(() => {
+    if (user && !decided) {
+      setConsent({ analytics: true, advertising: false });
+    }
+  }, [user, decided, setConsent]);
 
   // ── Consent Mode v2 updater ──────────────────────────────────────────────
-  // Hem mount anında (returning user) hem de consent değişince çalışır.
-  // Layout'taki default:'denied' üzerine kullanıcı tercihini yazar.
   useEffect(() => {
-    if (!decided) return; // Banner henüz görülmedi — default:'denied' geçerli
+    if (!decided) return;
     const adState: ConsentState = advertisingConsent ? 'granted' : 'denied';
     gtagConsentUpdate({
       analytics_storage  : analyticsConsent ? 'granted' : 'denied',
@@ -71,17 +82,23 @@ export default function GoogleAnalytics() {
   }, [decided, analyticsConsent, advertisingConsent]);
 
   // ── SPA page_view ─────────────────────────────────────────────────────────
-  // İlk render atlanır (duplicate önlemi). Sonraki route değişimlerinde
-  // analytics consent varsa page_view gönderilir.
+  // Also fires when consent is granted for the first time (catches the current
+  // page that was already loaded before the user accepted cookies).
   useEffect(() => {
     if (!analyticsConsent || !decided || !GA_ID) return;
     const url = pathname + (query ? `?${query}` : '');
 
-    if (isFirstRender.current) {
+    // First render: skip if NOT a fresh consent grant (duplicate prevention).
+    // But if decided just flipped from false → true, fire for the current page.
+    const justGranted = !prevDecided.current && decided;
+    prevDecided.current = decided;
+
+    if (isFirstRender.current && !justGranted) {
       isFirstRender.current = false;
       lastTrackedUrl.current = url;
       return;
     }
+    isFirstRender.current = false;
 
     if (lastTrackedUrl.current === url) return;
     lastTrackedUrl.current = url;
