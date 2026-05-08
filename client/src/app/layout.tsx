@@ -163,6 +163,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <script async src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} />
           </>
         )}
+        {/* Google AdSense — verification meta + async loader */}
+        <meta name="google-adsense-account" content="ca-pub-4025714961987754" />
+        {/* eslint-disable-next-line @next/next/no-before-interactive-script-outside-document */}
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4025714961987754"
+          crossOrigin="anonymous"
+        />
       </head>
       <body className={`${font.variable} font-sans`}>
         <Providers>

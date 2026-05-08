@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import {
   Heart, Bookmark, Share2, ExternalLink, Loader2, Play, ChevronRight,
-  RefreshCw, Copy, Check, X,
+  RefreshCw, Copy, Check, X, Trash2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -99,6 +99,10 @@ export default function SlideoViewer({
 
   // Heart double-tap animation
   const [heartAnim, setHeartAnim] = useState<{ id: number; x: number; y: number } | null>(null);
+
+  // Delete state
+  const [deletingSlideo, setDeletingSlideo] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Share fallback (shown when clipboard is blocked)
   const [showShareFallback, setShowShareFallback] = useState(false);
@@ -389,6 +393,28 @@ export default function SlideoViewer({
     setTimeout(() => setShareCopied(false), 2000);
   }, [slideo.id, slideo.title, user, feedVariant, feedSubjectKey]);
 
+  const handleDeleteSlideo = useCallback(async () => {
+    if (!confirmDelete) { setConfirmDelete(true); return; }
+    setDeletingSlideo(true);
+    try {
+      await api.delete(`/slideo/${slideo.id}`);
+      toast.success('Slideo silindi');
+      onNext();
+    } catch {
+      toast.error('Slideo silinemedi');
+    } finally {
+      setDeletingSlideo(false);
+      setConfirmDelete(false);
+    }
+  }, [confirmDelete, slideo.id, onNext]);
+
+  // Auto-reset confirmDelete after 3 seconds
+  useEffect(() => {
+    if (!confirmDelete) return;
+    const t = setTimeout(() => setConfirmDelete(false), 3000);
+    return () => clearTimeout(t);
+  }, [confirmDelete]);
+
   // ?? Keyboard shortcuts ??????????????????????????????????????????????????????
   useEffect(() => {
     if (!isActive) return;
@@ -645,6 +671,30 @@ export default function SlideoViewer({
             </div>
             <span className="text-[10px] text-white/85 font-black leading-none">Paylaş</span>
           </button>
+
+          {/* Delete — only for slideo owner or admin */}
+          {user && (user.id === slideo.user.id || (user as any).isAdmin) && (
+            <button
+              onClick={handleDeleteSlideo}
+              aria-label="Slideo'yu sil"
+              className="group flex flex-col items-center gap-1.5 min-w-[52px]"
+            >
+              <div className={cn(
+                'w-11 h-11 rounded-2xl flex items-center justify-center border backdrop-blur-md transition-all duration-200 active:scale-90 shadow-lg',
+                confirmDelete
+                  ? 'bg-red-500/50 border-red-300/70'
+                  : 'bg-black/55 border-white/20 group-hover:bg-red-500/30 group-hover:border-red-300/50',
+              )}>
+                {deletingSlideo
+                  ? <Loader2 className="w-[21px] h-[21px] text-white animate-spin" />
+                  : <Trash2 className="w-[21px] h-[21px] text-white" />
+                }
+              </div>
+              <span className="text-[10px] text-white/85 font-black leading-none">
+                {confirmDelete ? 'Emin?' : 'Sil'}
+              </span>
+            </button>
+          )}
         </div>
 
         {/* Bottom info bar */}
