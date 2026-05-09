@@ -46,6 +46,18 @@ function gtagConsentUpdate(params: ConsentParams) {
   }
 }
 
+/**
+ * Returns true when Google's Funding Choices CMP (AdSense panel) has registered
+ * a real __tcfapi implementation.  When active for EEA/UK users, the CMP manages
+ * all consent signals itself — we must NOT call gtag('consent','update') manually
+ * or we risk overriding the CMP's decision.
+ */
+function isGoogleCmpActive(): boolean {
+  if (typeof window === 'undefined') return false;
+  // Real TCF handler is a function; pre-stubs are arrays or undefined
+  return typeof (window as any).__tcfapi === 'function';
+}
+
 export default function GoogleAnalytics() {
   const analyticsConsent   = useConsentStore((s) => s.analytics);
   const advertisingConsent = useConsentStore((s) => s.advertising);
@@ -63,15 +75,18 @@ export default function GoogleAnalytics() {
   // ── Auto-grant analytics for authenticated users who haven't seen the banner
   // Logged-in users bypass the cookie banner, so `decided` stays false and GA
   // never fires for them. Grant analytics-only consent on their behalf (no ads).
+  // Skip when Google CMP is managing consent (EEA/UK users) — let CMP decide.
   useEffect(() => {
-    if (user && !decided) {
+    if (user && !decided && !isGoogleCmpActive()) {
       setConsent({ analytics: true, advertising: false });
     }
   }, [user, decided, setConsent]);
 
   // ── Consent Mode v2 updater ──────────────────────────────────────────────
+  // Skip if Google CMP is active — it calls gtag('consent','update') on its
+  // own; a duplicate call from us would override the CMP's decision.
   useEffect(() => {
-    if (!decided) return;
+    if (!decided || isGoogleCmpActive()) return;
     const adState: ConsentState = advertisingConsent ? 'granted' : 'denied';
     gtagConsentUpdate({
       analytics_storage  : analyticsConsent ? 'granted' : 'denied',

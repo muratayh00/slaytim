@@ -6,6 +6,23 @@ import { Shield, X, ChevronDown, ChevronUp, Check } from 'lucide-react';
 import { useConsentStore } from '@/store/consent';
 import { useAuthStore } from '@/store/auth';
 
+/**
+ * Returns true if Google's Funding Choices CMP (loaded via AdSense) has
+ * registered a real __tcfapi implementation for this user.
+ *
+ * Google CMP fires only for EEA/UK visitors. When active it registers
+ * window.__tcfapi as a *function* (the real TCF handler).  Before CMP loads,
+ * __tcfapi is either undefined or an array stub (queue pattern).
+ * We must NOT call our own gtag consent-update or show our banner while
+ * Google CMP is managing consent — they would conflict.
+ */
+function isGoogleCmpActive(): boolean {
+  if (typeof window === 'undefined') return false;
+  const api = (window as any).__tcfapi;
+  // Real implementation is a function; pre-stubs are arrays or undefined
+  return typeof api === 'function';
+}
+
 export default function CookieBanner() {
   const { user, isLoading } = useAuthStore();
   const {
@@ -24,12 +41,29 @@ export default function CookieBanner() {
   const [localAnalytics, setLocalAnalytics] = useState(analytics);
   const [localAds, setLocalAds] = useState(advertising);
 
+  // Detect Google CMP (Funding Choices) for EEA/UK users.
+  // If Google CMP is managing consent we must not show our own banner or
+  // call gtag('consent','update') — that would override their signals.
+  const [deferToGoogleCmp, setDeferToGoogleCmp] = useState(false);
+
+  useEffect(() => {
+    // Immediate check — covers returning EEA users where CMP may already be loaded
+    if (isGoogleCmpActive()) { setDeferToGoogleCmp(true); return; }
+
+    // Delayed checks — Google CMP loads async via the AdSense script (500-2 000 ms)
+    const t1 = setTimeout(() => { if (isGoogleCmpActive()) setDeferToGoogleCmp(true); }, 800);
+    const t2 = setTimeout(() => { if (isGoogleCmpActive()) setDeferToGoogleCmp(true); }, 2200);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
   useEffect(() => {
     setLocalAnalytics(analytics);
     setLocalAds(advertising);
   }, [analytics, advertising, panelOpen]);
 
   if (!hasHydrated || isLoading) return null;
+  // Google CMP is handling consent for this user (EEA/UK) — stay silent.
+  if (deferToGoogleCmp) return null;
   // Logged-in users: only show when panel is explicitly opened (they get
   // auto-consent via GoogleAnalytics component — no need to interrupt UX).
   if (user && !panelOpen) return null;
