@@ -3,13 +3,39 @@
  * All calls are fire-and-forget and should never block UI.
  */
 
+import { useConsentStore } from '@/store/consent';
+
 declare global {
   interface Window {
     gtag?: (...args: unknown[]) => void;
   }
 }
 
+/**
+ * Returns true only when the user has explicitly granted analytics consent
+ * and the Zustand store has been hydrated from localStorage.
+ *
+ * Uses Zustand's `getState()` — works outside React components, always
+ * returns the latest state without subscribing to updates.
+ *
+ * This gate prevents custom events from reaching gtag() when consent is
+ * not yet granted, which in turn reduces the number of g/collect requests
+ * that get blocked by AdBlock (and show as "POST failed" in console).
+ */
+function isAnalyticsGranted(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const { analytics: analyticsConsent, decided, hasHydrated } = useConsentStore.getState();
+    return hasHydrated && decided && analyticsConsent;
+  } catch {
+    return false; // store not ready
+  }
+}
+
 function track(eventName: string, params?: Record<string, unknown>) {
+  // Consent guard — skip silently if analytics not yet granted.
+  // Reduces g/collect POST requests that AdBlock would block and log to console.
+  if (!isAnalyticsGranted()) return;
   if (typeof window === 'undefined' || !window.gtag) return;
   try {
     window.gtag('event', eventName, params);
@@ -126,21 +152,21 @@ export const analytics = {
     mode: 'images' | 'pdf';
     tt_ms: number;
   }) => {
-    track('preview_first_visual', params);
-    // Also fire to backend for server-side aggregation
-    if (typeof window !== 'undefined') {
-      const body = JSON.stringify(params);
-      // Use sendBeacon so it doesn't block navigation
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon('/api/analytics/preview-metric', new Blob([body], { type: 'application/json' }));
-      } else {
-        fetch('/api/analytics/preview-metric', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body,
-          keepalive: true,
-        }).catch(() => { /* fire and forget */ });
-      }
+    track('preview_first_visual', params); // already consent-gated via track()
+    // Also fire to our own backend for server-side aggregation.
+    // Gate on the same analytics consent — this is behavioral tracking data.
+    if (!isAnalyticsGranted() || typeof window === 'undefined') return;
+    const body = JSON.stringify(params);
+    // Use sendBeacon so it doesn't block navigation
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/analytics/preview-metric', new Blob([body], { type: 'application/json' }));
+    } else {
+      fetch('/api/analytics/preview-metric', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true,
+      }).catch(() => { /* fire and forget */ });
     }
   },
 };
