@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { X, Upload, Loader2, CheckCircle } from 'lucide-react';
+import { X, Upload, Loader2, CheckCircle, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
@@ -110,6 +110,14 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
   const [savedConverted, setSavedConverted] = useState(false);
   const [coverPages, setCoverPages] = useState<Array<{ pageNumber: number; url: string }>>([]);
   const [coverPagesLoading, setCoverPagesLoading] = useState(false);
+  // true while background polling continues after first page shown
+  const [coverPollingMore, setCoverPollingMore] = useState(false);
+  // non-empty = permanent error (previewStatus='failed' or fatal fetch error)
+  const [coverPagesError, setCoverPagesError] = useState('');
+  // true when all retry attempts exhausted without a single page
+  const [coverPagesTimedOut, setCoverPagesTimedOut] = useState(false);
+  // number of times user clicked "Tekrar dene"
+  const [coverRetryCount, setCoverRetryCount] = useState(0);
   const [selectedCover, setSelectedCover] = useState<string | null>(null);
   const [coverError, setCoverError] = useState('');
 
@@ -157,51 +165,104 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
   });
 
   // Fetch preview pages for cover selection.
-  // Retry logic:
-  //   • 200 with pages        → done, show grid
-  //   • 200 with empty pages  → thumbnails still generating, retry
-  //   • 409                   → conversion still running (not done), retry — it will finish soon
-  //   • 404 / 403             → resource missing or forbidden, abort
-  //   • other errors          → transient, retry
+  //
+  // State machine:
+  //   409                               → conversion/PDF not ready yet → silent retry (no console error)
+  //   200 + previewStatus='failed' + 0  → permanent failure → set coverPagesError, stop
+  //   200 + 0 pages                     → preview worker not started yet → retry
+  //   200 + pages + previewStatus!='ready' → show partial grid, keep polling
+  //   200 + pages + previewStatus='ready'  → show full grid, stop
+  //   404 / 403                         → resource gone / forbidden → stop
+  //   5xx / network                     → transient → retry
+  //
+  // Key: validateStatus makes 409 a normal response (not a thrown error).
+  // This suppresses Axios error propagation for 409 → no red console errors.
   const fetchCoverPages = useCallback(async (id: number) => {
     setCoverPagesLoading(true);
-    const MAX_RETRIES = 20;  // up to 20 × 4 s = 80 s total wait
-    const RETRY_DELAY = 4_000;
+    setCoverPollingMore(false);
+    setCoverPagesError('');
+    setCoverPagesTimedOut(false);
+
+    const MAX_RETRIES = 25; // 25 × 3 s = 75 s total
+    const RETRY_DELAY = 3_000;
+
     let pages: Array<{ pageNumber: number; url: string }> = [];
     let firstPageShown = false;
+
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const res = await api.get(`/slides/${id}/preview-meta`);
-        const fetched = Array.isArray(res?.data?.pages) ? res.data.pages : [];
-        const previewStatus = res?.data?.previewStatus as string | undefined;
+        // Accept 200 and 409 as non-error status codes.
+        // 404 / 403 / 5xx will still throw → caught below.
+        const res = await api.get(`/slides/${id}/preview-meta`, {
+          validateStatus: (s) => s === 200 || s === 409,
+        });
+
+        if (res.status === 409) {
+          // Conversion or PDF fallback not ready — silent retry.
+          // No throw, no console error, just wait.
+          if (attempt < MAX_RETRIES) await new Promise((r) => setTimeout(r, RETRY_DELAY));
+          continue;
+        }
+
+        // ── 200 response ─────────────────────────────────────────────────
+        const fetched = Array.isArray(res.data?.pages) ? res.data.pages : [];
+        const previewStatus = res.data?.previewStatus as string | undefined;
+
+        // Permanent preview failure — worker exhausted all attempts
+        if (previewStatus === 'failed' && fetched.length === 0) {
+          setCoverPagesError(
+            'Kapak önizlemeleri oluşturulamadı. Slayt yüklendi — sayfandan kapak seçebilirsin.'
+          );
+          setCoverPagesLoading(false);
+          return;
+        }
+
         if (fetched.length > 0) {
           pages = fetched.slice(0, 12);
+          const isReady = previewStatus === 'ready';
+
           if (!firstPageShown) {
-            // İlk sayfa geldi: spinner'ı kapat, kullanıcı hemen seçim yapabilsin
+            // İlk sayfa geldi: spinner kapat, kullanıcı hemen seçebilsin
             setCoverPages(pages);
             setCoverPagesLoading(false);
+            setCoverPollingMore(!isReady);
             firstPageShown = true;
           } else {
-            // Sonraki poll'lar: grid'i sessizce güncelle
+            // Sonraki poll'lar: grid sessizce güncelle
             setCoverPages(pages);
+            setCoverPollingMore(!isReady);
           }
-          if (previewStatus === 'ready') break; // Tüm sayfalar hazır, poll dur
-          // previewStatus='processing' → daha fazla sayfa gelecek, bekle
+
+          if (isReady) break; // Tüm sayfalar hazır, poll dur
+          // previewStatus='processing' → daha fazla sayfa gelecek
         }
+        // fetched.length === 0 → worker henüz başlamadı → retry
+
       } catch (err: any) {
         const status = err?.response?.status;
-        if (status === 404 || status === 403) { break; } // resource gone, stop
-        // 409 = conversion still processing → wait and retry
-        // other errors (5xx, network) → retry
+        if (status === 404 || status === 403) break; // Kaynak yok/yasak — dur
+        // 5xx veya ağ hatası → geçici → retry
       }
-      if (attempt < MAX_RETRIES) {
-        await new Promise((r) => setTimeout(r, RETRY_DELAY));
-      }
+
+      if (attempt < MAX_RETRIES) await new Promise((r) => setTimeout(r, RETRY_DELAY));
     }
-    // Final: loading'i kapat ve son durumu yaz
-    setCoverPages(pages);
+
+    // Loop bitti — son durumu yaz
+    if (pages.length === 0) setCoverPagesTimedOut(true);
+    setCoverPollingMore(false);
+    setCoverPages(pages); // emin ol: en son state'i yaz
     setCoverPagesLoading(false);
   }, []);
+
+  // Called when user taps "Tekrar dene" in the cover phase
+  const retryFetchCoverPages = useCallback(() => {
+    if (!savedSlideId) return;
+    setCoverRetryCount((n) => n + 1);
+    setCoverPages([]);
+    setSelectedCover(null);
+    setCoverError('');
+    fetchCoverPages(savedSlideId);
+  }, [savedSlideId, fetchCoverPages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -407,48 +468,92 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
               Slaytının bir sayfasını kapak olarak seç — kartlarda gösterilecek.
             </p>
 
-            {/* Page thumbnail grid */}
-            {coverPagesLoading ? (
+            {/* ── State: waiting for first page ─────────────────────────── */}
+            {coverPagesLoading && (
               <div className="text-center py-10 space-y-3">
                 <Loader2 className="w-7 h-7 animate-spin text-primary mx-auto" />
-                <p className="text-sm font-medium text-foreground">Sayfalar hazırlanıyor…</p>
-                <p className="text-xs text-muted-foreground">
-                  Dönüşüm devam ediyor, az kaldı!
-                </p>
-              </div>
-            ) : coverPages.length > 0 ? (
-              <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1 scrollbar-thin">
-                {coverPages.map((page) => (
-                  <button
-                    key={page.pageNumber}
-                    type="button"
-                    onClick={() => { setSelectedCover(page.url); setCoverError(''); }}
-                    className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all focus-visible:ring-2 focus-visible:ring-primary ${
-                      selectedCover === page.url
-                        ? 'border-primary ring-2 ring-primary/30'
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={page.url} alt={`Sayfa ${page.pageNumber}`} className="w-full h-full object-cover" loading="lazy" />
-                    {selectedCover === page.url && (
-                      <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
-                        <CheckCircle className="w-5 h-5 text-primary drop-shadow" />
-                      </div>
-                    )}
-                    <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] px-1 py-0.5 rounded font-bold">
-                      {page.pageNumber}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              /* Pages never arrived — very large file or server issue */
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                <p>Sayfalar yüklenemedi. Lütfen daha sonra slayt sayfasından kapak seçebilirsin.</p>
+                <p className="text-sm font-medium text-foreground">Kapak sayfaları hazırlanıyor…</p>
+                <p className="text-xs text-muted-foreground">Dönüşüm devam ediyor, az kaldı!</p>
               </div>
             )}
 
+            {/* ── State: permanent preview failure ──────────────────────── */}
+            {!coverPagesLoading && coverPagesError && (
+              <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 space-y-2 text-center">
+                <p className="text-sm font-medium text-red-600 dark:text-red-400">{coverPagesError}</p>
+                <button
+                  type="button"
+                  onClick={retryFetchCoverPages}
+                  className="inline-flex items-center gap-1.5 text-xs text-primary font-medium hover:underline"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  Tekrar dene
+                </button>
+              </div>
+            )}
+
+            {/* ── State: timed out — no pages arrived ───────────────────── */}
+            {!coverPagesLoading && !coverPagesError && coverPagesTimedOut && coverPages.length === 0 && (
+              <div className="rounded-xl border border-border/60 bg-muted/30 p-5 space-y-3 text-center">
+                <p className="text-sm font-medium text-foreground">Sayfalar şu an hazır değil.</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Dönüşüm arka planda devam ediyor. Birkaç saniye bekleyip tekrar deneyebilirsin.
+                </p>
+                <button
+                  type="button"
+                  onClick={retryFetchCoverPages}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Tekrar dene
+                </button>
+                {coverRetryCount >= 2 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Kapak daha sonra slayt sayfasından da seçilebilir.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* ── State: pages available (partial or complete) ───────────── */}
+            {coverPages.length > 0 && (
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1 scrollbar-thin">
+                  {coverPages.map((page) => (
+                    <button
+                      key={page.pageNumber}
+                      type="button"
+                      onClick={() => { setSelectedCover(page.url); setCoverError(''); }}
+                      className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all focus-visible:ring-2 focus-visible:ring-primary ${
+                        selectedCover === page.url
+                          ? 'border-primary ring-2 ring-primary/30'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={page.url} alt={`Sayfa ${page.pageNumber}`} className="w-full h-full object-cover" loading="lazy" />
+                      {selectedCover === page.url && (
+                        <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
+                          <CheckCircle className="w-5 h-5 text-primary drop-shadow" />
+                        </div>
+                      )}
+                      <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] px-1 py-0.5 rounded font-bold">
+                        {page.pageNumber}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {/* Background polling indicator — more pages loading */}
+                {coverPollingMore && (
+                  <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                    <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                    Daha fazla sayfa yükleniyor…
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Validation error (must pick a page) */}
             {coverError && (
               <p className="text-sm text-red-500 font-medium">{coverError}</p>
             )}
@@ -462,15 +567,50 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
               >
                 İptal
               </button>
-              <button
-                type="button"
-                onClick={handleCoverConfirm}
-                disabled={loading || coverPagesLoading}
-                className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition disabled:opacity-60 flex items-center justify-center gap-2 text-sm"
-              >
-                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                {coverPages.length === 0 && !coverPagesLoading ? 'Tamam' : 'Devam Et'}
-              </button>
+
+              {/* Primary action button — adapts to cover phase state */}
+              {coverPagesLoading && coverPages.length === 0 ? (
+                /* Still waiting for first page — can't proceed yet */
+                <button
+                  type="button"
+                  disabled
+                  className="flex-1 py-3 rounded-xl bg-primary/40 text-white font-bold text-sm cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Hazırlanıyor…
+                </button>
+              ) : coverPages.length > 0 ? (
+                /* Pages loaded — must select one */
+                <button
+                  type="button"
+                  onClick={handleCoverConfirm}
+                  disabled={loading}
+                  className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition disabled:opacity-60 flex items-center justify-center gap-2 text-sm"
+                >
+                  {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Devam Et
+                </button>
+              ) : coverRetryCount >= 2 ? (
+                /* Timed out and user retried multiple times — allow bypass */
+                <button
+                  type="button"
+                  onClick={handleCoverConfirm}
+                  disabled={loading}
+                  className="flex-1 py-3 rounded-xl bg-muted border border-border text-muted-foreground font-medium hover:text-foreground hover:bg-muted/80 transition disabled:opacity-60 flex items-center justify-center gap-2 text-sm"
+                >
+                  {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Kapaksız Yükle
+                </button>
+              ) : (
+                /* Timed out — nudge to retry first */
+                <button
+                  type="button"
+                  disabled
+                  className="flex-1 py-3 rounded-xl bg-primary/40 text-white font-bold text-sm cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  Tekrar dene →
+                </button>
+              )}
             </div>
           </div>
         ) : (
