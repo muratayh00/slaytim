@@ -103,14 +103,22 @@ async function putLocalFile(filePath, key, contentType) {
     throw new Error('Could not resolve upload path for local storage.');
   }
   const body = await fs.promises.readFile(filePath);
-  await c.send(
-    new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-      Body: body,
-      ContentType: contentType || undefined,
-    }),
-  );
+  // 30-second abort: prevents indefinite hang when S3/R2 is slow or unreachable.
+  const controller = new AbortController();
+  const uploadTimer = setTimeout(() => controller.abort(), 30_000);
+  try {
+    await c.send(
+      new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: key,
+        Body: body,
+        ContentType: contentType || undefined,
+      }),
+      { abortSignal: controller.signal },
+    );
+  } finally {
+    clearTimeout(uploadTimer);
+  }
   return `/uploads/${String(key).replace(/^\/+/, '')}`;
 }
 
@@ -134,14 +142,22 @@ async function putBuffer(buffer, key, contentType) {
     await fs.promises.writeFile(localPath, buffer);
     return toUploadsUrl(localPath);
   }
-  await c.send(
-    new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-      Body: buffer,
-      ContentType: contentType || undefined,
-    }),
-  );
+  // 30-second abort on remote upload (same as putLocalFile).
+  const ctrl = new AbortController();
+  const bufTimer = setTimeout(() => ctrl.abort(), 30_000);
+  try {
+    await c.send(
+      new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType || undefined,
+      }),
+      { abortSignal: ctrl.signal },
+    );
+  } finally {
+    clearTimeout(bufTimer);
+  }
   return `/uploads/${String(key).replace(/^\/+/, '')}`;
 }
 

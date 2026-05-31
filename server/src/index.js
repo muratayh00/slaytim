@@ -72,6 +72,15 @@ const seoPagesRoutes = require('./routes/seo-pages');
 
 const app = express();
 const server = http.createServer(app);
+
+// ── HTTP keep-alive tuning ────────────────────────────────────────────────────
+// Node.js default keepAliveTimeout = 5s, Nginx upstream keepalive_timeout = 75s.
+// Mismatch: Nginx sends a new request on an existing connection that Node has
+// already silently closed → client receives ECONNRESET / 502 Bad Gateway.
+// Fix: Node must hold connections open longer than the upstream proxy.
+server.keepAliveTimeout = 75_000; // 75 s — matches Nginx keepalive_timeout
+server.headersTimeout   = 80_000; // must be > keepAliveTimeout
+
 const PORT = process.env.PORT || 5000;
 const TRUST_PROXY = process.env.TRUST_PROXY;
 // E2E_DISABLE_RATE_LIMIT is only honoured outside production.
@@ -241,19 +250,21 @@ app.use((req, res, next) => {
   next();
 });
 
-// Request logger
+// Request logger with slow-request thresholds
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
-    const ms = Date.now() - start;
-    const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
-    logger[level](`${req.method} ${req.url} ${res.statusCode} ${ms}ms`, {
-      method: req.method,
-      url: req.url,
-      status: res.statusCode,
-      ms,
-      ip: req.ip,
-    });
+    const ms  = Date.now() - start;
+    const base = { method: req.method, url: req.url, status: res.statusCode, ms, ip: req.ip };
+    const msg  = `${req.method} ${req.url} ${res.statusCode} ${ms}ms`;
+    if (ms > 5_000) {
+      logger.warn(`[SLOW REQUEST] ${msg}`, base);
+    } else if (ms > 1_000) {
+      logger.warn(`[SLOW] ${msg}`, base);
+    } else {
+      const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
+      logger[level](msg, base);
+    }
   });
   next();
 });

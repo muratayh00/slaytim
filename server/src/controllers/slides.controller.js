@@ -707,11 +707,15 @@ const create = async (req, res) => {
       return res.status(400).json({ error: 'Gecerli topicId zorunlu' });
     }
 
-    const fileUrl = await putLocalFile(
-      req.file.path,
-      `slides/${req.file.filename}`,
-      req.file.mimetype,
-    );
+    // ── Early-response: skip blocking R2 upload ─────────────────────────────
+    // Remote mode: use the local multer path as a temporary fileUrl.
+    //   The conversion worker picks this up, uploads to R2 as its first step,
+    //   then updates slide.fileUrl in the DB before proceeding with conversion.
+    //   This drops the 201 response time from 10-60 s → ~300 ms.
+    // Local mode: putLocalFile is instant (just maps the path), behaviour unchanged.
+    const fileUrl = isRemoteEnabled()
+      ? `/uploads/slides/${req.file.filename}`
+      : await putLocalFile(req.file.path, `slides/${req.file.filename}`, req.file.mimetype);
 
     const topic = await prisma.topic.findUnique({
       where: { id: topicIdNum },
@@ -800,9 +804,17 @@ const create = async (req, res) => {
       actorUserId: req.user.id,
       slideTitle: title,
     });
-    // Only delete the local temp file if it was already uploaded to remote storage (S3/R2).
-    // With local storage the file in uploads/slides/ IS the source — deleting it breaks conversion.
-    if (isRemoteEnabled()) cleanupUploadedFile(req.file);
+    // Local file cleanup is now handled by conversion.service after it promotes
+    // the file to R2 (pre-step at the start of convertSlide).
+    // In local mode the file in uploads/slides/ IS the permanent source — never delete it.
+    logger.info('[upload] Slide accepted, queued for conversion', {
+      slideId: slide.id,
+      fileSize: req.file?.size,
+      mimeType: req.file?.mimetype,
+      filename: req.file?.filename,
+      remoteMode: isRemoteEnabled(),
+      enqueueError: enqueueError || null,
+    });
     checkBadges(req.user.id).catch(() => {});
     const uploadHour = new Date().getHours();
     if (uploadHour >= 0 && uploadHour < 5) {
@@ -1542,11 +1554,50 @@ const updateThumbnail = async (req, res) => {
     if (slide.userId !== req.user.id && !req.user.isAdmin) {
       return res.status(403).json({ error: 'Forbidden' });
     }
+
+    const { imageDataUrl, thumbnailUrl: rawThumbnailUrl } = req.body || {};
+
+    // ── Path A: Direct URL from preview-meta (cover page selection) ────────────
+    // The upload modal fetches preview page URLs from /preview-meta and sends the
+    // chosen URL as `thumbnailUrl`. We canonicalize it to an /uploads/ path and
+    // save it directly — no re-upload needed.
+    // Note: conversionStatus check is intentionally skipped here because the URL
+    // was already served by preview-meta (proof that the asset exists).
+    if (rawThumbnailUrl && typeof rawThumbnailUrl === 'string') {
+      const canonical = toCanonicalMediaUrl(rawThumbnailUrl) || rawThumbnailUrl;
+      // Basic safety: must look like a media asset path, not an arbitrary URL.
+      const ALLOWED_PATH_RE = /\/(?:previews|thumbnails|pdfs|slides)\//i;
+      if (!ALLOWED_PATH_RE.test(canonical)) {
+        return res.status(422).json({
+          code: 'INVALID_THUMBNAIL_URL',
+          error: 'Geçersiz kapak görseli URL\'i.',
+        });
+      }
+
+      const updated = await prisma.slide.update({
+        where: { id: slideId },
+        data: { thumbnailUrl: canonical },
+        select: slideSelect,
+      });
+
+      // Clean up old thumbnail if it differs (best-effort)
+      const previous = slide.thumbnailUrl ? toCanonicalMediaUrl(slide.thumbnailUrl) : null;
+      const next = toCanonicalMediaUrl(canonical);
+      if (previous && next && previous !== next && /\/thumbnails\//.test(previous)) {
+        deleteStoredObject(previous).catch(() => {});
+      }
+
+      return res.json(normalizeSlideMedia(updated));
+    }
+
+    // ── Path B: Base64 image data URL (legacy / custom cover upload) ──────────
+    // For this path we still require conversion to be done, because the caller
+    // is uploading a new image blob (e.g., the slide detail page "set cover"
+    // button) and we need the slide to be in a stable state first.
     if (slide.conversionStatus !== 'done') {
       return res.status(409).json({ error: 'Slide preview is not ready yet' });
     }
 
-    const { imageDataUrl } = req.body || {};
     const decoded = decodeDataUrlImage(imageDataUrl);
     if (!decoded) {
       return res.status(422).json({

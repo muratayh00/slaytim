@@ -25,6 +25,35 @@ const CAT_ICONS: Record<string, string> = {
   'bilim': 'B', 'sanat-kultur': 'S',
 };
 
+/**
+ * Display-only Turkish character corrections.
+ * Slugs and routes are never touched — only what the user sees in chips.
+ */
+const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
+  'ogrenme': 'Öğrenme',
+  'kisisel-gelisim': 'Kişisel Gelişim',
+  'kisisel': 'Kişisel',
+  'gelistirme': 'Geliştirme',
+  'yazilim-gelistirme': 'Yazılım Geliştirme',
+  'tasarimi': 'Tasarımı',
+  'iletisim': 'İletişim',
+  'cografya': 'Coğrafya',
+  'hazirlama': 'Hazırlama',
+  'sunum-hazirlama': 'Sunum Hazırlama',
+  'yonetim': 'Yönetim',
+  'proje-yonetimi': 'Proje Yönetimi',
+  'bilisim': 'Bilişim',
+  'muhendisligi': 'Mühendisliği',
+  'muhendislik': 'Mühendislik',
+  'yatirim': 'Yatırım',
+  'girisimcilik': 'Girişimcilik',
+  'is-girisimcilik': 'İş & Girişimcilik',
+};
+
+function getCatDisplayName(cat: { slug: string; name: string }): string {
+  return CATEGORY_DISPLAY_NAMES[cat.slug] ?? cat.name;
+}
+
 interface HomeClientProps {
   initialTrending?: any[];
   initialLatest?: any[];
@@ -199,7 +228,7 @@ export default function HomeClient({
         <div className="bg-background">
           <div className="max-w-6xl mx-auto px-5 py-3">
             <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
-              {[{ id: 0, slug: '', name: 'Tümü' }, ...categories].map((cat) => (
+              {[{ id: 0, slug: '', name: 'Tümü' }, ...categories.filter((c) => ((c as any)._count?.topics ?? 0) > 0)].map((cat) => (
                 <button
                   key={cat.id}
                   onClick={() => {
@@ -215,7 +244,7 @@ export default function HomeClient({
                   }`}
                 >
                   {cat.slug ? <span>{CAT_ICONS[cat.slug] || 'K'}</span> : null}
-                  {cat.name}
+                  {getCatDisplayName(cat)}
                   {cat.slug && <span className="text-[10px] opacity-70">{(cat as any)._count?.topics ?? 0}</span>}
                 </button>
               ))}
@@ -339,7 +368,7 @@ export default function HomeClient({
               </div>
 
               <div className="flex gap-2 flex-wrap mb-5 pb-4 border-b border-border/50">
-                {[{ slug: '', name: 'Tümü' }, ...categories].map((cat) => (
+                {[{ slug: '', name: 'Tümü' }, ...categories.filter((c) => ((c as any)._count?.topics ?? 0) > 0)].map((cat) => (
                   <button
                     key={cat.slug}
                     onClick={() => loadByCategory(cat.slug)}
@@ -349,7 +378,7 @@ export default function HomeClient({
                         : 'bg-muted text-muted-foreground hover:bg-secondary hover:text-foreground'
                     }`}
                   >
-                    {cat.name}
+                    {getCatDisplayName(cat)}
                   </button>
                 ))}
               </div>
@@ -401,6 +430,45 @@ export default function HomeClient({
           </>
         )}
       </div>
+
+      {/* ── SEO Platform Description ──────────────────────────────────────────
+          Görünür metin blok — arama motorları için içerik zenginliği sağlar.
+          Kullanıcıya da faydalı: platformu tanıtır.
+      ─────────────────────────────────────────────────────────────────────── */}
+      <section className="border-t border-border/40 bg-muted/30">
+        <div className="max-w-4xl mx-auto px-5 py-12">
+          <h2 className="text-xl font-bold mb-3">Slaytim Nedir?</h2>
+          <p className="text-muted-foreground leading-relaxed mb-6 text-[15px]">
+            Slaytim, öğrencilerin, eğitimcilerin ve profesyonellerin PowerPoint ve PPTX sunumlarını
+            paylaşabildiği, keşfedebildiği ve tartışabildiği ücretsiz bir slayt paylaşım platformudur.
+            Eğitim, teknoloji, iş dünyası, tasarım ve daha onlarca kategoride binlerce slayta ulaşabilir,
+            kendi sunumlarını topluluğa açabilirsin.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div>
+              <h3 className="font-semibold mb-2 text-[15px]">Slideo Nedir?</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Slideo, slaytlarından oluşturulan kısa dikey içerik akışıdır. Tıpkı bir keşif
+                akışı gibi eğitici slayt sayfalarını hızla gezebilir, beğenebilir ve paylaşabilirsin.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2 text-[15px]">Nasıl Kullanılır?</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                PPT veya PPTX dosyanı yükle, otomatik PDF önizlemesi oluşturulsun, konulara ekle ve
+                topluluğunla paylaş. Ücretsiz hesap oluşturmak yalnızca birkaç saniye sürer.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2 text-[15px]">Kimler İçin?</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Öğrenciler, öğretmenler, araştırmacılar ve sunum hazırlayan herkes için.
+                Bilgini paylaş, başkalarının deneyimlerinden öğren.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

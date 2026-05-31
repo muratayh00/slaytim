@@ -117,9 +117,14 @@ async function validateMagicBytes(req, res, next) {
     }
 
     if (ext === '.pdf') {
-      const raw = fs.readFileSync(req.file.path);
+      const raw = await fs.promises.readFile(req.file.path); // async — avoids blocking the event loop
       try {
-        const parsed = await pdfParse(raw);
+        const parsed = await Promise.race([
+          pdfParse(raw),
+          new Promise((_, rej) =>
+            setTimeout(() => rej(new Error('pdf_parse_timeout')), 10_000)
+          ),
+        ]);
         const pages = Number(parsed?.numpages || 0);
         if (!Number.isInteger(pages) || pages <= 0) {
           throw new Error('no_pages');

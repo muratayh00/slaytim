@@ -587,8 +587,43 @@ async function enqueueSlideConversion(slideId) {
 }
 
 async function convertSlide(slideId) {
-  const slide = await prisma.slide.findUnique({ where: { id: slideId } });
+  let slide = await prisma.slide.findUnique({ where: { id: slideId } });
   if (!slide?.fileUrl) throw new Error('Slide file not found');
+
+  // ── R2 Promote Pre-step ───────────────────────────────────────────────────
+  // The upload controller now responds 201 BEFORE uploading to R2.
+  // If fileUrl still points to a local temp path and remote storage is enabled,
+  // upload the original file to R2 first, update the DB record, then proceed.
+  // The local slide variable keeps the original path so inputPath below still
+  // resolves to the existing local file — no redundant R2 download is needed.
+  let promotedLocalPath = null;
+
+  if (slide.fileUrl?.startsWith('/uploads/slides/') && isRemoteEnabled()) {
+    const localFilePath = path.join(UPLOADS_DIR, slide.fileUrl.replace(/^\/uploads\//, ''));
+    if (fs.existsSync(localFilePath)) {
+      try {
+        const filename   = path.basename(localFilePath);
+        const extForR2   = path.extname(localFilePath).toLowerCase();
+        const mimeForR2  = extForR2 === '.pdf'
+          ? 'application/pdf'
+          : extForR2 === '.pptx'
+            ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+            : 'application/vnd.ms-powerpoint';
+        const remoteUrl  = await putLocalFile(localFilePath, `slides/${filename}`, mimeForR2);
+        await prisma.slide.update({ where: { id: slideId }, data: { fileUrl: remoteUrl } });
+        promotedLocalPath = localFilePath; // cleaned up in finally block
+        logger.info('[conversion] Original file promoted to R2', { slideId, remoteUrl });
+        // Keep slide.fileUrl as local path so inputPath (below) uses existing local file.
+        // DB already has the R2 URL for downloads and future re-processing.
+      } catch (err) {
+        logger.warn('[conversion] R2 promote failed (non-fatal, continuing with local file)', {
+          slideId,
+          error: err?.message,
+        });
+      }
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   const sourceIsRemote = /^https?:\/\//i.test(slide.fileUrl);
   const sourcePathForExt = sourceIsRemote ? new URL(slide.fileUrl).pathname : slide.fileUrl;
@@ -821,6 +856,10 @@ async function convertSlide(slideId) {
   } finally {
     if (tempInputPath && fs.existsSync(tempInputPath)) {
       try { fs.unlinkSync(tempInputPath); } catch {}
+    }
+    // Clean up the original local file after it has been promoted to R2.
+    if (promotedLocalPath && fs.existsSync(promotedLocalPath)) {
+      try { fs.unlinkSync(promotedLocalPath); } catch {}
     }
   }
 }

@@ -301,6 +301,7 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
       fd.append('topicId', String(topicId));
 
       const { data } = await api.post('/slides', fd, {
+        timeout: 120_000, // 2 dk: yavaş bağlantılarda dosya transferi için
         onUploadProgress: (ev) => {
           const total = ev.total || file.size || 0;
           if (!total) return;

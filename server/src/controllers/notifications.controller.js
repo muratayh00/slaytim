@@ -119,41 +119,61 @@ const markRead = async (req, res) => {
 };
 
 const stream = async (req, res) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
+  let headersCommitted = false;
 
+  try {
+    // ── SSE headers ────────────────────────────────────────────────────────────
+    // X-Accel-Buffering: no  → tells Nginx to stream bytes immediately instead
+    // of buffering the whole response.  Without this the client receives an
+    // empty body (ERR_EMPTY_RESPONSE) because Nginx holds data until the
+    // connection closes.
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // ← critical for Nginx
     res.flushHeaders?.();
+    headersCommitted = true;
+
+    // Immediately confirm connection — EventSource opens before any DB work.
+    res.write(': connected\n\n');
 
     registerSseClient(userId, res);
 
-    const unread = await prisma.notification.count({
-      where: { userId, isRead: false },
-    });
-    res.write('retry: 5000\n');
-    res.write(`id: unread_${Date.now()}\n`);
-    res.write(`event: unread_count\n`);
-    res.write(`data: ${JSON.stringify({
-      type: 'unread_count',
-      id: `unread_${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      data: { count: unread },
-    })}\n\n`);
-
+    // 25-second heartbeat keeps the TCP connection alive through idle proxies.
     const keepAlive = setInterval(() => {
-      res.write(`: keep-alive\n\n`);
+      try { res.write(': ping\n\n'); } catch { clearInterval(keepAlive); }
     }, 25_000);
 
     req.on('close', () => {
       clearInterval(keepAlive);
       unregisterSseClient(userId, res);
-      res.end();
+      try { res.end(); } catch {}
     });
+
+    // Fetch & push initial unread count after registering (so no events are missed).
+    const unread = await prisma.notification.count({
+      where: { userId, isRead: false },
+    });
+    const ts = Date.now();
+    res.write('retry: 5000\n');
+    res.write(`id: unread_${ts}\n`);
+    res.write(`event: unread_count\n`);
+    res.write(`data: ${JSON.stringify({
+      type: 'unread_count',
+      id: `unread_${ts}`,
+      createdAt: new Date().toISOString(),
+      data: { count: unread },
+    })}\n\n`);
   } catch (err) {
-    logger.error('SSE stream setup failed', { error: err.message, stack: err.stack });
-    res.status(401).json({ error: 'Invalid or expired token' });
+    logger.error('SSE stream error', { userId, error: err.message, stack: err.stack });
+    // Headers already committed → cannot send JSON; just end the stream.
+    if (headersCommitted) {
+      try { res.end(); } catch {}
+    } else {
+      res.status(500).json({ error: 'Stream setup failed' });
+    }
+    unregisterSseClient(userId, res);
   }
 };
 
