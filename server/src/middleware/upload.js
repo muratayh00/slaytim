@@ -2,6 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const pdfParse = require('../lib/pdf-parse');
+const logger = require('../lib/logger');
 
 // Allowed MIME types for presentations
 const ALLOWED_MIME_TYPES = [
@@ -41,30 +42,64 @@ class UploadValidationError extends Error {
   }
 }
 
+// ── Shared log helper ─────────────────────────────────────────────────────────
+// All upload-middleware log lines share this structure so grep/filter is easy:
+//   pm2 logs slaytim-api | grep '\[upload-mw\]'
+function mwLog(level, stage, req, file, extra = {}) {
+  const f = file || req?.file;
+  logger[level](`[upload-mw] ${stage}`, {
+    requestId: req?._uploadRequestId,
+    originalname: f?.originalname,
+    size: f?.size,
+    mimetype: f?.mimetype,
+    path: f?.path,
+    elapsedMs: req?._uploadMwStart ? Date.now() - req._uploadMwStart : undefined,
+    ...extra,
+  });
+}
+
+// ── diskStorage with timing ───────────────────────────────────────────────────
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
+    // Stamp the request the first time multer touches it.
+    if (!req._uploadMwStart) {
+      req._uploadMwStart = Date.now();
+      req._uploadRequestId = `ul-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+    mwLog('info', 'multer destination start', req, file);
+
     const dir = path.join(__dirname, '../../uploads/slides');
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+    mwLog('info', 'multer destination resolved', req, file, { dir });
     cb(null, dir);
   },
   filename: (req, file, cb) => {
     const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
     const ext = path.extname(file.originalname).toLowerCase();
     const safeExt = ALLOWED_EXTENSIONS.includes(ext) ? ext : '';
-    cb(null, `${unique}${safeExt}`);
+    const name = `${unique}${safeExt}`;
+
+    mwLog('info', 'multer filename generated', req, file, { generatedName: name });
+    cb(null, name);
   },
 });
 
+// ── fileFilter with logging ───────────────────────────────────────────────────
 const fileFilter = (req, file, cb) => {
   const ext = path.extname(file.originalname).toLowerCase();
   const mimeAllowed = ALLOWED_MIME_TYPES.includes(file.mimetype);
   const genericMime = GENERIC_MIME_TYPES.includes(file.mimetype);
   const extAllowed = ALLOWED_EXTENSIONS.includes(ext);
 
+  mwLog('info', 'fileFilter check', req, file, { ext, mimeAllowed, genericMime, extAllowed });
+
   // Some clients send .ppt/.pptx with generic MIME; magic-byte validation still enforces real type.
   if (extAllowed && (mimeAllowed || genericMime)) {
+    mwLog('info', 'fileFilter accepted', req, file);
     cb(null, true);
   } else {
+    mwLog('warn', 'fileFilter rejected', req, file, { reason: 'UNSUPPORTED_FILE_TYPE' });
     cb(
       new UploadValidationError(
         'UNSUPPORTED_FILE_TYPE',
@@ -88,10 +123,19 @@ const upload = multer({
 async function validateMagicBytes(req, res, next) {
   if (!req.file) return next();
 
+  // Ensure timing baseline exists even if fileFilter ran before storage stamped req
+  if (!req._uploadMwStart) req._uploadMwStart = Date.now();
+  if (!req._uploadRequestId) {
+    req._uploadRequestId = `ul-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  mwLog('info', 'validateMagicBytes start', req, req.file);
+
   const ext = path.extname(req.file.originalname).toLowerCase();
   const signature = MAGIC_BYTES[ext];
 
   if (!signature) {
+    mwLog('warn', 'validateMagicBytes unsupported extension', req, req.file, { ext });
     cleanupUploadedFile(req.file);
     return res.status(UPLOAD_ERROR_STATUS.UNSUPPORTED_SIGNATURE).json({
       code: 'UNSUPPORTED_SIGNATURE',
@@ -109,6 +153,7 @@ async function validateMagicBytes(req, res, next) {
 
     const valid = signature.bytes.every((byte, i) => buf[i] === byte);
     if (!valid) {
+      mwLog('warn', 'validateMagicBytes magic byte mismatch', req, req.file, { ext });
       cleanupUploadedFile(req.file);
       return res.status(UPLOAD_ERROR_STATUS.MAGIC_BYTE_MISMATCH).json({
         code: 'MAGIC_BYTE_MISMATCH',
@@ -116,7 +161,14 @@ async function validateMagicBytes(req, res, next) {
       });
     }
 
+    mwLog('info', 'validateMagicBytes magic bytes ok', req, req.file, { ext });
+
     if (ext === '.pdf') {
+      mwLog('info', 'validateMagicBytes pdf parse start', req, req.file, {
+        fileSizeBytes: req.file.size,
+      });
+      const pdfParseStart = Date.now();
+
       const raw = await fs.promises.readFile(req.file.path); // async — avoids blocking the event loop
       try {
         const parsed = await Promise.race([
@@ -126,10 +178,18 @@ async function validateMagicBytes(req, res, next) {
           ),
         ]);
         const pages = Number(parsed?.numpages || 0);
+        mwLog('info', 'validateMagicBytes pdf parse finish', req, req.file, {
+          pages,
+          parseDurationMs: Date.now() - pdfParseStart,
+        });
         if (!Number.isInteger(pages) || pages <= 0) {
           throw new Error('no_pages');
         }
-      } catch {
+      } catch (pdfErr) {
+        mwLog('warn', 'validateMagicBytes pdf parse failed', req, req.file, {
+          reason: pdfErr?.message,
+          parseDurationMs: Date.now() - pdfParseStart,
+        });
         cleanupUploadedFile(req.file);
         return res.status(UPLOAD_ERROR_STATUS.INVALID_PDF_STRUCTURE).json({
           code: 'INVALID_PDF_STRUCTURE',
@@ -141,6 +201,7 @@ async function validateMagicBytes(req, res, next) {
     if (fd != null) {
       try { fs.closeSync(fd); } catch {}
     }
+    mwLog('error', 'validateMagicBytes io error', req, req.file, { error: err?.message });
     cleanupUploadedFile(req.file);
     return res.status(UPLOAD_ERROR_STATUS.VALIDATION_IO_ERROR).json({
       code: 'VALIDATION_IO_ERROR',
@@ -148,6 +209,7 @@ async function validateMagicBytes(req, res, next) {
     });
   }
 
+  mwLog('info', 'validateMagicBytes next called', req, req.file);
   next();
 }
 

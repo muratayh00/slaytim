@@ -690,6 +690,44 @@ const getCreatorInsights = async (req, res) => {
 };
 
 const create = async (req, res) => {
+  // ── Timing baseline ────────────────────────────────────────────────────────
+  // t0 = the moment the handler is invoked (after all middleware finished).
+  // All subsequent log lines include elapsedMs so the slow step is immediately
+  // visible with:  pm2 logs slaytim-api | grep '\[upload\]'
+  const t0 = Date.now();
+  const requestId = req._uploadRequestId || `h-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const elapsed = () => Date.now() - t0;
+
+  logger.info('[upload] Handler entered', {
+    requestId,
+    userId: req.user?.id,
+    filename: req.file?.originalname,
+    fileSize: req.file?.size,
+    mimetype: req.file?.mimetype,
+    mwElapsedMs: req._uploadMwStart ? Date.now() - req._uploadMwStart : null,
+  });
+
+  // Detect client disconnect before we send a response (e.g. axios 120s timeout fires)
+  req.on('close', () => {
+    if (!res.headersSent) {
+      logger.warn('[upload] Client disconnected — no response sent yet', {
+        requestId,
+        userId: req.user?.id,
+        elapsedMs: elapsed(),
+        filename: req.file?.originalname,
+      });
+    }
+  });
+
+  // Log total time + status code on finish (only fires when response IS sent)
+  res.on('finish', () => {
+    logger.info('[upload] Response sent', {
+      requestId,
+      statusCode: res.statusCode,
+      elapsedMs: elapsed(),
+    });
+  });
+
   try {
     if (!req.file) return res.status(400).json({ error: 'File is required' });
 
@@ -717,31 +755,38 @@ const create = async (req, res) => {
       ? `/uploads/slides/${req.file.filename}`
       : await putLocalFile(req.file.path, `slides/${req.file.filename}`, req.file.mimetype);
 
+    // ── Topic lookup ─────────────────────────────────────────────────────────
+    logger.info('[upload] Topic lookup start', { requestId, topicIdNum, elapsedMs: elapsed() });
     const topic = await prisma.topic.findUnique({
       where: { id: topicIdNum },
       select: { id: true, roomId: true },
     });
+    logger.info('[upload] Topic lookup done', { requestId, found: Boolean(topic), elapsedMs: elapsed() });
+
     if (!topic) {
       cleanupUploadedFile(req.file);
       return res.status(404).json({ error: 'Topic not found' });
     }
 
+    // ── Room membership check ────────────────────────────────────────────────
     if (topic.roomId) {
+      logger.info('[upload] Room membership check start', { requestId, roomId: topic.roomId, elapsedMs: elapsed() });
       const membership = await prisma.roomMember.findUnique({
         where: { roomId_userId: { roomId: topic.roomId, userId: req.user.id } },
         select: { roomId: true },
       });
+      logger.info('[upload] Room membership check done', { requestId, isMember: Boolean(membership), elapsedMs: elapsed() });
       if (!membership) {
         cleanupUploadedFile(req.file);
         return res.status(403).json({ error: 'Bu oda konusuna slayt yuklemek icin odaya katilmalisin' });
       }
     }
 
+    // ── Slide DB create ──────────────────────────────────────────────────────
     // Optimistic-insert loop: generates a slug, tries to insert, retries on the rare
     // P2002 unique-constraint violation that can still occur if two requests race
     // through uniqueSlug simultaneously and land on the same value.
-    // uniqueSlug already uses random suffixes to make this astronomically unlikely,
-    // but this loop closes the remaining TOCTOU window with zero chance of a 500.
+    logger.info('[upload] Slide DB create start', { requestId, elapsedMs: elapsed() });
     let slide;
     {
       const baseTitle = toSlug(title);
@@ -771,12 +816,22 @@ const create = async (req, res) => {
         }
       }
     }
+    logger.info('[upload] Slide DB create done', { requestId, slideId: slide.id, elapsedMs: elapsed() });
 
+    // ── Redis/BullMQ enqueue ─────────────────────────────────────────────────
+    logger.info('[upload] Enqueue start', { requestId, slideId: slide.id, elapsedMs: elapsed() });
     let enqueueError = null;
     try {
       await enqueueSlideConversion(slide.id);
+      logger.info('[upload] Enqueue done', { requestId, slideId: slide.id, elapsedMs: elapsed() });
     } catch (err) {
       enqueueError = String(err?.message || 'Conversion enqueue failed').slice(0, 500);
+      logger.warn('[upload] Enqueue failed — marking slide as failed', {
+        requestId,
+        slideId: slide.id,
+        error: enqueueError,
+        elapsedMs: elapsed(),
+      });
       await prisma.conversionJob.upsert({
         where: { slideId: slide.id },
         create: {
@@ -799,39 +854,57 @@ const create = async (req, res) => {
         data: { conversionStatus: 'failed' },
       }).catch(() => {});
     }
-    notifyTopicSubscribers({
-      topicId: topicIdNum,
-      actorUserId: req.user.id,
-      slideTitle: title,
-    });
-    // Local file cleanup is now handled by conversion.service after it promotes
-    // the file to R2 (pre-step at the start of convertSlide).
-    // In local mode the file in uploads/slides/ IS the permanent source — never delete it.
-    logger.info('[upload] Slide accepted, queued for conversion', {
-      slideId: slide.id,
-      fileSize: req.file?.size,
-      mimeType: req.file?.mimetype,
-      filename: req.file?.filename,
-      remoteMode: isRemoteEnabled(),
-      enqueueError: enqueueError || null,
-    });
-    checkBadges(req.user.id).catch(() => {});
-    const uploadHour = new Date().getHours();
-    if (uploadHour >= 0 && uploadHour < 5) {
-      awardBadge(req.user.id, 'hidden_night_owl').catch(() => {});
-    }
 
+    // ── Build response payload ───────────────────────────────────────────────
+    let responsePayload;
     if (enqueueError) {
       const fresh = await prisma.slide.findUnique({
         where: { id: slide.id },
         select: slideSelect,
       }).catch(() => null);
-      return res.status(201).json(normalizeSlideMedia(fresh || { ...slide, conversionStatus: 'failed' }));
+      responsePayload = normalizeSlideMedia(fresh || { ...slide, conversionStatus: 'failed' });
+    } else {
+      responsePayload = normalizeSlideMedia(slide);
     }
 
-    res.status(201).json(normalizeSlideMedia(slide));
+    // ── Send 201 ─────────────────────────────────────────────────────────────
+    // All side-effects (notifications, badge checks) run AFTER the response is
+    // sent so they cannot delay the client.
+    logger.info('[upload] Sending 201', { requestId, slideId: slide.id, elapsedMs: elapsed() });
+    res.status(201).json(responsePayload);
+
+    // ── Post-response side-effects (fire-and-forget) ─────────────────────────
+    // setImmediate yields the current tick so the response is flushed before
+    // any of these run. None of these are in the critical path.
+    setImmediate(() => {
+      notifyTopicSubscribers({
+        topicId: topicIdNum,
+        actorUserId: req.user.id,
+        slideTitle: title,
+      });
+      checkBadges(req.user.id).catch(() => {});
+      const uploadHour = new Date().getHours();
+      if (uploadHour >= 0 && uploadHour < 5) {
+        awardBadge(req.user.id, 'hidden_night_owl').catch(() => {});
+      }
+      logger.info('[upload] Slide accepted, queued for conversion', {
+        requestId,
+        slideId: slide.id,
+        fileSize: req.file?.size,
+        mimeType: req.file?.mimetype,
+        filename: req.file?.filename,
+        remoteMode: isRemoteEnabled(),
+        enqueueError: enqueueError || null,
+        totalHandlerMs: elapsed(),
+      });
+    });
   } catch (err) {
-    logger.error('Failed to upload slide', { error: err.message, stack: err.stack });
+    logger.error('[upload] Handler error', {
+      requestId,
+      elapsedMs: elapsed(),
+      error: err.message,
+      stack: err.stack,
+    });
     cleanupUploadedFile(req.file);
     const mapped = mapSlideUploadError(err);
     res.status(mapped.status).json({

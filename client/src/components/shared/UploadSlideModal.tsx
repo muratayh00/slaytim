@@ -335,10 +335,15 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
             break;
           }
           if (status === 'failed') {
-            throw new Error(
-              statusRes?.data?.conversionJob?.lastError ||
-              'PDF dönüşümü başarısız. Sunucuda LibreOffice kurulu olmalı.'
-            );
+            // Slayt DB'de oluştu — sadece conversion şu an tamamlanamadı.
+            // Kullanıcıyı kapak adımına geçir; slayt sayfasından retry yapılabilir.
+            // Throw etmek tüm formu sıfırlıyor ve kullanıcı slaydına ulaşamıyor.
+            toast('Dönüşüm şu an tamamlanamadı, slayt kaydedildi. Slayt sayfasından tekrar deneyebilirsin.', {
+              icon: '⚠️',
+              duration: 6000,
+            });
+            converted = false;
+            break;
           }
           if (status === 'unsupported') {
             throw new Error('Bu dosya formatı için önizleme desteklenmiyor.');
@@ -362,8 +367,15 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
         fetchCoverPages(slideId);
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.message || 'Yükleme başarısız';
-      toast.error(msg);
+      // Dosya transferi (POST /slides) sırasında timeout → kullanıcıya net mesaj
+      const isUploadTimeout =
+        err?.code === 'ECONNABORTED' ||
+        err?.message?.includes('timeout') ||
+        err?.message?.includes('Network Error');
+      const msg = isUploadTimeout
+        ? 'Dosya sunucuya ulaşamadı (bağlantı zaman aşımına uğradı). Daha küçük bir dosya deneyin veya internet bağlantınızı kontrol edin.'
+        : err?.response?.data?.error || err?.message || 'Yükleme başarısız';
+      toast.error(msg, { duration: isUploadTimeout ? 8000 : 4000 });
       setLoading(false);
       setUploadPercent(0);
       setConversionPercent(0);
@@ -437,9 +449,12 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
   );
   const shownPercent = loading ? Math.max(1, overallPercent) : overallPercent;
 
+  // Upload ve conversion fazları kullanıcıya ayrı gösterilir:
+  //   "Yükleniyor" = dosya sunucuya gönderiliyor (POST /slides ağ transferi)
+  //   "Dönüştürülüyor" = server 201 döndü, worker conversion yapıyor
   const phaseLabel = phase === 'uploading'
-    ? `Yükleniyor %${shownPercent}`
-    : `Önizleme hazırlanıyor %${shownPercent}`;
+    ? `Dosya yükleniyor… %${shownPercent}`
+    : `Slayt yüklendi — önizleme hazırlanıyor… %${shownPercent}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
