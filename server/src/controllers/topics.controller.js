@@ -55,21 +55,29 @@ const resolveTopicCategorySelection = async ({ categoryId, mainCategoryId, subca
     return { error: 'Gecerli ana kategori zorunlu' };
   }
 
-  const main = await prisma.category.findUnique({
-    where: { id: providedMain },
-    select: { id: true, isMain: true, parentId: true, isActive: true },
-  });
+  // Fetch main + sub category in PARALLEL (saves ~50-100 ms vs sequential awaits).
+  const providedSub = Number(subcategoryId);
+  const hasSubId = Number.isInteger(providedSub) && providedSub > 0;
+
+  const [main, sub] = await Promise.all([
+    prisma.category.findUnique({
+      where: { id: providedMain },
+      select: { id: true, isMain: true, parentId: true, isActive: true },
+    }),
+    hasSubId
+      ? prisma.category.findUnique({
+          where: { id: providedSub },
+          select: { id: true, parentId: true, isActive: true },
+        })
+      : Promise.resolve(null),
+  ]);
+
   if (!main || main.isActive === false) return { error: 'Kategori bulunamadi' };
 
   const resolvedMainId = main.parentId ? main.parentId : main.id;
   let resolvedSubcategoryId = null;
 
-  const providedSub = Number(subcategoryId);
-  if (Number.isInteger(providedSub) && providedSub > 0) {
-    const sub = await prisma.category.findUnique({
-      where: { id: providedSub },
-      select: { id: true, parentId: true, isActive: true },
-    });
+  if (hasSubId) {
     if (!sub || sub.isActive === false) return { error: 'Alt kategori bulunamadi' };
     if (!sub.parentId || sub.parentId !== resolvedMainId) {
       return { error: 'Alt kategori secili ana kategoriye ait degil' };

@@ -1,16 +1,28 @@
 const prisma = require('../lib/prisma');
 const logger = require('../lib/logger');
+const ttlCache = require('../lib/ttl-cache');
+
+// Categories change very rarely (admin-only). Cache for 5 minutes.
+// This eliminates a DB round-trip on every "Konu Aç" page open.
+const CAT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 const getAll = async (req, res) => {
   try {
     const activeOnly = String(req.query?.activeOnly || '') === '1';
+    const treeMode   = String(req.query?.tree || '') === '1';
+    const cacheKey   = `categories:${activeOnly ? 'active' : 'all'}:${treeMode ? 'tree' : 'flat'}`;
+
+    const cached = ttlCache.get('categories', cacheKey);
+    if (cached) return res.json(cached);
+
     const categories = await prisma.category.findMany({
       where: activeOnly ? { isActive: true } : undefined,
       orderBy: { name: 'asc' },
       include: { _count: { select: { topics: true, followedCategories: true } } },
     });
 
-    if (String(req.query?.tree || '') === '1') {
+    let result;
+    if (treeMode) {
       const mainCategories = categories
         .filter((cat) => (cat.isMain || cat.parentId === null) && cat.isActive !== false)
         .sort((a, b) => {
@@ -27,10 +39,13 @@ const getAll = async (req, res) => {
             }),
         }));
 
-      return res.json({ mainCategories, categories });
+      result = { mainCategories, categories };
+    } else {
+      result = categories;
     }
 
-    return res.json(categories);
+    ttlCache.set('categories', cacheKey, result, CAT_CACHE_TTL);
+    return res.json(result);
   } catch (err) {
     logger.error('Failed to fetch categories', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Failed to fetch categories' });
