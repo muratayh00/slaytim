@@ -273,108 +273,133 @@ export default function UploadSlideModal({ topicId, onSuccess, onClose }: Props)
     if (!title) return toast.error('Başlık gir');
 
     setLoading(true);
-    setUploadPercent(5);
+    setUploadPercent(0);
     setConversionPercent(0);
     setPhase('uploading');
     setConversionStatus('');
 
+    // ── Conversion health check (fire-and-forget, non-blocking) ─────────────
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    if (ext !== 'pdf') {
+      void api.get('/health/conversion', { timeout: 1500 })
+        .then((health) => {
+          const hasLibre = Boolean(health?.data?.converters?.libreOffice);
+          const hasPowerPoint = Boolean(health?.data?.converters?.powerPoint);
+          if (!hasLibre && !hasPowerPoint) {
+            toast('Sunucuda dönüştürücü görünmüyor. Önizleme gecikebilir.', { icon: '⚠️' });
+          }
+        })
+        .catch(() => {}); // ignore health check failures
+    }
+
+    let slideId = 0;
+
     try {
-      const ext = file.name.split('.').pop()?.toLowerCase() || '';
-      if (ext !== 'pdf') {
-        void api.get('/health/conversion', { timeout: 1500 })
-          .then((health) => {
-            const hasLibre = Boolean(health?.data?.converters?.libreOffice);
-            const hasPowerPoint = Boolean(health?.data?.converters?.powerPoint);
-            if (!hasLibre && !hasPowerPoint) {
-              toast('Sunucuda dönüştürücü görünmüyor. Önizleme gecikebilir.', { icon: '⚠️' });
-            }
-          })
-          .catch((healthErr) => {
-            console.warn('[upload] conversion health check failed:', healthErr?.message || healthErr);
-          });
+      // ── Adım 1: Slayt kaydı oluştur (metadata only, ~300 ms) ──────────────
+      // Bu istek dosya içermiyor — anlık yanıt döner.
+      // Kullanıcı validasyon hatalarını (geçersiz konu, spam guard vb.) hemen görür.
+      setUploadPercent(2); // show a little progress while step 1 runs
+      const { data: initData } = await api.post('/slides/start', {
+        title,
+        description: form.description.trim(),
+        topicId: String(topicId),
+      }, { timeout: 15_000 }); // 15 s — metadata only, should be instant
+
+      slideId = Number(initData?.id);
+      if (!Number.isInteger(slideId) || slideId <= 0) {
+        throw new Error('Sunucudan geçersiz slayt ID alındı');
       }
 
+      setUploadPercent(3); // brief pause so user sees the bar start
+
+      // ── Adım 2: Dosyayı yükle (file only, 10 dakika timeout) ─────────────
+      // Bu istek SADECE dosyayı gönderir. Timeout yalnızca ağ transferini kapsar;
+      // sunucu dosyayı aldıktan sonra 3-5 s içinde yanıt verir.
+      // Yavaş bağlantılarda (1 Mbps) 50 MB = ~400 s → 600 s timeout yeterli.
       const fd = new FormData();
       fd.append('file', file);
-      fd.append('title', title);
-      fd.append('description', form.description.trim());
-      fd.append('topicId', String(topicId));
 
-      const { data } = await api.post('/slides', fd, {
-        timeout: 120_000, // 2 dk: yavaş bağlantılarda dosya transferi için
+      await api.post(`/slides/${slideId}/upload-file`, fd, {
+        timeout: 600_000, // 10 dakika — yavaş bağlantılar için yeterli
         onUploadProgress: (ev) => {
           const total = ev.total || file.size || 0;
           if (!total) return;
-          const pct = Math.max(1, Math.min(100, Math.round((ev.loaded / total) * 100)));
+          // 3 → 100 arasında göster (ilk 3% adım 1 için ayrıldı)
+          const pct = Math.max(3, Math.min(100, Math.round(3 + (ev.loaded / total) * 97)));
           setUploadPercent(pct);
         },
       });
 
+      // ── Dosya yüklendi, conversion başlıyor ──────────────────────────────
       setUploadPercent(100);
       setPhase('converting');
       setConversionPercent(5);
 
+      // ── Adım 3: Conversion polling ──────────────────────────────────────
       const startedAt = Date.now();
-      const slideId = Number(data?.id);
       let converted = false;
 
-      if (Number.isInteger(slideId) && slideId > 0) {
-        while (Date.now() - startedAt < CONVERSION_TIMEOUT_MS) {
-          const elapsed = Date.now() - startedAt;
-          // Logaritmik eğri: başta hızlı, sonra yavaşlıyor — daha doğal görünür
-          const logPct = Math.max(5, Math.min(92, Math.round(Math.log1p(elapsed / 2500) * 30)));
-          setConversionPercent((prev) => Math.max(prev, logPct));
+      while (Date.now() - startedAt < CONVERSION_TIMEOUT_MS) {
+        const elapsed = Date.now() - startedAt;
+        const logPct = Math.max(5, Math.min(92, Math.round(Math.log1p(elapsed / 2500) * 30)));
+        setConversionPercent((prev) => Math.max(prev, logPct));
 
-          const statusRes = await api.get(`/slides/${slideId}`);
-          const status = String(statusRes?.data?.conversionStatus || '');
-          setConversionStatus(status);
+        const statusRes = await api.get(`/slides/${slideId}`);
+        const status = String(statusRes?.data?.conversionStatus || '');
+        setConversionStatus(status);
 
-          if (status === 'done') {
-            setConversionPercent(100);
-            converted = true;
-            break;
-          }
-          if (status === 'failed') {
-            // Slayt DB'de oluştu — sadece conversion şu an tamamlanamadı.
-            // Kullanıcıyı kapak adımına geçir; slayt sayfasından retry yapılabilir.
-            // Throw etmek tüm formu sıfırlıyor ve kullanıcı slaydına ulaşamıyor.
-            toast('Dönüşüm şu an tamamlanamadı, slayt kaydedildi. Slayt sayfasından tekrar deneyebilirsin.', {
-              icon: '⚠️',
-              duration: 6000,
-            });
-            converted = false;
-            break;
-          }
-          if (status === 'unsupported') {
-            throw new Error('Bu dosya formatı için önizleme desteklenmiyor.');
-          }
-          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+        if (status === 'done') {
+          setConversionPercent(100);
+          converted = true;
+          break;
         }
-        if (!converted) {
-          // Timeout — dönüşüm hâlâ devam ediyor olabilir
-          toast('Dönüşüm devam ediyor, kapak seçimini yapabilirsiniz…', { icon: '⏳' });
+        if (status === 'failed') {
+          toast('Dönüşüm şu an tamamlanamadı, slayt kaydedildi. Slayt sayfasından tekrar deneyebilirsin.', {
+            icon: '⚠️',
+            duration: 6000,
+          });
+          converted = false;
+          break;
         }
+        if (status === 'unsupported') {
+          toast('Bu dosya formatı için önizleme desteklenmiyor.', { icon: '⚠️', duration: 5000 });
+          converted = false;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      }
+      if (!converted && !['failed', 'unsupported'].includes(conversionStatus)) {
+        toast('Dönüşüm devam ediyor, kapak seçimini yapabilirsiniz…', { icon: '⏳' });
       }
 
-      // Conversion done (or timeout) → move to cover selection step
+      // ── Slide verisini çek ve cover adımına geç ──────────────────────────
+      const slideRes = await api.get(`/slides/${slideId}`).catch(() => null);
+      const slideData = slideRes?.data || { id: slideId };
+
       setSavedSlideId(slideId);
-      setSavedSlideData(data);
+      setSavedSlideData(slideData);
       setSavedConverted(converted);
       setPhase('cover');
       setLoading(false);
-      // Fetch preview pages in background
-      if (Number.isInteger(slideId) && slideId > 0) {
-        fetchCoverPages(slideId);
-      }
+      fetchCoverPages(slideId);
+
     } catch (err: any) {
-      // Dosya transferi (POST /slides) sırasında timeout → kullanıcıya net mesaj
       const isUploadTimeout =
         err?.code === 'ECONNABORTED' ||
         err?.message?.includes('timeout') ||
         err?.message?.includes('Network Error');
-      const msg = isUploadTimeout
-        ? 'Dosya sunucuya ulaşamadı (bağlantı zaman aşımına uğradı). Daha küçük bir dosya deneyin veya internet bağlantınızı kontrol edin.'
-        : err?.response?.data?.error || err?.message || 'Yükleme başarısız';
+
+      let msg: string;
+      if (isUploadTimeout && slideId > 0) {
+        // Adım 1 başardı ama dosya transferi (adım 2) timeout aldı
+        msg = 'Dosya sunucuya ulaşamadı — bağlantı zaman aşımına uğradı. Daha küçük bir dosya deneyin ya da daha hızlı bir ağ bağlantısıyla tekrar deneyin.';
+      } else if (isUploadTimeout) {
+        // Adım 1 bile başarısız oldu
+        msg = 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.';
+      } else {
+        msg = err?.response?.data?.error || err?.message || 'Yükleme başarısız';
+      }
+
       toast.error(msg, { duration: isUploadTimeout ? 8000 : 4000 });
       setLoading(false);
       setUploadPercent(0);

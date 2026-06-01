@@ -6,6 +6,8 @@ const {
   getBySlug,
   getMine,
   create,
+  startSlideUpload,
+  uploadSlideFile,
   update,
   suggestMetadata,
   saveMetadata,
@@ -58,9 +60,16 @@ const router = Router();
 
 router.get('/popular', getPopular);
 router.get('/my', authenticate, getMine);
-// /suggest-metadata must be registered before any /:id routes so Express does
-// not try to match the literal string "suggest-metadata" as a numeric slide id.
+// ── Literal-string routes MUST come before /:id to prevent mis-matching ──────
+// /suggest-metadata, /start must be registered before any /:id routes.
 router.post('/suggest-metadata', authenticate, suggestMetadata);
+
+// ── Two-step upload ───────────────────────────────────────────────────────────
+// Step 1: create slide record without file (fast, JSON, ~300 ms)
+router.post('/start', authenticate, spamGuard, uploadIpLimiter, startSlideUpload);
+// Step 2: upload the file for a slide created by /start (multer + magic bytes)
+// Client should use a long timeout (600 s) since this is the actual file transfer.
+router.post('/:id/upload-file', validateNumericParam('id'), authenticate, upload.single('file'), validateMagicBytes, uploadSlideFile);
 router.get('/topic/:topicId', validateNumericParam('topicId'), getByTopic);
 router.get('/slug/:slug', getBySlug);
 router.get('/:id/page-stats', validateNumericParam('id'), getPageStats);

@@ -2048,12 +2048,234 @@ const getPageImage = async (req, res) => {
   }
 };
 
+// ─── Two-step upload ─────────────────────────────────────────────────────────
+//
+// Problem: POST /slides (file + metadata) times out on slow connections because
+// the entire file must transfer before the server can respond (axios 120 s limit).
+//
+// Solution — split into two requests:
+//   1. POST /slides/start  (metadata only, JSON, ~300 ms response)
+//   2. POST /slides/:id/upload-file  (file only, 10-min timeout on client)
+//
+// The slide record is created in step 1 (hidden from feeds) and made visible +
+// queued for conversion in step 2 once the file lands on disk.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Step 1 — Create a hidden slide record without a file.
+ * Runs spam guard + rate limit before the file transfer starts so the user
+ * gets validation errors instantly (not 2 minutes into a slow upload).
+ */
+const startSlideUpload = async (req, res) => {
+  try {
+    const { title: rawTitle, description: rawDesc, topicId } = req.body;
+    const topicIdNum = Number(topicId);
+    const title = sanitizeText(rawTitle, 200);
+    const description = sanitizeText(rawDesc, 1000) || null;
+
+    if (!title) return res.status(400).json({ error: 'Baslik zorunlu' });
+    if (!Number.isInteger(topicIdNum) || topicIdNum <= 0) {
+      return res.status(400).json({ error: 'Gecerli topicId zorunlu' });
+    }
+
+    const topic = await prisma.topic.findUnique({
+      where: { id: topicIdNum },
+      select: { id: true, roomId: true },
+    });
+    if (!topic) return res.status(404).json({ error: 'Topic not found' });
+
+    if (topic.roomId) {
+      const membership = await prisma.roomMember.findUnique({
+        where: { roomId_userId: { roomId: topic.roomId, userId: req.user.id } },
+        select: { roomId: true },
+      });
+      if (!membership) {
+        return res.status(403).json({ error: 'Bu oda konusuna slayt yuklemek icin odaya katilmalisin' });
+      }
+    }
+
+    // Optimistic-insert loop — same slug-uniqueness logic as create()
+    let slide;
+    const baseTitle = toSlug(title);
+    for (let attempt = 0; attempt <= 5; attempt++) {
+      const slug = attempt === 0
+        ? await uniqueSlug(prisma.slide, baseTitle)
+        : `${baseTitle.slice(0, 70)}-${randomSuffix()}`;
+      try {
+        slide = await prisma.slide.create({
+          data: {
+            title,
+            description,
+            slug,
+            fileUrl: 'pending_upload',   // placeholder — updated by uploadSlideFile
+            topicId: topicIdNum,
+            userId: req.user.id,
+            conversionStatus: 'awaiting_file', // excluded from reconciliation jobs
+            isHidden: true,              // hidden from feeds until file is uploaded
+          },
+          select: { id: true, slug: true, title: true },
+        });
+        break;
+      } catch (err) {
+        const isSlugConflict =
+          err?.code === 'P2002' &&
+          (err?.meta?.target?.includes('slug') || String(err?.message || '').includes('slug'));
+        if (attempt < 5 && isSlugConflict) continue;
+        throw err;
+      }
+    }
+
+    logger.info('[upload/start] Slide record created, awaiting file', {
+      slideId: slide.id,
+      userId: req.user.id,
+      topicId: topicIdNum,
+    });
+
+    return res.status(201).json({ id: slide.id, slug: slide.slug, title: slide.title });
+  } catch (err) {
+    logger.error('[upload/start] Failed', { error: err.message, stack: err.stack });
+    return res.status(500).json({ error: 'Slayt kaydı oluşturulamadı. Lütfen tekrar deneyin.' });
+  }
+};
+
+/**
+ * Step 2 — Accept the file for a slide created by startSlideUpload.
+ * Runs after upload.single('file') + validateMagicBytes middleware.
+ * Updates the slide record, makes it visible, and enqueues conversion.
+ */
+const uploadSlideFile = async (req, res) => {
+  const t0 = Date.now();
+  const requestId = req._uploadRequestId || `uf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const elapsed = () => Date.now() - t0;
+
+  logger.info('[upload/file] Handler entered', {
+    requestId,
+    slideId: req.params.id,
+    userId: req.user?.id,
+    filename: req.file?.originalname,
+    fileSize: req.file?.size,
+    mwElapsedMs: req._uploadMwStart ? Date.now() - req._uploadMwStart : null,
+  });
+
+  req.on('close', () => {
+    if (!res.headersSent) {
+      logger.warn('[upload/file] Client disconnected before response', {
+        requestId,
+        slideId: req.params.id,
+        elapsedMs: elapsed(),
+      });
+    }
+  });
+
+  res.on('finish', () => {
+    logger.info('[upload/file] Response sent', {
+      requestId,
+      statusCode: res.statusCode,
+      elapsedMs: elapsed(),
+    });
+  });
+
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Dosya gerekli' });
+
+    const slideId = Number(req.params.id);
+
+    const slide = await prisma.slide.findUnique({
+      where: { id: slideId },
+      select: { id: true, userId: true, conversionStatus: true, topicId: true, title: true },
+    });
+    if (!slide) {
+      cleanupUploadedFile(req.file);
+      return res.status(404).json({ error: 'Slayt bulunamadi' });
+    }
+    if (slide.userId !== req.user.id && !req.user.isAdmin) {
+      cleanupUploadedFile(req.file);
+      return res.status(403).json({ error: 'Yetkisiz' });
+    }
+    if (slide.conversionStatus !== 'awaiting_file') {
+      // Duplicate upload or already processed — reject to avoid overwriting
+      cleanupUploadedFile(req.file);
+      return res.status(409).json({ error: 'Bu slayta zaten dosya yuklenmis veya islem tamamlandi' });
+    }
+
+    // Determine the final file URL (same logic as create())
+    const fileUrl = isRemoteEnabled()
+      ? `/uploads/slides/${req.file.filename}`
+      : await putLocalFile(req.file.path, `slides/${req.file.filename}`, req.file.mimetype);
+
+    logger.info('[upload/file] File received, updating DB', {
+      requestId, slideId, fileUrl, elapsedMs: elapsed(),
+    });
+
+    // Make the slide visible and ready for conversion
+    await prisma.slide.update({
+      where: { id: slideId },
+      data: {
+        fileUrl,
+        conversionStatus: 'pending',
+        isHidden: false,
+      },
+    });
+
+    // Enqueue conversion
+    logger.info('[upload/file] Enqueue start', { requestId, slideId, elapsedMs: elapsed() });
+    let enqueueError = null;
+    try {
+      await enqueueSlideConversion(slideId);
+      logger.info('[upload/file] Enqueue done', { requestId, slideId, elapsedMs: elapsed() });
+    } catch (err) {
+      enqueueError = String(err?.message || 'Enqueue failed').slice(0, 500);
+      logger.warn('[upload/file] Enqueue failed', { requestId, slideId, error: enqueueError });
+      await prisma.slide.update({
+        where: { id: slideId },
+        data: { conversionStatus: 'failed' },
+      }).catch(() => {});
+    }
+
+    logger.info('[upload/file] Sending 200', { requestId, slideId, elapsedMs: elapsed() });
+    res.json({
+      ok: true,
+      slideId,
+      conversionStatus: enqueueError ? 'failed' : 'queued',
+    });
+
+    // Post-response side-effects (fire-and-forget)
+    setImmediate(() => {
+      notifyTopicSubscribers({
+        topicId: slide.topicId,
+        actorUserId: req.user.id,
+        slideTitle: slide.title,
+      });
+      checkBadges(req.user.id).catch(() => {});
+      const uploadHour = new Date().getHours();
+      if (uploadHour >= 0 && uploadHour < 5) {
+        awardBadge(req.user.id, 'hidden_night_owl').catch(() => {});
+      }
+      logger.info('[upload/file] Post-response side-effects dispatched', {
+        requestId, slideId, totalMs: elapsed(),
+      });
+    });
+  } catch (err) {
+    logger.error('[upload/file] Handler error', {
+      requestId,
+      slideId: req.params.id,
+      elapsedMs: elapsed(),
+      error: err.message,
+      stack: err.stack,
+    });
+    cleanupUploadedFile(req.file);
+    res.status(500).json({ error: 'Dosya yuklenirken hata olustu. Lutfen tekrar deneyin.' });
+  }
+};
+
 module.exports = {
   getByTopic,
   getOne,
   getBySlug,
   getMine,
   create,
+  startSlideUpload,
+  uploadSlideFile,
   update,
   suggestMetadata,
   saveMetadata,
