@@ -95,19 +95,21 @@ function getPdftoppmBinary() {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
- * Render a RANGE of PDF pages to PNGs using a SINGLE pdftoppm invocation.
+ * Render a RANGE of PDF pages to JPEGs using a SINGLE pdftoppm invocation.
  *
- * This is the key performance optimization: instead of spawning pdftoppm once
- * per page (each time re-reading the entire PDF), we spawn it once and let it
- * render all pages in sequence while keeping the PDF in memory.
+ * KEY PERFORMANCE CHOICES:
+ *   - JPEG intermediate instead of PNG: 3-5× faster disk writes (lossy, but
+ *     we convert to WebP immediately after, so intermediate quality doesn't matter).
+ *   - Single spawn: keeps the entire PDF in memory across all pages (no re-reads).
+ *   - DPI=96: 16:9 presentations render at exactly 1280×720 — sharp needs no resize.
  *
- * Output files are named: page-{N}.png (zero-padded based on last page number)
+ * Output files are named: pg-001.jpg, pg-002.jpg … (pdftoppm zero-pads by range size)
  *
  * @param {string} pdfPath   — local PDF file path
  * @param {number} fromPage  — 1-based, inclusive
  * @param {number} toPage    — 1-based, inclusive
- * @param {string} outDir    — directory to write PNGs into
- * @returns {Promise<Array<{pngPath: string, pageNumber: number}>>}
+ * @param {string} outDir    — directory to write JPEGs into
+ * @returns {Promise<Array<{imgPath: string, pageNumber: number}>>}
  */
 function renderPageRangeToPng(pdfPath, fromPage, toPage, outDir) {
   const pdftoppm = getPdftoppmBinary();
@@ -118,84 +120,106 @@ function renderPageRangeToPng(pdfPath, fromPage, toPage, outDir) {
     '-r', String(PREVIEW_DPI),
     '-f', String(fromPage),
     '-l', String(toPage),
-    '-png',
+    '-jpeg',           // JPEG output: 3-5× faster to write than PNG for typical slides
     pdfPath,
     prefix,
   ];
 
   return new Promise((resolve, reject) => {
-    // Generous timeout: 2 min for large PDFs (60 pages at 120 DPI ≈ 15-30s)
+    // Generous timeout: 2 min for large PDFs (60 pages at 96 DPI ≈ 10-20s)
     execFile(pdftoppm, args, { timeout: 120_000 }, (err, _stdout, stderr) => {
-      if (err) return reject(new Error((stderr || err.message || 'pdftoppm failed').trim()));
-
-      // Collect all generated PNG files
-      let files;
-      try {
-        files = fs.readdirSync(outDir)
-          .filter((f) => f.startsWith('pg') && f.endsWith('.png'))
-          .map((f) => {
-            // pdftoppm output: pg-002.png, pg-02.png, pg-2.png depending on range
-            const numStr = f.replace(/^pg-?/, '').replace('.png', '');
-            const num = parseInt(numStr, 10);
-            return { pngPath: path.join(outDir, f), pageNumber: num };
-          })
-          .filter((f) => !isNaN(f.pageNumber))
-          .sort((a, b) => a.pageNumber - b.pageNumber);
-      } catch (readErr) {
-        return reject(new Error(`Failed to read pdftoppm output: ${readErr.message}`));
+      if (err) {
+        // Fallback: try PNG if JPEG flag is not supported by this pdftoppm build
+        const fallbackArgs = [
+          '-r', String(PREVIEW_DPI),
+          '-f', String(fromPage),
+          '-l', String(toPage),
+          '-png',
+          pdfPath,
+          prefix,
+        ];
+        execFile(pdftoppm, fallbackArgs, { timeout: 120_000 }, (err2, _stdout2, stderr2) => {
+          if (err2) return reject(new Error((stderr2 || err2.message || 'pdftoppm failed').trim()));
+          resolve(collectOutputFiles(outDir, ['.png']));
+        });
+        return;
       }
 
-      if (files.length === 0) {
-        return reject(new Error(`pdftoppm produced no PNGs for pages ${fromPage}-${toPage}`));
-      }
-
-      resolve(files);
+      resolve(collectOutputFiles(outDir, ['.jpg', '.jpeg']));
     });
   });
 }
 
+/** Collect pdftoppm output files from outDir, supporting multiple extensions. */
+function collectOutputFiles(outDir, exts) {
+  const files = fs.readdirSync(outDir)
+    .filter((f) => f.startsWith('pg') && exts.some((e) => f.endsWith(e)))
+    .map((f) => {
+      // pdftoppm output: pg-002.jpg, pg-02.jpg, pg-2.jpg depending on range
+      const numStr = f.replace(/^pg-?/, '').replace(/\.(jpg|jpeg|png)$/, '');
+      const num = parseInt(numStr, 10);
+      return { imgPath: path.join(outDir, f), pageNumber: num };
+    })
+    .filter((f) => !isNaN(f.pageNumber))
+    .sort((a, b) => a.pageNumber - b.pageNumber);
+
+  if (files.length === 0) {
+    throw new Error(`pdftoppm produced no output files in ${outDir}`);
+  }
+  return files;
+}
+
 /**
- * Render a single PDF page to PNG.
- * Used for the first-page fast-path only.
+ * Render a single PDF page to JPEG (fast-path: page 1 only).
+ * Falls back to PNG if -jpeg is not supported by the installed pdftoppm.
  */
 function renderPageToPng(pdfPath, pageNumber, outDir) {
   const pdftoppm = getPdftoppmBinary();
   if (!pdftoppm) throw new Error('pdftoppm not available');
 
   const prefix = path.join(outDir, `pg-${pageNumber}`);
-  const args = [
-    '-r', String(PREVIEW_DPI),
-    '-f', String(pageNumber),
-    '-l', String(pageNumber),
-    '-png',
-    '-singlefile',
-    pdfPath,
-    prefix,
-  ];
 
-  return new Promise((resolve, reject) => {
-    execFile(pdftoppm, args, { timeout: 60_000 }, (err, _stdout, stderr) => {
-      if (err) return reject(new Error((stderr || err.message || 'pdftoppm failed').trim()));
-      const outFile = `${prefix}.png`;
-      if (!fs.existsSync(outFile)) {
-        return reject(new Error(`pdftoppm produced no output for page ${pageNumber}`));
-      }
-      resolve(outFile);
+  const tryRender = (useJpeg) => {
+    const ext  = useJpeg ? 'jpg' : 'png';
+    const flag = useJpeg ? '-jpeg' : '-png';
+    const args = [
+      '-r', String(PREVIEW_DPI),
+      '-f', String(pageNumber),
+      '-l', String(pageNumber),
+      flag,
+      '-singlefile',
+      pdfPath,
+      prefix,
+    ];
+    return new Promise((resolve, reject) => {
+      execFile(pdftoppm, args, { timeout: 60_000 }, (err, _stdout, stderr) => {
+        if (err) return reject(new Error((stderr || err.message || 'pdftoppm failed').trim()));
+        const outFile = `${prefix}.${ext}`;
+        if (!fs.existsSync(outFile)) {
+          return reject(new Error(`pdftoppm produced no output for page ${pageNumber} (${ext})`));
+        }
+        resolve(outFile);
+      });
     });
-  });
+  };
+
+  // Try JPEG first; fall back to PNG if unsupported.
+  return tryRender(true).catch(() => tryRender(false));
 }
 
 /**
- * Convert a PNG file → WebP buffer via sharp.
- * Resizes to PREVIEW_WIDTH (aspect-ratio preserving).
- * effort=0: fastest possible encoding (3-5× faster than effort=4, ~10% larger files)
+ * Convert an image file (JPEG or PNG) → WebP buffer via sharp.
+ * Resizes to PREVIEW_WIDTH (aspect-ratio preserving) only when needed.
+ * effort=0: fastest WebP encoding (3-5× faster than effort=4, ~10% larger files)
+ *
+ * sharp is format-agnostic — works identically for JPEG and PNG input.
  *
  * @returns {{ data: Buffer, info: { width, height, size } }}
  */
-async function pngToWebp(pngPath) {
+async function pngToWebp(imgPath) {
   const sharp = getSharp();
   if (!sharp) throw new Error('sharp not available');
-  return sharp(pngPath)
+  return sharp(imgPath)
     .resize({ width: PREVIEW_WIDTH, withoutEnlargement: true })
     .webp({ quality: PREVIEW_QUALITY, effort: 0 })  // effort=0 = fastest
     .toBuffer({ resolveWithObject: true });
@@ -287,8 +311,8 @@ async function generatePageAssetsRange(slideId, localPdfPath, fromPage, toPage) 
 
     // Process all pages in parallel: sharp + upload + DB
     const results = await Promise.allSettled(
-      pages.map(async ({ pngPath, pageNumber }) => {
-        const { data: webpBuf, info } = await pngToWebp(pngPath);
+      pages.map(async ({ imgPath, pageNumber }) => {
+        const { data: webpBuf, info } = await pngToWebp(imgPath);
         const { width, height, size } = info;
 
         const storageKey = `previews/${slideId}/page-${pageNumber}.webp`;

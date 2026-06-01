@@ -131,11 +131,17 @@ module.exports = {
         NODE_ENV: 'development',
         REDIS_ENABLED: 'true',
         PREVIEW_ENABLED: 'true',
+        // DPI 96: for 16:9 presentations (13.3"×7.5") pdftoppm renders at exactly
+        // 1280×720 — no sharp resize needed, ~35% fewer pixels vs DPI 120.
+        PREVIEW_DPI: '96',
+        PREVIEW_QUALITY: '80',
       },
       env_production: {
         NODE_ENV: 'production',
         REDIS_ENABLED: 'true',
         PREVIEW_ENABLED: 'true',
+        PREVIEW_DPI: '96',
+        PREVIEW_QUALITY: '80',
       },
 
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
