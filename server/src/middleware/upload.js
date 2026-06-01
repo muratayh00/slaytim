@@ -1,7 +1,6 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const pdfParse = require('../lib/pdf-parse');
 const logger = require('../lib/logger');
 
 // Allowed MIME types for presentations
@@ -162,41 +161,11 @@ async function validateMagicBytes(req, res, next) {
     }
 
     mwLog('info', 'validateMagicBytes magic bytes ok', req, req.file, { ext });
-
-    if (ext === '.pdf') {
-      mwLog('info', 'validateMagicBytes pdf parse start', req, req.file, {
-        fileSizeBytes: req.file.size,
-      });
-      const pdfParseStart = Date.now();
-
-      const raw = await fs.promises.readFile(req.file.path); // async — avoids blocking the event loop
-      try {
-        const parsed = await Promise.race([
-          pdfParse(raw),
-          new Promise((_, rej) =>
-            setTimeout(() => rej(new Error('pdf_parse_timeout')), 10_000)
-          ),
-        ]);
-        const pages = Number(parsed?.numpages || 0);
-        mwLog('info', 'validateMagicBytes pdf parse finish', req, req.file, {
-          pages,
-          parseDurationMs: Date.now() - pdfParseStart,
-        });
-        if (!Number.isInteger(pages) || pages <= 0) {
-          throw new Error('no_pages');
-        }
-      } catch (pdfErr) {
-        mwLog('warn', 'validateMagicBytes pdf parse failed', req, req.file, {
-          reason: pdfErr?.message,
-          parseDurationMs: Date.now() - pdfParseStart,
-        });
-        cleanupUploadedFile(req.file);
-        return res.status(UPLOAD_ERROR_STATUS.INVALID_PDF_STRUCTURE).json({
-          code: 'INVALID_PDF_STRUCTURE',
-          error: 'PDF dosyasi bozuk veya okunamiyor. Lutfen gecerli bir PDF yukleyin.',
-        });
-      }
-    }
+    // pdfParse structural check removed — magic bytes (%PDF header) are sufficient
+    // for security. Corrupt PDFs are caught gracefully at conversion time by the
+    // worker (conversionStatus → 'failed'). The pdfParse call was blocking the
+    // event loop for up to 10 s on large PDFs, adding unnecessary latency to
+    // every PDF upload.
   } catch (err) {
     if (fd != null) {
       try { fs.closeSync(fd); } catch {}
